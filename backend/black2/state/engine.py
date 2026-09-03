@@ -129,8 +129,10 @@ class SemanticStateEngine:
             {"id": "script_message_active", "offset": 0x247546, "length": 1},
             {"id": "active_dialogue_target", "offset": 0x2490A0, "length": 256},
             {"id": "msg_printer_buffer", "offset": 0x2490A0, "length": 1024},
-            {"id": "dialogue_tcb", "offset": 0x332C20, "length": 0x80},
-            {"id": "dialogue_heap_active", "offset": 0x32B800, "length": 0x400},
+            {"id": "msgbg_controller_root", "offset": 0x272000, "length": 0x20},
+            {"id": "dialogue_heap_active_1", "offset": 0x321D00, "length": 0x2600},
+            {"id": "dialogue_heap_active_2", "offset": 0x32B800, "length": 0x800},
+            {"id": "dialogue_heap_active_3", "offset": 0x332B00, "length": 0x1600},
             {"id": "dialogue_bitmap_surface", "offset": 0x335380, "length": 0x1000},
             {"id": "text_printer_struct", "offset": 0x31FCB0, "length": 64},
             {"id": "main_menu_struct", "offset": 0x23B630, "length": 16}
