@@ -1,0 +1,240 @@
+{
+  "label": "current_after_input",
+  "captured_at_unix": 1788396794.5762985,
+  "frame_from_state": 3183825,
+  "method": "RAM-only non-atomic HTTP reads; use frame-bounded bridge batch capture for final verification.",
+  "semantic_state_untrusted_for_visible_text": {
+    "timestamp": 1788396794.4909866,
+    "frame": 3183825,
+    "context": {
+      "screen_type": "DIALOGUE_ACTIVE",
+      "screen_description": "【对话中 - 城镇居民 / 剧情 NPC】\"同时游戏!\"",
+      "available_actions": [
+        "按 A 键继续对话",
+        "按 B 键加速文字"
+      ],
+      "can_move_player": false,
+      "is_dialogue_active": true,
+      "dialogue_text": "同时游戏!",
+      "full_dialogue_text": "科学的力量真是惊人!\n现在可以用通信\n和100个人\n同时游戏!",
+      "speaker": "城镇居民 / 剧情 NPC",
+      "speaker_category": "NPC",
+      "active_pointer": "0x002490EC",
+      "dialogue_start_time": "2026-09-03 08:50:40",
+      "dialogue_duration_sec": 154.27,
+      "printer": {
+        "is_active": true,
+        "is_printing": false,
+        "waiting_for_input": true,
+        "current_line": 4,
+        "line_pixel_y": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288,
+        "full_text": "同时游戏!",
+        "current_page_text": "同时游戏!",
+        "lines": [
+          "同时游戏!"
+        ],
+        "total_chars": 5,
+        "printed_chars": 5,
+        "remaining_chars": 0,
+        "progress_pct": 100.0
+      },
+      "choices": [],
+      "recommended_action": "调用 advance_dialogue() 或按 A 键翻页",
+      "dialogue_history": [
+        {
+          "id": 3,
+          "start_time": "2026-09-03 08:50:40",
+          "end_time": null,
+          "unix_timestamp": 1788396640.2254348,
+          "frame_start": 3174609,
+          "frame_end": 3183825,
+          "speaker": "城镇居民 / 剧情 NPC",
+          "speaker_category": "NPC",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "同时游戏!",
+          "duration_seconds": 154.27,
+          "is_active": true,
+          "has_choices": false,
+          "choices": []
+        },
+        {
+          "id": 2,
+          "start_time": "2026-09-03 08:50:26",
+          "end_time": "2026-09-03 08:50:40",
+          "unix_timestamp": 1788396626.617178,
+          "frame_start": 3173795,
+          "frame_end": 3174609,
+          "speaker": "城镇居民 / 剧情 NPC",
+          "speaker_category": "NPC",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "科学的力量真是惊人!",
+          "duration_seconds": 13.61,
+          "is_active": false,
+          "has_choices": false,
+          "choices": []
+        },
+        {
+          "id": 1,
+          "start_time": "2026-09-03 00:03:39",
+          "end_time": "2026-09-03 08:48:18",
+          "unix_timestamp": 1788365019.245643,
+          "frame_start": 1288214,
+          "frame_end": 3166137,
+          "speaker": "城镇居民 / 剧情 NPC",
+          "speaker_category": "NPC",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "同时游戏!",
+          "duration_seconds": 31479.26,
+          "is_active": false,
+          "has_choices": false,
+          "choices": []
+        }
+      ]
+    },
+    "location": "实时 ARM9 地图（Map Section 未验证）",
+    "map_loaded": true,
+    "player_name": "zero",
+    "rival_name": "NO",
+    "gender": "男孩子 (Male)",
+    "party_count": 0,
+    "money": 3000,
+    "badges": 0,
+    "ready_for_input": true,
+    "suggested_buttons": [
+      "A"
+    ],
+    "map_section_id": null,
+    "player_facing": "North",
+    "movement_state": "Standing (静止站立)",
+    "player_world_pos": {
+      "x": 39,
+      "y": 772,
+      "z": 12
+    },
+    "player_position_verified": true
+  },
+  "raw_dumps": {
+    "script_and_message_state": {
+      "domain": "Main RAM",
+      "offset": "0x247500",
+      "address": "0x02247500",
+      "length": 512,
+      "hex": "6e742e630018556618a63b00f47424028c752402447524024455000038000000e47424026075240204004e197363726970745f7379732e63000000000100f100000000000400010050a424020000000000000000000000000000000000000000445500006801000018752402d876240204004e197363726970745f776f726b2e630032000000ad00000000003f6403000d000000e4dc230204000000c0b42302d0742402b01e27022035260200000000000000000000000004772402a4902402dc992402000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014a32402445500002c000000607524021477240204004e19776f72647365742e630000005076240275c08200"
+    },
+    "msg_buffer": {
+      "domain": "Main RAM",
+      "offset": "0x2490A0",
+      "address": "0x022490A0",
+      "length": 512,
+      "hex": "00a2008180042500ecd2f8b6d179665b84769b52cf911f772f66ca60ba4e01ff00f001be0000feffb0732857ef53e54e28751a90e14ffeff8c5411ff10ff10ff2a4eba4e00f000be0000feff0c54f665386e0f6201ffffff00a5002f0534005a000200a6004c000034005b0002003f00a001a3015101060000009f01a30160000200ae0c000061003c0000045c000200000000003c0000045d000200000000003f00600007003a0c0000030008006000ff00260c000061003c0000045e000700000000003f0065003500e4020100fb00230100004b02fb002900e40201000800000061006000fb00300c00000300080060000700fc0b00000300080060000200b80b00006000ff00c80b000061008c02013c0000045f00fb00000000003f003c00000460000700000000003f00600007001b020000030008006000ff007b0b00006100a200590568000700a4006000fb000302000061003c0000046100fb00000001003e004b02fb002700e2020400040000006100a20059056800fb00a4003c00000462000200000000003f0060000200570b0000030008006000ff00530b000061003c00000463000200000000003f0004005600000032003f002800a84003002800ab4001002800534101002300e50223006a00240008045e0203000100e3000100e30002009b0249009b02ae009b02b3009b02b4009b02c3009b02c7009b"
+    },
+    "printer_candidate": {
+      "domain": "Main RAM",
+      "offset": "0x31FCB0",
+      "address": "0x0231FCB0",
+      "length": 128,
+      "hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d000030001000002d000030001000002d000020000000102d000010600000002d000010bc00000065655f6b7573615f73705f6c6d3100000010000000100000000000109a010000"
+    },
+    "printer_pointer_candidates": {
+      "domain": "Main RAM",
+      "offset": "0x332C00",
+      "address": "0x02332C00",
+      "length": 256,
+      "hex": "205f27020800080020000100445500006c000000d42b33020000000015004e197463626c2e6300632035260294902702942b45010100000001000000000000008c2b3302c82b33025c533302ec90240203010301030100000f004019000000000000000000000000000000000800000008001000e40127024004400458202702c82b3302351f0202524600001802000000000000c062330200002c00000001000040ee0200100000001000000010000000100000000000000000000000000000001000000000000000000000000000000010000052460000cc010000602b33029453330215004d196733645f73797374656d2e630046000078bf080600000000"
+    },
+    "player_actor_candidate": {
+      "domain": "Main RAM",
+      "offset": "0x23DE00",
+      "address": "0x0223DE00",
+      "length": 256,
+      "hex": "00000000000000000000ff00000000000000000037000100ed0237000100ed0237000100ed020000008037000f0001000080ed02000000000000000000000000000000000000000000000000000000000000000000000000020088000200880001010000000000001487300268db2302fcbf1c0224f01c0202000400000000000c0000000c000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001c000102010101001602000101000000220000000000000000000000030000000a4000000600ab010b000000000000000b00010003000100"
+    }
+  },
+  "decoded_loaded_msg_fragments": [
+    {
+      "offset": 12,
+      "text": "科学的力量真是惊人!",
+      "control_words": [
+        "0xF000"
+      ]
+    },
+    {
+      "offset": 40,
+      "text": "现在可以用通信和100个人",
+      "control_words": [
+        "0xFFFE",
+        "0xFFFE",
+        "0xF000"
+      ]
+    },
+    {
+      "offset": 76,
+      "text": "同时游戏!",
+      "control_words": [
+        "0xFFFE",
+        "0xFFFF"
+      ]
+    },
+    {
+      "offset": 324,
+      "text": "夀栅",
+      "control_words": []
+    },
+    {
+      "offset": 374,
+      "text": "夀栅",
+      "control_words": []
+    }
+  ],
+  "printer_field_observations": [
+    {
+      "address": "0x0231FCB4",
+      "offset": "+0x04",
+      "type": "u16",
+      "value": 4,
+      "confidence": "candidate",
+      "note": "line_index_candidate"
+    },
+    {
+      "address": "0x0231FCC8",
+      "offset": "+0x18",
+      "type": "u32",
+      "value": 3305587,
+      "confidence": "candidate",
+      "note": "source_pointer_candidate"
+    },
+    {
+      "address": "0x0231FCD2",
+      "offset": "+0x22",
+      "type": "u16",
+      "value": 0,
+      "confidence": "candidate",
+      "note": "scroll_distance_candidate"
+    },
+    {
+      "address": "0x0231FCE8",
+      "offset": "+0x38",
+      "type": "u16",
+      "value": 45,
+      "confidence": "candidate",
+      "note": "cursor_x_candidate"
+    },
+    {
+      "address": "0x0231FCEA",
+      "offset": "+0x3A",
+      "type": "u16",
+      "value": 12288,
+      "confidence": "candidate",
+      "note": "cursor_y_candidate"
+    }
+  ],
+  "assertions": [
+    "Loaded MsgBuffer fragments are not labelled as current visible lines.",
+    "All TextPrinter offsets in this snapshot are candidates unless validated by a stage transition."
+  ]
+}

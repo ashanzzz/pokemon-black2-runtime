@@ -1,0 +1,21 @@
+{
+  "before": "reverse_engineering\\experiments\\EXP_010_text_printer_a_edge\\snapshot_after_interaction_start.json",
+  "after": "reverse_engineering\\experiments\\EXP_010_text_printer_a_edge\\snapshot_after_one_a_from_first.json",
+  "changed_byte_count": 2,
+  "changes": [
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C3C",
+      "address": "0x02332C3C",
+      "before": 1,
+      "after": 0
+    },
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C4C",
+      "address": "0x02332C4C",
+      "before": 200,
+      "after": 236
+    }
+  ]
+}

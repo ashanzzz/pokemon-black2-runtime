@@ -1,0 +1,33 @@
+{
+  "schema": "pointer_scan/v1",
+  "captured_at_unix": 1788414750.3077307,
+  "method": "bridge-owned memory.scan_pattern; read-only Main-RAM scan",
+  "target_u32": "0x0223DCE4",
+  "target_little_endian_hex": "e4dc2302",
+  "request": {
+    "start": 0,
+    "size": 4194304,
+    "limit": 256
+  },
+  "response": {
+    "frame": 4194692,
+    "domain": "Main RAM",
+    "pattern_hex": "e4dc2302",
+    "start": 0,
+    "size": 4194304,
+    "matches": [
+      2389396,
+      3180296,
+      3190500
+    ],
+    "arm9_matches": [
+      "0x02247594",
+      "0x02308708",
+      "0x0230AEE4"
+    ]
+  },
+  "assertions": [
+    "A raw pointer match establishes only a memory reference, not ownership or type.",
+    "A pointer target must still pass structure-coherence and lifecycle tests."
+  ]
+}

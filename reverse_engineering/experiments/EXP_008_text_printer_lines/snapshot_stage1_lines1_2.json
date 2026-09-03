@@ -1,0 +1,172 @@
+{
+  "stage": "STAGE_1_LINES_1_2",
+  "timestamp": 1788360426.1919525,
+  "time_str": "2026-09-02 22:47:06",
+  "frame": 1046272,
+  "player_state": {
+    "name": "zero",
+    "rival": "NO",
+    "facing": "North",
+    "coords": {
+      "x": 7,
+      "y": 5,
+      "z": 11
+    }
+  },
+  "active_context": {
+    "screen_type": "DIALOGUE_ACTIVE",
+    "screen_description": "【对话中 - 城镇居民 / 剧情 NPC】\"你要也和宝可梦在一起的话 就能和NO\"",
+    "available_actions": [
+      "按 A 键继续对话",
+      "按 B 键加速文字"
+    ],
+    "can_move_player": false,
+    "is_dialogue_active": true,
+    "dialogue_text": "你要也和宝可梦在一起的话\n就能和NO",
+    "full_dialogue_text": "你要也和宝可梦在一起的话\n就能和NO\n比试一下了。",
+    "speaker": "城镇居民 / 剧情 NPC",
+    "speaker_category": "NPC",
+    "active_pointer": "0x002490AC",
+    "dialogue_start_time": "2026-09-02 22:46:01",
+    "dialogue_duration_sec": 53.59,
+    "printer": {
+      "is_active": true,
+      "is_printing": false,
+      "waiting_for_input": true,
+      "full_text": "你要也和宝可梦在一起的话\n就能和NO",
+      "current_page_text": "你要也和宝可梦在一起的话\n就能和NO",
+      "lines": [
+        "你要也和宝可梦在一起的话",
+        "就能和NO"
+      ],
+      "total_chars": 17,
+      "printed_chars": 17,
+      "remaining_chars": 0,
+      "progress_pct": 100.0
+    },
+    "choices": [],
+    "recommended_action": "调用 advance_dialogue() 或按 A 键翻页",
+    "dialogue_history": [
+      {
+        "id": 3,
+        "start_time": "2026-09-02 22:46:01",
+        "end_time": null,
+        "unix_timestamp": 1788360361.0284,
+        "frame_start": 1043067,
+        "frame_end": 1046272,
+        "speaker": "城镇居民 / 剧情 NPC",
+        "speaker_category": "NPC",
+        "location": "实时 ARM9 地图（Map Section 未验证）",
+        "map_section_id": null,
+        "text": "你要也和宝可梦在一起的话\n就能和NO",
+        "duration_seconds": 53.59,
+        "is_active": true,
+        "has_choices": false,
+        "choices": []
+      },
+      {
+        "id": 2,
+        "start_time": "2026-09-02 22:45:58",
+        "end_time": "2026-09-02 22:46:00",
+        "unix_timestamp": 1788360358.9691253,
+        "frame_start": 1042944,
+        "frame_end": 1043059,
+        "speaker": "城镇居民 / 剧情 NPC",
+        "speaker_category": "NPC",
+        "location": "实时 ARM9 地图（Map Section 未验证）",
+        "map_section_id": null,
+        "text": "你要也和宝可梦在一起的话\n就能和NO",
+        "duration_seconds": 1.93,
+        "is_active": false,
+        "has_choices": false,
+        "choices": []
+      },
+      {
+        "id": 1,
+        "start_time": "2026-09-02 22:38:44",
+        "end_time": "2026-09-02 22:45:58",
+        "unix_timestamp": 1788359924.2654307,
+        "frame_start": 1017634,
+        "frame_end": 1042936,
+        "speaker": "城镇居民 / 剧情 NPC",
+        "speaker_category": "NPC",
+        "location": "实时 ARM9 地图（Map Section 未验证）",
+        "map_section_id": null,
+        "text": "你要也和宝可梦在一起的话\n就能和NO",
+        "duration_seconds": 434.57,
+        "is_active": false,
+        "has_choices": false,
+        "choices": []
+      }
+    ]
+  },
+  "ptrs_dump": {
+    "0x0224764C": {
+      "u32_val": "0x00000000",
+      "raw_hex": "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00",
+      "decoded_text": ""
+    },
+    "0x0233605C": {
+      "u32_val": "0xFFFFFFFF",
+      "raw_hex": "ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff ff",
+      "decoded_text": ""
+    },
+    "0x02333C74": {
+      "u32_val": "0x00000000",
+      "raw_hex": "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00",
+      "decoded_text": ""
+    },
+    "0x022490A0": {
+      "u32_val": "0x8100A200",
+      "raw_hex": "00 a2 00 81 80 04 1c 00 ec d2 f8 b6 60 4f 81 89 5f 4e 8c 54 9d 5b ef 53 a6 68 28 57 00 4e 77 8d",
+      "decoded_text": "脀你要也和宝可梦在一起的话\n就能和NO\n比试一下"
+    },
+    "0x02249134": {
+      "u32_val": "0x4F60770B",
+      "raw_hex": "0b 77 60 4f 88 5f 09 67 29 59 06 52 84 76 37 68 50 5b 02 30 00 f0 01 be 00 00 ff ff ff 00 26 0c",
+      "decoded_text": "看你很有天分的样子。a<^？e5"
+    },
+    "0x02233C74": {
+      "u32_val": "0x00000000",
+      "raw_hex": "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00",
+      "decoded_text": ""
+    }
+  },
+  "found_active_pointers": [
+    {
+      "pointer_address": "0x022475BC",
+      "pointer_offset": "0x2475BC",
+      "target_address": "0x022490A4"
+    },
+    {
+      "pointer_address": "0x0231D87C",
+      "pointer_offset": "0x31D87C",
+      "target_address": "0x022490A4"
+    },
+    {
+      "pointer_address": "0x0231D8E0",
+      "pointer_offset": "0x31D8E0",
+      "target_address": "0x022490A4"
+    },
+    {
+      "pointer_address": "0x0231FCC8",
+      "pointer_offset": "0x31FCC8",
+      "target_address": "0x022490D8"
+    },
+    {
+      "pointer_address": "0x02324298",
+      "pointer_offset": "0x324298",
+      "target_address": "0x02249100"
+    },
+    {
+      "pointer_address": "0x02333F60",
+      "pointer_offset": "0x333F60",
+      "target_address": "0x022490A4"
+    },
+    {
+      "pointer_address": "0x02333FC4",
+      "pointer_offset": "0x333FC4",
+      "target_address": "0x022490A4"
+    }
+  ]
+}

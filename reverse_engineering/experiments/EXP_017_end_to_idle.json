@@ -1,0 +1,1655 @@
+{
+  "schema": "event_aligned_trace/v1",
+  "timestamp": 1788439206.510363,
+  "button": "A",
+  "sample_count": 61,
+  "timeline": [
+    {
+      "index": 0,
+      "phase": "before_edge",
+      "frame": 5219519,
+      "script_lock": 0,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "faf42c4c0b17a541b6f5619b080975498aaa08896a84c04afe44e3ccff1db765",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 1,
+      "phase": "after_frame_1",
+      "frame": 5219520,
+      "script_lock": 0,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "faf42c4c0b17a541b6f5619b080975498aaa08896a84c04afe44e3ccff1db765",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 2,
+      "phase": "after_frame_2",
+      "frame": 5219521,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "faf42c4c0b17a541b6f5619b080975498aaa08896a84c04afe44e3ccff1db765",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 3,
+      "phase": "after_frame_3",
+      "frame": 5219522,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "faf42c4c0b17a541b6f5619b080975498aaa08896a84c04afe44e3ccff1db765",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 4,
+      "phase": "after_frame_4",
+      "frame": 5219523,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "faf42c4c0b17a541b6f5619b080975498aaa08896a84c04afe44e3ccff1db765",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 5,
+      "phase": "after_frame_5",
+      "frame": 5219524,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "72e9a0e27112cb63b83f23f36d0c01e52b7ff98a80bfde8c343d0ee9ab112d6d",
+        "non_zero_bytes": 2880,
+        "changed_bytes_from_prev": 960,
+        "line0_non_zero": 960,
+        "line1_non_zero": 1920,
+        "active_row_count": 24,
+        "first_active_row": 8,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 6,
+      "phase": "after_frame_6",
+      "frame": 5219525,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 1338,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 7,
+      "phase": "after_frame_7",
+      "frame": 5219526,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 8,
+      "phase": "after_frame_8",
+      "frame": 5219527,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 9,
+      "phase": "after_frame_9",
+      "frame": 5219528,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 10,
+      "phase": "after_frame_10",
+      "frame": 5219529,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 11,
+      "phase": "after_frame_11",
+      "frame": 5219530,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 12,
+      "phase": "after_frame_12",
+      "frame": 5219531,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 13,
+      "phase": "after_frame_13",
+      "frame": 5219532,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 14,
+      "phase": "after_frame_14",
+      "frame": 5219533,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "877efe413fb39caaf868c25879411ca55649261dafde6ce5301bfe6ce713180b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 15,
+      "phase": "after_frame_15",
+      "frame": 5219534,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "76ba60703cdb22ad6f6da112db7e383b4a6a5ddf8c9e3a8f212aaeae39146ba5",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 61,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 16,
+      "phase": "after_frame_16",
+      "frame": 5219535,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "76ba60703cdb22ad6f6da112db7e383b4a6a5ddf8c9e3a8f212aaeae39146ba5",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 17,
+      "phase": "after_frame_17",
+      "frame": 5219536,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "76ba60703cdb22ad6f6da112db7e383b4a6a5ddf8c9e3a8f212aaeae39146ba5",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 18,
+      "phase": "after_frame_18",
+      "frame": 5219537,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "76ba60703cdb22ad6f6da112db7e383b4a6a5ddf8c9e3a8f212aaeae39146ba5",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 19,
+      "phase": "after_frame_19",
+      "frame": 5219538,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "f0d1cf9ae5c208908fb8f649ca1c6b822c52c77807df6971a4747b135efe6076",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 53,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 20,
+      "phase": "after_frame_20",
+      "frame": 5219539,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "f0d1cf9ae5c208908fb8f649ca1c6b822c52c77807df6971a4747b135efe6076",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 21,
+      "phase": "after_frame_21",
+      "frame": 5219540,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "f0d1cf9ae5c208908fb8f649ca1c6b822c52c77807df6971a4747b135efe6076",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 22,
+      "phase": "after_frame_22",
+      "frame": 5219541,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "f0d1cf9ae5c208908fb8f649ca1c6b822c52c77807df6971a4747b135efe6076",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 23,
+      "phase": "after_frame_23",
+      "frame": 5219542,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "a90e3fd8764ae09c763517342edb83c6cdf21f0d51cdcd6c2eee81ce9733c883",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 60,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 24,
+      "phase": "after_frame_24",
+      "frame": 5219543,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "a90e3fd8764ae09c763517342edb83c6cdf21f0d51cdcd6c2eee81ce9733c883",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 25,
+      "phase": "after_frame_25",
+      "frame": 5219544,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "a90e3fd8764ae09c763517342edb83c6cdf21f0d51cdcd6c2eee81ce9733c883",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 26,
+      "phase": "after_frame_26",
+      "frame": 5219545,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "a90e3fd8764ae09c763517342edb83c6cdf21f0d51cdcd6c2eee81ce9733c883",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 27,
+      "phase": "after_frame_27",
+      "frame": 5219546,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "913a64e6107cba2e0d9d4ab2f608089864ec0eaa46400798a7c8c638d4e4584d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 48,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 28,
+      "phase": "after_frame_28",
+      "frame": 5219547,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "913a64e6107cba2e0d9d4ab2f608089864ec0eaa46400798a7c8c638d4e4584d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 29,
+      "phase": "after_frame_29",
+      "frame": 5219548,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "913a64e6107cba2e0d9d4ab2f608089864ec0eaa46400798a7c8c638d4e4584d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 30,
+      "phase": "after_frame_30",
+      "frame": 5219549,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "913a64e6107cba2e0d9d4ab2f608089864ec0eaa46400798a7c8c638d4e4584d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 31,
+      "phase": "after_frame_31",
+      "frame": 5219550,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "af11f237ace4bf8f6b42c53b53c296e98f45e3ccbd4499a81dc37ecace45f895",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 60,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 32,
+      "phase": "after_frame_32",
+      "frame": 5219551,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "af11f237ace4bf8f6b42c53b53c296e98f45e3ccbd4499a81dc37ecace45f895",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 33,
+      "phase": "after_frame_33",
+      "frame": 5219552,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "af11f237ace4bf8f6b42c53b53c296e98f45e3ccbd4499a81dc37ecace45f895",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 34,
+      "phase": "after_frame_34",
+      "frame": 5219553,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "af11f237ace4bf8f6b42c53b53c296e98f45e3ccbd4499a81dc37ecace45f895",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 35,
+      "phase": "after_frame_35",
+      "frame": 5219554,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "06cbaa3012f6f036f57af0180f1e871629476d2890d76c5a98ad4e1307da7b1a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 56,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 36,
+      "phase": "after_frame_36",
+      "frame": 5219555,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "06cbaa3012f6f036f57af0180f1e871629476d2890d76c5a98ad4e1307da7b1a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 37,
+      "phase": "after_frame_37",
+      "frame": 5219556,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "06cbaa3012f6f036f57af0180f1e871629476d2890d76c5a98ad4e1307da7b1a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 38,
+      "phase": "after_frame_38",
+      "frame": 5219557,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "06cbaa3012f6f036f57af0180f1e871629476d2890d76c5a98ad4e1307da7b1a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 39,
+      "phase": "after_frame_39",
+      "frame": 5219558,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "15b327d08759cd796c563980782e554b610cd88e4ba6ddbf78c8eb9eca69bb31",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 58,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 40,
+      "phase": "after_frame_40",
+      "frame": 5219559,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "15b327d08759cd796c563980782e554b610cd88e4ba6ddbf78c8eb9eca69bb31",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 41,
+      "phase": "after_frame_41",
+      "frame": 5219560,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "15b327d08759cd796c563980782e554b610cd88e4ba6ddbf78c8eb9eca69bb31",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 42,
+      "phase": "after_frame_42",
+      "frame": 5219561,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "15b327d08759cd796c563980782e554b610cd88e4ba6ddbf78c8eb9eca69bb31",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 43,
+      "phase": "after_frame_43",
+      "frame": 5219562,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "9e92979d04634cf0f7ac924ec73fbf2e42c293122f8d3c2d1b7fcaee95bbd00a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 58,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 44,
+      "phase": "after_frame_44",
+      "frame": 5219563,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "9e92979d04634cf0f7ac924ec73fbf2e42c293122f8d3c2d1b7fcaee95bbd00a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 45,
+      "phase": "after_frame_45",
+      "frame": 5219564,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "9e92979d04634cf0f7ac924ec73fbf2e42c293122f8d3c2d1b7fcaee95bbd00a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 46,
+      "phase": "after_frame_46",
+      "frame": 5219565,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "9e92979d04634cf0f7ac924ec73fbf2e42c293122f8d3c2d1b7fcaee95bbd00a",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 47,
+      "phase": "after_frame_47",
+      "frame": 5219566,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "41d249cbd936565ec5220b5e05d9b0f192992b802a979312918bd7caf826c76b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 34,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 48,
+      "phase": "after_frame_48",
+      "frame": 5219567,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "41d249cbd936565ec5220b5e05d9b0f192992b802a979312918bd7caf826c76b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 49,
+      "phase": "after_frame_49",
+      "frame": 5219568,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "41d249cbd936565ec5220b5e05d9b0f192992b802a979312918bd7caf826c76b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 50,
+      "phase": "after_frame_50",
+      "frame": 5219569,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "41d249cbd936565ec5220b5e05d9b0f192992b802a979312918bd7caf826c76b",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 51,
+      "phase": "after_frame_51",
+      "frame": 5219570,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "ae7fd504ba91d64e928fb5bf62f3fe29b322bf3ea8376b1368f5c99028eff95d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 20,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 52,
+      "phase": "after_frame_52",
+      "frame": 5219571,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "ae7fd504ba91d64e928fb5bf62f3fe29b322bf3ea8376b1368f5c99028eff95d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 53,
+      "phase": "after_frame_53",
+      "frame": 5219572,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "ae7fd504ba91d64e928fb5bf62f3fe29b322bf3ea8376b1368f5c99028eff95d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 54,
+      "phase": "after_frame_54",
+      "frame": 5219573,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "ae7fd504ba91d64e928fb5bf62f3fe29b322bf3ea8376b1368f5c99028eff95d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 55,
+      "phase": "after_frame_55",
+      "frame": 5219574,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "ae7fd504ba91d64e928fb5bf62f3fe29b322bf3ea8376b1368f5c99028eff95d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 56,
+      "phase": "after_frame_56",
+      "frame": 5219575,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "ae7fd504ba91d64e928fb5bf62f3fe29b322bf3ea8376b1368f5c99028eff95d",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 57,
+      "phase": "after_frame_57",
+      "frame": 5219576,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "09a3c60ea4a849c24426da68c0ef5231d6d832841a0f83e5bc1b260434782ca0",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 20,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 58,
+      "phase": "after_frame_58",
+      "frame": 5219577,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "09a3c60ea4a849c24426da68c0ef5231d6d832841a0f83e5bc1b260434782ca0",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 59,
+      "phase": "after_frame_59",
+      "frame": 5219578,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "09a3c60ea4a849c24426da68c0ef5231d6d832841a0f83e5bc1b260434782ca0",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    },
+    {
+      "index": 60,
+      "phase": "after_frame_60",
+      "frame": 5219579,
+      "script_lock": 1,
+      "printer": {
+        "line_index": 4,
+        "sub_proc_candidate": 48,
+        "speed_counter_candidate": 0,
+        "current_char_ptr": "0x00327073",
+        "raw_curr_char_ptr": 3305587,
+        "scroll_distance": 0,
+        "cursor_x": 45,
+        "cursor_y": 12288
+      },
+      "printer_head_hex": "75000100040008003000000073686f72745f67726173735f737032004d0041542d00000000014c00080010007f0100006d00010028002c002d00003000100000",
+      "pixel": {
+        "hash_sha256": "09a3c60ea4a849c24426da68c0ef5231d6d832841a0f83e5bc1b260434782ca0",
+        "non_zero_bytes": 3840,
+        "changed_bytes_from_prev": 0,
+        "line0_non_zero": 1920,
+        "line1_non_zero": 1920,
+        "active_row_count": 32,
+        "first_active_row": 0,
+        "last_active_row": 31
+      }
+    }
+  ]
+}

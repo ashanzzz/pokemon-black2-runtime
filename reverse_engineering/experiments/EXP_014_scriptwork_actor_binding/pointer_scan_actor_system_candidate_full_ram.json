@@ -1,0 +1,63 @@
+{
+  "schema": "pointer_scan/v1",
+  "captured_at_unix": 1788414751.157517,
+  "method": "bridge-owned memory.scan_pattern; read-only Main-RAM scan",
+  "target_u32": "0x0223DB68",
+  "target_little_endian_hex": "68db2302",
+  "request": {
+    "start": 0,
+    "size": 4194304,
+    "limit": 256
+  },
+  "response": {
+    "frame": 4194729,
+    "domain": "Main RAM",
+    "pattern_hex": "68db2302",
+    "start": 0,
+    "size": 4194304,
+    "matches": [
+      2340632,
+      2350188,
+      2350444,
+      2350700,
+      2350956,
+      2351212,
+      2351468,
+      2351724,
+      2351980,
+      2352236,
+      2352492,
+      2352748,
+      2401056,
+      2504032,
+      3179820,
+      3182228,
+      3185848,
+      3189860
+    ],
+    "arm9_matches": [
+      "0x0223B718",
+      "0x0223DC6C",
+      "0x0223DD6C",
+      "0x0223DE6C",
+      "0x0223DF6C",
+      "0x0223E06C",
+      "0x0223E16C",
+      "0x0223E26C",
+      "0x0223E36C",
+      "0x0223E46C",
+      "0x0223E56C",
+      "0x0223E66C",
+      "0x0224A320",
+      "0x02263560",
+      "0x0230852C",
+      "0x02308E94",
+      "0x02309CB8",
+      "0x0230AC64"
+    ]
+  },
+  "assertions": [
+    "A raw pointer match establishes only a memory reference, not ownership or type.",
+    "A pointer target must still pass structure-coherence and lifecycle tests."
+  ]
+}

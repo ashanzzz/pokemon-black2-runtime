@@ -1,0 +1,815 @@
+{
+  "total_diffs": 1298,
+  "text_ptr_diffs": [
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231FCC8",
+      "offset": "0x00FCC8",
+      "val_stage1": "0x022490D8 (35950808)",
+      "val_stage2": "0x022490E4 (35950820)",
+      "delta": 12
+    }
+  ],
+  "diff_sample": [
+    {
+      "region": "script_text_buffer",
+      "address": "0x022429DC",
+      "offset": "0x0029DC",
+      "val_stage1": "0x190A0004 (420085764)",
+      "val_stage2": "0x1A0B0004 (436928516)",
+      "delta": 16842752
+    },
+    {
+      "region": "script_text_buffer",
+      "address": "0x02243D24",
+      "offset": "0x003D24",
+      "val_stage1": "0x000DBE35 (900661)",
+      "val_stage2": "0x000DCC85 (904325)",
+      "delta": 3664
+    },
+    {
+      "region": "script_text_buffer",
+      "address": "0x0224A46C",
+      "offset": "0x00A46C",
+      "val_stage1": "0x021A8709 (35292937)",
+      "val_stage2": "0x0215429D (34947741)",
+      "delta": -345196
+    },
+    {
+      "region": "script_text_buffer",
+      "address": "0x0224A470",
+      "offset": "0x00A470",
+      "val_stage1": "0x0224AA17 (35957271)",
+      "val_stage2": "0x0224AA19 (35957273)",
+      "delta": 2
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x02312FC8",
+      "offset": "0x002FC8",
+      "val_stage1": "0x00001000 (4096)",
+      "val_stage2": "0x00006000 (24576)",
+      "delta": 20480
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x023193B0",
+      "offset": "0x0093B0",
+      "val_stage1": "0x00013B1C (80668)",
+      "val_stage2": "0x00013B59 (80729)",
+      "delta": 61
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED78",
+      "offset": "0x00ED78",
+      "val_stage1": "0x21F21FFF (569516031)",
+      "val_stage2": "0x1FFF21FF (536814079)",
+      "delta": -32701952
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED7C",
+      "offset": "0x00ED7C",
+      "val_stage1": "0x22121FFF (571613183)",
+      "val_stage2": "0x12111111 (303108369)",
+      "delta": -268504814
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED80",
+      "offset": "0x00ED80",
+      "val_stage1": "0x111221FF (286401023)",
+      "val_stage2": "0x12222222 (304226850)",
+      "delta": 17825827
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED84",
+      "offset": "0x00ED84",
+      "val_stage1": "0x2221211F (572596511)",
+      "val_stage2": "0x1121111F (287379743)",
+      "delta": -285216768
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED88",
+      "offset": "0x00ED88",
+      "val_stage1": "0x1F221121 (522326305)",
+      "val_stage2": "0x1221221F (304161311)",
+      "delta": -218164994
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED8C",
+      "offset": "0x00ED8C",
+      "val_stage1": "0x12122122 (303178018)",
+      "val_stage2": "0x1F21F21F (522318367)",
+      "delta": 219140349
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED98",
+      "offset": "0x00ED98",
+      "val_stage1": "0x1111FFFF (286392319)",
+      "val_stage2": "0x21FFFFF2 (570425330)",
+      "delta": 284033011
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231ED9C",
+      "offset": "0x00ED9C",
+      "val_stage1": "0x2222FFFF (572719103)",
+      "val_stage2": "0x221FF212 (572518930)",
+      "delta": -200173
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDA0",
+      "offset": "0x00EDA0",
+      "val_stage1": "0x111F2111 (287252753)",
+      "val_stage2": "0x1111F212 (286388754)",
+      "delta": -863999
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDA4",
+      "offset": "0x00EDA4",
+      "val_stage1": "0x221F2122 (572465442)",
+      "val_stage2": "0x22222111 (572662033)",
+      "delta": 196591
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDA8",
+      "offset": "0x00EDA8",
+      "val_stage1": "0x111F22F2 (287253234)",
+      "val_stage2": "0x111F2222 (287253026)",
+      "delta": -208
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDAC",
+      "offset": "0x00EDAC",
+      "val_stage1": "0x222FF212 (573567506)",
+      "val_stage2": "0x221FFFF2 (572522482)",
+      "delta": -1045024
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDB8",
+      "offset": "0x00EDB8",
+      "val_stage1": "0x21111111 (554766609)",
+      "val_stage2": "0xFFFF21FF (4294910463)",
+      "delta": 3740143854
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDBC",
+      "offset": "0x00EDBC",
+      "val_stage1": "0x22222121 (572662049)",
+      "val_stage2": "0xF21F2121 (4062126369)",
+      "delta": 3489464320
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDC0",
+      "offset": "0x00EDC0",
+      "val_stage1": "0xF2111111 (4061204753)",
+      "val_stage2": "0x21211121 (555815201)",
+      "delta": -3505389552
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDC4",
+      "offset": "0x00EDC4",
+      "val_stage1": "0xF2122121 (4061274401)",
+      "val_stage2": "0x21222122 (555884834)",
+      "delta": -3505389567
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDC8",
+      "offset": "0x00EDC8",
+      "val_stage1": "0xF2111111 (4061204753)",
+      "val_stage2": "0x21111121 (554766625)",
+      "delta": -3506438128
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDCC",
+      "offset": "0x00EDCC",
+      "val_stage1": "0xF2222221 (4062323233)",
+      "val_stage2": "0x22222221 (572662305)",
+      "delta": -3489660928
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDD8",
+      "offset": "0x00EDD8",
+      "val_stage1": "0xF21FFFFF (4062183423)",
+      "val_stage2": "0xF211FFFF (4061265919)",
+      "delta": -917504
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDDC",
+      "offset": "0x00EDDC",
+      "val_stage1": "0xF21F21FF (4062126591)",
+      "val_stage2": "0x11221111 (287445265)",
+      "delta": -3774681326
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDE0",
+      "offset": "0x00EDE0",
+      "val_stage1": "0xF21F21FF (4062126591)",
+      "val_stage2": "0x21F21222 (569512482)",
+      "delta": -3492614109
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDE4",
+      "offset": "0x00EDE4",
+      "val_stage1": "0x111F21FF (287252991)",
+      "val_stage2": "0x21111111 (554766609)",
+      "delta": 267513618
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDE8",
+      "offset": "0x00EDE8",
+      "val_stage1": "0x221111FF (571544063)",
+      "val_stage2": "0x21221222 (555880994)",
+      "delta": -15663069
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDEC",
+      "offset": "0x00EDEC",
+      "val_stage1": "0xF2122111 (4061274385)",
+      "val_stage2": "0x21211FFF (555819007)",
+      "delta": -3505455378
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EDFC",
+      "offset": "0x00EDFC",
+      "val_stage1": "0x1111FFFF (286392319)",
+      "val_stage2": "0xF12F2111 (4046397713)",
+      "delta": 3760005394
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE00",
+      "offset": "0x00EE00",
+      "val_stage1": "0x1222F211 (304280081)",
+      "val_stage2": "0x212F2122 (556736802)",
+      "delta": 252456721
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE04",
+      "offset": "0x00EE04",
+      "val_stage1": "0x1111F212 (286388754)",
+      "val_stage2": "0x112F21FF (288301567)",
+      "delta": 1912813
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE08",
+      "offset": "0x00EE08",
+      "val_stage1": "0x1222F212 (304280082)",
+      "val_stage2": "0x112F21FF (288301567)",
+      "delta": -15978515
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE0C",
+      "offset": "0x00EE0C",
+      "val_stage1": "0x1FFFF21F (536867359)",
+      "val_stage2": "0x212F21FF (556737023)",
+      "delta": 19869664
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE18",
+      "offset": "0x00EE18",
+      "val_stage1": "0xFFFFF211 (4294963729)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3566
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE1C",
+      "offset": "0x00EE1C",
+      "val_stage1": "0x21111122 (554766626)",
+      "val_stage2": "0x2FFF21FF (805249535)",
+      "delta": 250482909
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE20",
+      "offset": "0x00EE20",
+      "val_stage1": "0x212221F2 (555885042)",
+      "val_stage2": "0x11FF21FF (301933055)",
+      "delta": -253951987
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE24",
+      "offset": "0x00EE24",
+      "val_stage1": "0x21FF2111 (570368273)",
+      "val_stage2": "0x21FF21FF (570368511)",
+      "delta": 238
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE28",
+      "offset": "0x00EE28",
+      "val_stage1": "0x21FF2122 (570368290)",
+      "val_stage2": "0xF12F21FF (4046397951)",
+      "delta": 3476029661
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE2C",
+      "offset": "0x00EE2C",
+      "val_stage1": "0x21FF2121 (570368289)",
+      "val_stage2": "0xF21F21F1 (4062126577)",
+      "delta": 3491758288
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE38",
+      "offset": "0x00EE38",
+      "val_stage1": "0xF21FFFFF (4062183423)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 232783872
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE3C",
+      "offset": "0x00EE3C",
+      "val_stage1": "0x1111111F (286331167)",
+      "val_stage2": "0xFFFFFF21 (4294967073)",
+      "delta": 4008635906
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE40",
+      "offset": "0x00EE40",
+      "val_stage1": "0x2222221F (572662303)",
+      "val_stage2": "0xFFFFF112 (4294963474)",
+      "delta": 3722301171
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE44",
+      "offset": "0x00EE44",
+      "val_stage1": "0xFFFFF22F (4294963759)",
+      "val_stage2": "0xFFFFF12F (4294963503)",
+      "delta": -256
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE48",
+      "offset": "0x00EE48",
+      "val_stage1": "0x1111111F (286331167)",
+      "val_stage2": "0xFFFF21FF (4294910463)",
+      "delta": 4008579296
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE4C",
+      "offset": "0x00EE4C",
+      "val_stage1": "0x2212222F (571613743)",
+      "val_stage2": "0xFFFF12FF (4294906623)",
+      "delta": 3723292880
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE5C",
+      "offset": "0x00EE5C",
+      "val_stage1": "0x11112111 (286335249)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4008632046
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE60",
+      "offset": "0x00EE60",
+      "val_stage1": "0x22222122 (572662050)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3722305245
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE64",
+      "offset": "0x00EE64",
+      "val_stage1": "0x111F22FF (287253247)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4007714048
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE68",
+      "offset": "0x00EE68",
+      "val_stage1": "0x221FF211 (572518929)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3722448366
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE6C",
+      "offset": "0x00EE6C",
+      "val_stage1": "0xF21FF222 (4062179874)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 232787421
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE78",
+      "offset": "0x00EE78",
+      "val_stage1": "0xF21FFFFF (4062183423)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 232783872
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE7C",
+      "offset": "0x00EE7C",
+      "val_stage1": "0x21111111 (554766609)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3740200686
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE80",
+      "offset": "0x00EE80",
+      "val_stage1": "0x22212222 (572596770)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3722370525
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE84",
+      "offset": "0x00EE84",
+      "val_stage1": "0xFF21F211 (4280414737)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 14552558
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE88",
+      "offset": "0x00EE88",
+      "val_stage1": "0xFF21F212 (4280414738)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 14552557
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE8C",
+      "offset": "0x00EE8C",
+      "val_stage1": "0xFF21F21F (4280414751)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 14552544
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE98",
+      "offset": "0x00EE98",
+      "val_stage1": "0x1FF21FFF (535961599)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3759005696
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EE9C",
+      "offset": "0x00EE9C",
+      "val_stage1": "0x11111111 (286331153)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4008636142
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEA0",
+      "offset": "0x00EEA0",
+      "val_stage1": "0x12221222 (304222754)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3990744541
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEA4",
+      "offset": "0x00EEA4",
+      "val_stage1": "0x112111FF (287379967)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4007587328
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEA8",
+      "offset": "0x00EEA8",
+      "val_stage1": "0x1212121F (303174175)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3991793120
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEAC",
+      "offset": "0x00EEAC",
+      "val_stage1": "0x12211221 (304157217)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3990810078
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEB8",
+      "offset": "0x00EEB8",
+      "val_stage1": "0xFFFFFFF2 (4294967282)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 13
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEBC",
+      "offset": "0x00EEBC",
+      "val_stage1": "0x11112111 (286335249)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4008632046
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEC0",
+      "offset": "0x00EEC0",
+      "val_stage1": "0x22222222 (572662306)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3722304989
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEC4",
+      "offset": "0x00EEC4",
+      "val_stage1": "0x1FFFFF21 (536870689)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3758096606
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEC8",
+      "offset": "0x00EEC8",
+      "val_stage1": "0x21FFF212 (570421778)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3724545517
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EECC",
+      "offset": "0x00EECC",
+      "val_stage1": "0x21FF2122 (570368290)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3724599005
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EED8",
+      "offset": "0x00EED8",
+      "val_stage1": "0xFFFFFF21 (4294967073)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 222
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEDC",
+      "offset": "0x00EEDC",
+      "val_stage1": "0x21111111 (554766609)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3740200686
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEE0",
+      "offset": "0x00EEE0",
+      "val_stage1": "0x22222221 (572662305)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3722304990
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEE4",
+      "offset": "0x00EEE4",
+      "val_stage1": "0xFFFF2122 (4294910242)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 57053
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEE8",
+      "offset": "0x00EEE8",
+      "val_stage1": "0xFFFF21F2 (4294910450)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 56845
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EEEC",
+      "offset": "0x00EEEC",
+      "val_stage1": "0xFFFF21FF (4294910463)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 56832
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF18",
+      "offset": "0x00EF18",
+      "val_stage1": "0x1FFFFFFF (536870911)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3758096384
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF1C",
+      "offset": "0x00EF1C",
+      "val_stage1": "0x111FFFFF (287309823)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4007657472
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF20",
+      "offset": "0x00EF20",
+      "val_stage1": "0x122FFFFF (305135615)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3989831680
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF24",
+      "offset": "0x00EF24",
+      "val_stage1": "0x1FFFFFFF (536870911)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3758096384
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF28",
+      "offset": "0x00EF28",
+      "val_stage1": "0x1111FFFF (286392319)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4008574976
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF2C",
+      "offset": "0x00EF2C",
+      "val_stage1": "0x1222F21F (304280095)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3990687200
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF38",
+      "offset": "0x00EF38",
+      "val_stage1": "0xFFFFFFF2 (4294967282)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 13
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF3C",
+      "offset": "0x00EF3C",
+      "val_stage1": "0xF2111121 (4061204769)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 233762526
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF40",
+      "offset": "0x00EF40",
+      "val_stage1": "0xF2122222 (4061274658)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 233692637
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF44",
+      "offset": "0x00EF44",
+      "val_stage1": "0xF21FFFF2 (4062183410)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 232783885
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF48",
+      "offset": "0x00EF48",
+      "val_stage1": "0xF2111111 (4061204753)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 233762542
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF4C",
+      "offset": "0x00EF4C",
+      "val_stage1": "0xF2222122 (4062322978)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 232644317
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF58",
+      "offset": "0x00EF58",
+      "val_stage1": "0x1FF21FFF (535961599)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3759005696
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF5C",
+      "offset": "0x00EF5C",
+      "val_stage1": "0x1FF221FF (535962111)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3759005184
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF60",
+      "offset": "0x00EF60",
+      "val_stage1": "0x11211111 (287379729)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 4007587566
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF64",
+      "offset": "0x00EF64",
+      "val_stage1": "0x21212221 (555819553)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3739147742
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF68",
+      "offset": "0x00EF68",
+      "val_stage1": "0x2211FF21 (571604769)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3723362526
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF6C",
+      "offset": "0x00EF6C",
+      "val_stage1": "0x2121FF21 (555876129)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3739091166
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF78",
+      "offset": "0x00EF78",
+      "val_stage1": "0xF21FFFF2 (4062183410)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 232783885
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF7C",
+      "offset": "0x00EF7C",
+      "val_stage1": "0x212FFFF2 (556793842)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3738173453
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF80",
+      "offset": "0x00EF80",
+      "val_stage1": "0x21FF2111 (570368273)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3724599022
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF84",
+      "offset": "0x00EF84",
+      "val_stage1": "0x22FF2122 (587145506)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3707821789
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF88",
+      "offset": "0x00EF88",
+      "val_stage1": "0x211121FF (554770943)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3740196352
+    },
+    {
+      "region": "text_printer_window_core",
+      "address": "0x0231EF8C",
+      "offset": "0x00EF8C",
+      "val_stage1": "0x212221FF (555885055)",
+      "val_stage2": "0xFFFFFFFF (4294967295)",
+      "delta": 3739082240
+    }
+  ]
+}

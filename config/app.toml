@@ -1,0 +1,12 @@
+[server]
+host = "127.0.0.1"
+port = 8765
+
+[bizhawk]
+socket_port = 8766
+default_domain = "Main RAM"
+melon_ds_main_ram_size = 4194304
+
+[sampling]
+state_hz = 10
+heartbeat_interval_frames = 30

@@ -1,0 +1,1538 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokémon Black 2 - AI Semantic Runtime & Observer UI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+  <script src="/assets/map-schematic-canvas.js?v=mode-fix-14"></script>
+  <script src="/assets/world-geometry-renderer.js?v=mode-fix-14"></script>
+  <script src="/assets/native-world-viewer.js?v=mode-fix-14"></script>
+  <style>
+    body { background-color: #0f172a; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    .glass-panel { background: rgba(30, 41, 59, 0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .btn-key { transition: all 0.1s; user-select: none; }
+    .btn-key:active { transform: scale(0.94); }
+    .touch-screen-box { width: 256px; height: 192px; cursor: crosshair; }
+    .world-shell { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 14px; min-height: 0; }
+    .world-stage { position: relative; min-height: 530px; overflow: hidden; border: 1px solid #1e2b42; border-radius: 14px; background: #02070d; }
+    .world-canvas, .world-schematic-canvas, .world-geometry-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .world-canvas[hidden], .world-schematic-canvas[hidden], .world-geometry-canvas[hidden], .world-machine[hidden] { display: none !important; }
+    .world-machine { position: absolute; inset: 0; overflow: auto; padding: 16px; color: #dbeafe; background: #02070d; white-space: pre; font: 11px/1.55 ui-monospace, Consolas, monospace; }
+    .world-hint { position: absolute; left: 14px; bottom: 14px; max-width: calc(100% - 28px); padding: 7px 9px; border: 1px solid #2b3a55; border-radius: 6px; background: #07101ccc; color: #b8c8df; font: 11px/1.45 ui-monospace, Consolas, monospace; pointer-events: none; }
+    .world-inspector { min-width: 0; overflow: auto; padding: 4px 2px 4px 6px; }
+    .world-fact { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid #1d2b42; font-size: 11px; }
+    .world-fact span:first-child { color: #8299ba; flex-shrink: 0; }
+    .world-fact span:last-child { text-align: right; overflow-wrap: anywhere; }
+    .world-data { margin-top: 8px; max-height: 165px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #d2def0; font: 10px/1.5 ui-monospace, Consolas, monospace; }
+    .world-evidence { margin-top: 14px; padding-top: 12px; border-top: 1px solid #24334d; }
+    .world-evidence h3 { margin: 0 0 7px; color: #a8bdd9; font-size: 11px; letter-spacing: .04em; }
+    .world-evidence p { margin: 0; color: #b8c8df; font-size: 11px; line-height: 1.55; }
+    .world-overlay-panel { display: none; position: absolute; right: 14px; top: 14px; width: min(330px, calc(100% - 28px)); max-height: 52%; overflow: auto; padding: 11px; background: #07101ce8; border: 1px solid #375d78; border-radius: 10px; }
+    .world-overlay-row { padding: 6px 0; border-bottom: 1px solid #20334e; color: #d2def0; font: 10px/1.45 ui-monospace, Consolas, monospace; }
+    .world-overlay-muted { color: #9eb1ce; }
+    .world-selection { position: absolute; left: 14px; top: 14px; width: min(420px, calc(100% - 28px)); max-height: calc(100% - 28px); overflow-y: auto; padding: 12px; background: #07101cf2; border: 1px solid #2c778d; border-radius: 12px; color: #d2def0; z-index: 20; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7); }
+    .world-selection pre { margin: 7px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; color: #d6edf5; font: 11px/1.5 ui-monospace, Consolas, monospace; }
+    #world-viewer[data-world-mode="overlay"] .world-overlay-panel { display: block; }
+    #world-viewer[data-world-mode="actual"] .world-evidence:not(.world-player-coordinate) { display: none; }
+    @media (max-width: 980px) { .world-shell { grid-template-columns: 1fr; } .world-inspector { max-height: 360px; } }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navbar -->
+  <header class="glass-panel border-b border-slate-700/60 sticky top-0 z-50 px-6 py-3.5 flex items-center justify-between shadow-xl">
+    <div class="flex items-center gap-3">
+      <div class="p-2 bg-indigo-500/20 rounded-lg text-indigo-400 border border-indigo-500/30">
+        <i data-lucide="gamepad-2" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h1 class="text-lg font-bold bg-gradient-to-r from-cyan-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent">
+          Pokémon Black 2 · AI Semantic Runtime
+        </h1>
+        <p class="text-xs text-slate-400">Greenfield BizHawk Engine & Observer Dashboard</p>
+      </div>
+    </div>
+
+    <!-- Status Indicators -->
+    <div class="flex items-center gap-4">
+      <div id="statusBadge" class="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-slate-800 border border-slate-700 text-slate-400">
+        <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+        <span id="statusText">连接中...</span>
+      </div>
+
+      <div class="text-xs font-mono text-slate-400 bg-slate-800/80 px-3 py-1.5 rounded border border-slate-700">
+        Frame: <span id="frameCounter" class="text-cyan-400 font-bold">0</span>
+      </div>
+
+      <button id="doctorBtn" onclick="runDoctor()" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 border border-indigo-500/40 transition">
+        <i data-lucide="stethoscope" class="w-3.5 h-3.5"></i>
+        <span>健康诊断</span>
+      </button>
+
+      <a href="/ram-dumper" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600/30 text-purple-300 hover:bg-purple-600/50 border border-purple-500/40 transition">
+        <i data-lucide="database" class="w-3.5 h-3.5"></i>
+        <span>📸 全量内存采集 (Dump)</span>
+      </a>
+
+      <a href="/frontend/memory-tracer.html" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600/30 text-cyan-300 hover:bg-cyan-600/50 border border-cyan-500/40 transition">
+        <i data-lucide="activity" class="w-3.5 h-3.5"></i>
+        <span>⚡ 内存差分追踪器</span>
+      </a>
+
+      <label class="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+        <input type="checkbox" id="autoPoll" checked class="rounded bg-slate-800 border-slate-600 text-indigo-500 focus:ring-0">
+        <span>实时轮询 (500ms)</span>
+      </label>
+    </div>
+  </header>
+
+  <!-- Main Content Grid -->
+  <main class="flex-1 p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1800px] w-full mx-auto">
+
+    <!-- Column 1: Semantic Game State & Dialogue (5 cols) -->
+    <div class="lg:col-span-4 space-y-6">
+      
+      <!-- Current Location & Mode -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="map-pin" class="w-4 h-4 text-emerald-400"></i>
+            <span>当前场景与坐标</span>
+          </div>
+          <span id="screenTypeBadge" class="text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            OVERWORLD
+          </span>
+        </div>
+
+        <div class="p-3.5 rounded-xl bg-slate-900/70 border border-slate-800">
+          <div id="locationZh" class="text-base font-bold text-slate-100">桧扇市 主角家 (1F 室内)</div>
+          <div id="locationEn" class="text-xs text-slate-400 font-mono mt-0.5">Aspertia City - Player's House 1F</div>
+          <div class="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-800/80 text-xs">
+            <div>
+              <span class="text-slate-500">世界坐标:</span>
+              <span id="playerCoord" class="font-mono text-cyan-400 ml-1 font-semibold">坐标未验证</span>
+            </div>
+            <div>
+              <span class="text-slate-500">物理高程:</span>
+              <span id="playerElevation" class="font-mono text-amber-400 ml-1 font-semibold">Elev --</span>
+            </div>
+            <div>
+              <span class="text-slate-500">当前朝向:</span>
+              <span id="playerFacing" class="font-semibold text-emerald-400 ml-1">东 (East / →)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Player State & Telemetry -->
+        <div class="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-2.5">
+          <div class="text-xs font-bold text-cyan-300 flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="user" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>人物实时状态</span>
+            </span>
+            <span id="playerMotionBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-semibold">
+              静止 (Idle)
+            </span>
+          </div>
+
+          <!-- Attributes Grid -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div class="p-2 rounded-lg bg-slate-950/70 border border-slate-800">
+              <div class="text-[10px] text-slate-500 font-semibold">主角</div>
+              <div id="playerName" class="font-bold text-slate-200 truncate mt-0.5">zero (男)</div>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-950/70 border border-slate-800">
+              <div class="text-[10px] text-slate-500 font-semibold">零花钱</div>
+              <div id="playerMoney" class="font-bold text-amber-400 font-mono mt-0.5">¥ 3,000</div>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-950/70 border border-slate-800">
+              <div class="text-[10px] text-slate-500 font-semibold">徽章</div>
+              <div id="playerBadges" class="font-bold text-indigo-300 font-mono mt-0.5">0 枚</div>
+            </div>
+            <div class="p-2 rounded-lg bg-slate-950/70 border border-slate-800">
+              <div class="text-[10px] text-slate-500 font-semibold">队伍宝可梦</div>
+              <div id="playerParty" class="font-bold text-emerald-400 font-mono mt-0.5">0 只</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Three-Tier Goal Memory & AI Action Directive (三级目标记忆系统 & 行动提示词) -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-3.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="compass" class="w-4 h-4 text-cyan-400"></i>
+            <span>三级目标记忆系统 & 行动指令</span>
+          </div>
+          <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-semibold">
+            AI Directive
+          </span>
+        </div>
+
+        <!-- AI Action Directive High-Contrast Box -->
+        <div class="p-3 rounded-xl bg-gradient-to-r from-cyan-950/80 to-blue-950/80 border border-cyan-500/40 space-y-1.5 shadow-lg shadow-cyan-950/40">
+          <div class="text-[10px] font-mono uppercase tracking-wider text-cyan-300 font-bold flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+            <span>当前最高优先级行动指令 (Active Directive)</span>
+          </div>
+          <div id="aiActionDirectiveText" class="text-xs font-bold text-cyan-100 leading-relaxed">
+            【最高优先级】: 前往西北方展望台 (X=16, Y=705) 寻找戴大帽子的白露
+          </div>
+          <div class="pt-1.5 flex items-center gap-2">
+            <button onclick="triggerAutoNavigate()" id="autoNavBtn" class="btn-key flex-1 py-2 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-900/40">
+              <i data-lucide="navigation" class="w-3.5 h-3.5"></i>
+              <span>🚀 一键执行自动寻路前往目标</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Three Tier Goals Hierarchy -->
+        <div class="space-y-2 text-xs">
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-0.5">
+            <div class="text-[10px] font-semibold text-amber-400 flex items-center gap-1">
+              <span>🎯 近期即时目标:</span>
+            </div>
+            <div id="goalImmediateText" class="text-slate-200 leading-relaxed font-medium">向北穿过桧扇市街道，前往西北方展望台寻找白露</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-0.5">
+            <div class="text-[10px] font-semibold text-indigo-400 flex items-center gap-1">
+              <span>🚩 中期里程碑目标:</span>
+            </div>
+            <div id="goalMidTermText" class="text-slate-300 leading-relaxed">在展望台获得初学者宝可梦与图鉴，完成劲敌修的初战，获取城镇地图</div>
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-0.5">
+            <div class="text-[10px] font-semibold text-emerald-400 flex items-center gap-1">
+              <span>🏆 远期主线目标:</span>
+            </div>
+            <div id="goalLongTermText" class="text-slate-400 leading-relaxed">前往桧扇道馆挑战黑连获得基础徽章，经19号道路前往立涌市</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Real-time Dialogue Box & Speaker Identity -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="message-square-text" class="w-4 h-4 text-purple-400"></i>
+            <span>实时 RAM 对话捕获</span>
+            <span id="dialoguePtrBadge" class="text-[11px] font-mono text-purple-400/90 font-normal"></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="dialogueActiveBadge" class="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 font-medium">
+              未在对话中
+            </span>
+          </div>
+        </div>
+
+        <!-- Speaker and Timestamp Bar -->
+        <div class="flex items-center justify-between px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+          <div class="flex items-center gap-1.5 font-medium">
+            <i data-lucide="user" class="w-3.5 h-3.5 text-indigo-400"></i>
+            <span class="text-slate-400">说话者:</span>
+            <span id="dialogueSpeakerText" class="font-bold text-indigo-300">无活跃对话</span>
+          </div>
+          <div class="flex items-center gap-3 text-[11px] font-mono text-slate-400">
+            <span id="dialogueTimeDisplay" class="text-slate-400">时间: --:--:--</span>
+            <span id="dialogueDurationDisplay" class="text-amber-400/90 hidden">⏱️ 0.0s</span>
+          </div>
+        </div>
+
+        <div class="relative">
+          <div id="dialogueBox" class="min-h-[100px] max-h-[160px] overflow-y-auto p-4 rounded-xl bg-slate-950/90 border border-slate-800 text-sm font-sans leading-relaxed text-slate-200 whitespace-pre-wrap select-text">
+[当前未处于剧情对话中]
+          </div>
+        </div>
+
+        <!-- Dialogue Controls -->
+        <div class="grid grid-cols-3 gap-2">
+          <button onclick="advanceDialogue(1)" class="btn-key py-2 px-3 text-xs font-semibold rounded-lg bg-purple-600/30 text-purple-300 hover:bg-purple-600/50 border border-purple-500/40 flex items-center justify-center gap-1.5">
+            <i data-lucide="chevron-right" class="w-4 h-4"></i> 推进 1 步 (A)
+          </button>
+          <button onclick="advanceDialogue(5)" class="btn-key py-2 px-3 text-xs font-semibold rounded-lg bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 border border-indigo-500/40 flex items-center justify-center gap-1.5">
+            <i data-lucide="fast-forward" class="w-4 h-4"></i> 自动推进 5 步
+          </button>
+          <button onclick="scanDialogueStrings()" class="btn-key py-2 px-3 text-xs font-semibold rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 border border-slate-700 flex items-center justify-center gap-1.5">
+            <i data-lucide="search" class="w-4 h-4"></i> 扫描内存文字
+          </button>
+        </div>
+        <a href="/dialogue-checkpoints" class="block text-center text-xs text-amber-300 hover:text-amber-200 border border-amber-500/30 rounded-lg py-2 bg-amber-900/10 hover:bg-amber-900/25 transition">
+          🧪 打开“手动对话检查点采集器”（只读 RAM，不自动按 A）
+        </a>
+
+        <!-- Scanned strings panel -->
+        <div id="scannedStringsContainer" class="hidden p-3 rounded-xl bg-slate-900/90 border border-slate-800 max-h-48 overflow-y-auto text-xs space-y-1">
+          <div class="font-semibold text-slate-400 mb-2">内存中扫描到的文字片段:</div>
+          <div id="scannedStringsList" class="space-y-1 text-slate-300"></div>
+        </div>
+      </div>
+
+      <!-- Dialogue Chronological Timeline (梳理说话顺序与历史记录) -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="list-ordered" class="w-4 h-4 text-emerald-400"></i>
+            <span>对话时序记录 (按说话顺序)</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="dialogueCountBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">0 条记录</span>
+            <button onclick="clearDialogueTimeline()" class="text-[10px] px-2 py-0.5 rounded bg-slate-800/80 hover:bg-rose-900/40 text-slate-400 hover:text-rose-300 border border-slate-700 transition">清空</button>
+          </div>
+        </div>
+
+        <div id="dialogueTimelineList" class="max-h-[260px] overflow-y-auto space-y-2 text-xs pr-1">
+          <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-slate-500 text-center text-xs">
+            暂无历史对话记录，进行游戏互动时将自动捕获
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Column 2: Joypad Controller & Contextual Interaction Hub (4 cols) -->
+    <div class="lg:col-span-4 space-y-6">
+
+      <!-- Virtual Joypad Controller (永久独立手柄模拟) -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="gamepad-2" class="w-4 h-4 text-cyan-400"></i>
+            <span>虚拟手柄模拟器 (Silent Controller)</span>
+          </div>
+          <span class="text-[10px] text-slate-500 font-mono">100% 后台生效</span>
+        </div>
+
+        <!-- Joypad D-Pad + ABXY Layout -->
+        <div class="flex items-center justify-around py-1">
+          <!-- D-Pad -->
+          <div class="relative w-32 h-32">
+            <button onclick="pressKey('Up')" class="btn-key absolute top-0 left-10 w-12 h-10 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-t-lg flex items-center justify-center shadow-lg active:bg-cyan-600">
+              <i data-lucide="chevron-up" class="w-5 h-5 text-slate-200"></i>
+            </button>
+            <button onclick="pressKey('Left')" class="btn-key absolute top-10 left-0 w-10 h-12 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-l-lg flex items-center justify-center shadow-lg active:bg-cyan-600">
+              <i data-lucide="chevron-left" class="w-5 h-5 text-slate-200"></i>
+            </button>
+            <div class="absolute top-10 left-10 w-12 h-12 bg-slate-900 border border-slate-800 flex items-center justify-center">
+              <div class="w-3 h-3 rounded-full bg-slate-700"></div>
+            </div>
+            <button onclick="pressKey('Right')" class="btn-key absolute top-10 right-0 w-10 h-12 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-r-lg flex items-center justify-center shadow-lg active:bg-cyan-600">
+              <i data-lucide="chevron-right" class="w-5 h-5 text-slate-200"></i>
+            </button>
+            <button onclick="pressKey('Down')" class="btn-key absolute bottom-0 left-10 w-12 h-10 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-b-lg flex items-center justify-center shadow-lg active:bg-cyan-600">
+              <i data-lucide="chevron-down" class="w-5 h-5 text-slate-200"></i>
+            </button>
+          </div>
+
+          <!-- ABXY Buttons -->
+          <div class="relative w-32 h-32">
+            <button onclick="pressKey('X')" class="btn-key absolute top-0 left-10 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full font-bold text-amber-400 flex items-center justify-center shadow-lg active:bg-amber-600 active:text-white">
+              X
+            </button>
+            <button onclick="pressKey('Y')" class="btn-key absolute top-10 left-0 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full font-bold text-emerald-400 flex items-center justify-center shadow-lg active:bg-emerald-600 active:text-white">
+              Y
+            </button>
+            <button onclick="pressKey('A')" class="btn-key absolute top-10 right-0 w-11 h-11 bg-indigo-600 hover:bg-indigo-500 border border-indigo-400 rounded-full font-bold text-white flex items-center justify-center shadow-lg active:bg-indigo-700">
+              A
+            </button>
+            <button onclick="pressKey('B')" class="btn-key absolute bottom-0 left-10 w-11 h-11 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-full font-bold text-rose-400 flex items-center justify-center shadow-lg active:bg-rose-600 active:text-white">
+              B
+            </button>
+          </div>
+        </div>
+
+        <!-- Start / Select & Shoulder -->
+        <div class="flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+          <div class="flex gap-2">
+            <button onclick="pressKey('L')" class="btn-key px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-mono text-slate-300">L</button>
+            <button onclick="pressKey('R')" class="btn-key px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 font-mono text-slate-300">R</button>
+          </div>
+          <div class="flex gap-2">
+            <button onclick="pressKey('Select')" class="btn-key px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300">Select</button>
+            <button onclick="pressKey('Start')" class="btn-key px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-bold">Start</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Autonomous Map Navigation & Reachability Hub (全图自动寻路与可达性导航控制台) -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="map" class="w-4 h-4 text-emerald-400"></i>
+            <span>全图自动寻路与智能导航控制台</span>
+          </div>
+          <span id="navReachabilityBadge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700 font-bold">
+            🟢 可到达 (Reachable)
+          </span>
+        </div>
+
+        <!-- Landmark Quick Selector -->
+        <div class="space-y-1.5 text-xs">
+          <label class="text-slate-400 font-semibold flex items-center justify-between">
+            <span>🚩 目标地区 / 地标快速选择:</span>
+            <span class="text-[10px] text-slate-500 font-mono">Matrix #0 全图覆盖</span>
+          </label>
+          <select id="navLandmarkSelect" onchange="onNavLandmarkSelected()" class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-slate-200 text-xs font-medium focus:outline-none focus:border-cyan-500">
+            <option value="">-- 选择目标地标 (或手动输入坐标) --</option>
+          </select>
+        </div>
+
+        <!-- Coordinate Inputs Grid -->
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+            <span class="text-[10px] text-slate-400 font-semibold">目标 X 坐标 (East +):</span>
+            <input type="number" id="navGoalX" value="16" oninput="onNavCoordsChanged()" class="w-full px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 font-mono text-cyan-300 font-bold text-sm focus:outline-none focus:border-cyan-500">
+          </div>
+          <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+            <span class="text-[10px] text-slate-400 font-semibold">目标 Y 坐标 (South +):</span>
+            <input type="number" id="navGoalY" value="705" oninput="onNavCoordsChanged()" class="w-full px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-700 font-mono text-cyan-300 font-bold text-sm focus:outline-none focus:border-cyan-500">
+          </div>
+        </div>
+
+        <!-- Reachability Details Panel -->
+        <div class="p-3 rounded-xl bg-slate-950/90 border border-slate-800 text-xs space-y-1.5 font-mono">
+          <div class="flex justify-between text-slate-400">
+            <span>当前玩家位置:</span>
+            <span id="navCurrentPosText" class="text-slate-200 font-bold">(47, 771, L=12)</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>曼哈顿距离 / 预计步数:</span>
+            <span id="navDistanceText" class="text-cyan-400 font-bold">94 步 (直接可达)</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>目标地形判定:</span>
+            <span id="navTerrainText" class="text-emerald-400 font-semibold">陆地道路 (Walkable Ground)</span>
+          </div>
+          <div class="flex justify-between text-slate-400">
+            <span>可达性评估:</span>
+            <span id="navReasonText" class="text-slate-300 font-sans">路径通畅，可直接到达</span>
+          </div>
+        </div>
+
+        <!-- Movement Mode Selector (姿态切换: 步行 / 奔跑 / 骑车 / 冲浪) -->
+        <div class="space-y-1.5 text-xs">
+          <label class="text-slate-400 font-semibold">🚲 行进姿态 / 速度模式选择:</label>
+          <div class="grid grid-cols-4 gap-1.5">
+            <button onclick="setNavMode('walk')" id="modeBtn_walk" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 text-center font-medium">
+              🚶 步行
+            </button>
+            <button onclick="setNavMode('run')" id="modeBtn_run" class="p-2 rounded-lg bg-cyan-900/80 border border-cyan-500 text-cyan-200 text-center font-bold ring-1 ring-cyan-500">
+              🏃 奔跑(B)
+            </button>
+            <button onclick="setNavMode('bike')" id="modeBtn_bike" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 text-center font-medium">
+              🚲 骑车
+            </button>
+            <button onclick="setNavMode('surf')" id="modeBtn_surf" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 text-center font-medium">
+              🏄 冲浪
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Execution Buttons -->
+        <div class="flex items-center gap-2 pt-1">
+          <button onclick="startAutoNavigation()" id="startNavBtn" class="btn-key flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-950/50">
+            <i data-lucide="play" class="w-4 h-4"></i>
+            <span>🚀 开始纯内存自动寻路</span>
+          </button>
+          <button onclick="stopAutoNavigation()" id="stopNavBtn" class="btn-key py-2.5 px-3 rounded-xl bg-rose-950/80 hover:bg-rose-900 border border-rose-700 text-rose-200 text-xs font-semibold flex items-center gap-1">
+            <i data-lucide="square" class="w-3.5 h-3.5"></i>
+            <span>停止</span>
+          </button>
+        </div>
+
+        <!-- Real-time Navigation Progress Log -->
+        <div id="navProgressContainer" class="hidden p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] font-mono space-y-1">
+          <div class="flex justify-between text-cyan-300 font-semibold">
+            <span id="navProgressStepText">行进进度: 第 0 步</span>
+            <span id="navProgressStatusText">正在移动中...</span>
+          </div>
+          <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
+            <div id="navProgressBar" class="bg-cyan-400 h-1.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- NDS Contextual Smart Interaction Hub (场景自适应智能交互中心) -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+            <span>场景感知智能交互中心</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span id="interactionModeBadge" class="text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700 font-semibold">
+              当前状态: 自由探索中
+            </span>
+            <button onclick="toggleTouchCanvas()" id="touchModeToggleBtn" class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 border border-slate-700">
+              原始触控
+            </button>
+          </div>
+        </div>
+
+        <!-- Dynamic Context Action Container -->
+        <div id="directActionContainer" class="space-y-3">
+
+          <!-- View 1: Main Menu Direct Action Cards (仅在游戏初始主菜单时显示) -->
+          <div id="mainMenuActionView" class="space-y-2">
+            <div class="text-xs text-cyan-300 font-semibold flex items-center justify-between">
+              <span>🎮 主菜单快捷指令 (点击直达)</span>
+              <span class="text-[10px] text-slate-500">基于 RAM 光标自动寻址</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <button onclick="selectMenuDirect(0)" class="btn-key p-3 rounded-xl bg-gradient-to-r from-cyan-600/30 to-blue-600/30 text-cyan-200 hover:from-cyan-600/50 hover:to-blue-600/50 border border-cyan-500/40 font-bold flex flex-col items-start gap-0.5">
+                <span class="text-xs">▶ 从最初开始 (New Game)</span>
+                <span class="text-[10px] text-cyan-400/80 font-normal">开启全新冒险剧情</span>
+              </button>
+              <button onclick="triggerAction('continue_game')" class="btn-key p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 text-slate-200 border border-slate-700 font-bold flex flex-col items-start gap-0.5">
+                <span class="text-xs">📂 继续游戏 (Continue)</span>
+                <span class="text-[10px] text-slate-400 font-normal">读取已有存档进度</span>
+              </button>
+              <button onclick="selectMenuDirect(1)" class="btn-key p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-left">
+                🎁 不可思议的礼物
+              </button>
+              <button onclick="selectMenuDirect(2)" class="btn-key p-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-left">
+                🔗 合众连接 (Unova Link)
+              </button>
+            </div>
+          </div>
+
+          <!-- View 2: Name Input Smart Form (仅在命名输入界面时显示) -->
+          <div id="nameInputActionView" class="hidden space-y-2.5 p-3 rounded-xl bg-slate-900/90 border border-indigo-500/30">
+            <div class="text-xs text-indigo-300 font-semibold flex items-center justify-between">
+              <span class="flex items-center gap-1.5"><i data-lucide="edit-3" class="w-3.5 h-3.5 text-indigo-400"></i> 玩家/劲敌姓名一键写入</span>
+              <span class="text-[10px] text-slate-500">支持中/英/日文</span>
+            </div>
+            <div class="flex gap-2">
+              <input type="text" id="directNameInput" value="zero" maxlength="7" placeholder="输入玩家名字..." class="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-700 text-sm font-bold text-cyan-300 focus:outline-none focus:border-cyan-500">
+              <button onclick="submitDirectName()" class="btn-key px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold flex items-center gap-1 shadow-lg shadow-indigo-900/40">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i> 确认写入
+              </button>
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap pt-1">
+              <span class="text-[10px] text-slate-500 font-medium">推荐常用名:</span>
+              <button onclick="setAndSubmitName('zero')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono border border-slate-700">zero</button>
+              <button onclick="setAndSubmitName('Red')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono border border-slate-700">Red</button>
+              <button onclick="setAndSubmitName('小智')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono border border-slate-700">小智</button>
+              <button onclick="setAndSubmitName('排孜')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono border border-slate-700">排孜</button>
+              <button onclick="setAndSubmitName('鸣依')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-mono border border-slate-700">鸣依</button>
+            </div>
+          </div>
+
+          <!-- View 3: Dialogue Choice Interactive Buttons (分支选择选项) -->
+          <div id="dialogueChoiceActionView" class="hidden space-y-2 p-3 rounded-xl bg-purple-950/40 border border-purple-500/30">
+            <div class="text-xs text-purple-300 font-semibold flex items-center justify-between">
+              <span class="flex items-center gap-1.5"><i data-lucide="help-circle" class="w-3.5 h-3.5 text-purple-400"></i> 分支选择选项 (点击直选确认)</span>
+              <span class="text-[10px] text-slate-400">RAM 实时分支</span>
+            </div>
+            <div id="dialogueChoiceButtonsList" class="grid grid-cols-2 gap-2 text-xs">
+              <!-- Dynamically populated choices -->
+            </div>
+          </div>
+
+          <!-- View 4: Dialogue Normal Controls (普通对话推进) -->
+          <div id="dialogueNormalActionView" class="hidden grid grid-cols-3 gap-2">
+            <button onclick="advanceDialogue(1)" class="btn-key py-2.5 px-3 text-xs font-semibold rounded-lg bg-purple-600/30 text-purple-300 hover:bg-purple-600/50 border border-purple-500/40 flex items-center justify-center gap-1.5">
+              <i data-lucide="chevron-right" class="w-4 h-4"></i> 推进 (A)
+            </button>
+            <button onclick="advanceDialogue(5)" class="btn-key py-2.5 px-3 text-xs font-semibold rounded-lg bg-indigo-600/30 text-indigo-300 hover:bg-indigo-600/50 border border-indigo-500/40 flex items-center justify-center gap-1.5">
+              <i data-lucide="fast-forward" class="w-4 h-4"></i> 连进 5 步
+            </button>
+            <button onclick="pressKey('B')" class="btn-key py-2.5 px-3 text-xs font-semibold rounded-lg bg-rose-600/30 text-rose-300 hover:bg-rose-600/50 border border-rose-500/40 flex items-center justify-center gap-1.5">
+              <i data-lucide="zap" class="w-4 h-4"></i> 跳过 (B)
+            </button>
+          </div>
+
+          <!-- View 5: Overworld Quick Shortcuts (大地图常用指令) -->
+          <div id="overworldActionView" class="space-y-2">
+            <div class="text-xs text-emerald-300 font-semibold flex items-center justify-between">
+              <span>🌲 大地图快速交互</span>
+              <span class="text-[10px] text-slate-500">自由探索中</span>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <button onclick="pressKey('A')" class="btn-key p-2 rounded-lg bg-indigo-900/60 hover:bg-indigo-800 text-indigo-200 border border-indigo-700/60 font-medium flex items-center justify-center gap-1">
+                <span>A 对话/交互</span>
+              </button>
+              <button onclick="pressKey('B')" class="btn-key p-2 rounded-lg bg-rose-950/60 hover:bg-rose-900 text-rose-200 border border-rose-700/60 font-medium flex items-center justify-center gap-1">
+                <span>B 奔跑/取消</span>
+              </button>
+              <button onclick="pressKey('X')" class="btn-key p-2 rounded-lg bg-amber-950/60 hover:bg-amber-900 text-amber-200 border border-amber-700/60 font-medium flex items-center justify-center gap-1">
+                <span>X 打开菜单</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Raw NDS Touch Screen Box (Collapsible / Toggleable) -->
+        <div id="rawTouchCanvasContainer" class="hidden pt-2 border-t border-slate-800">
+          <div class="flex justify-between items-center mb-1.5 text-xs text-slate-400">
+            <span>原始触控模拟 (256x192)</span>
+            <span id="touchCoordPreview" class="font-mono text-[10px]">点击画布触控</span>
+          </div>
+          <div class="flex justify-center">
+            <div class="relative bg-slate-950 rounded-xl border-2 border-slate-700 overflow-hidden shadow-inner touch-screen-box" id="touchScreenBox" onclick="handleScreenTouch(event)">
+              <div class="absolute inset-0 grid grid-cols-4 grid-rows-3 pointer-events-none opacity-20 border border-slate-600">
+                <div class="border-r border-b border-slate-600"></div>
+                <div class="border-r border-b border-slate-600"></div>
+                <div class="border-r border-b border-slate-600"></div>
+                <div class="border-b border-slate-600"></div>
+              </div>
+              <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-slate-600 text-xs font-mono">
+                <i data-lucide="mouse-pointer" class="w-5 h-5 mb-1 opacity-50"></i>
+                <span>NDS TOUCH SCREEN</span>
+                <span class="text-[10px] text-slate-700 mt-1">256 x 192 px</span>
+              </div>
+              <div id="touchRipple" class="absolute w-6 h-6 rounded-full bg-cyan-400/40 border border-cyan-300 pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-opacity opacity-0 scale-100 duration-300"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Column 3: Diagnostics & Event Log (4 cols) -->
+    <div class="lg:col-span-4 space-y-6">
+      
+      <!-- BizHawk & Diagnostic Info -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="cpu" class="w-4 h-4 text-cyan-400"></i>
+            <span>模拟器与核心状态</span>
+          </div>
+          <span class="text-xs text-slate-400 font-mono">NDS MelonDS</span>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <div class="flex justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+            <span class="text-slate-400">BizHawk 进程 (PID):</span>
+            <span id="bizhawkPid" class="font-mono text-slate-200">34448 (EmuHawk.exe)</span>
+          </div>
+          <div class="flex justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+            <span class="text-slate-400">Lua Bridge 协议:</span>
+            <span id="bridgeProto" class="font-mono text-cyan-400">v1.2.0-unified (TCP)</span>
+          </div>
+          <div class="flex justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+            <span class="text-slate-400">ROM 文件:</span>
+            <span id="romName" class="font-medium text-slate-200">口袋妖怪 黑2</span>
+          </div>
+          <div class="flex justify-between p-2 rounded-lg bg-slate-900/60 border border-slate-800">
+            <span class="text-slate-400">主内存域 (ARM9 RAM):</span>
+            <span class="font-mono text-emerald-400">4,194,304 字节 (4MB)</span>
+          </div>
+        </div>
+
+        <!-- Developer Snapshot & Lock -->
+        <div class="flex gap-2 pt-2 border-t border-slate-800 text-xs">
+          <button onclick="captureSnapshot()" class="flex-1 py-2 px-3 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 flex items-center justify-center gap-1.5">
+            <i data-lucide="camera" class="w-3.5 h-3.5"></i> 内存快照
+          </button>
+          <button id="lockBtn" onclick="toggleAutomationLock()" class="flex-1 py-2 px-3 rounded-lg bg-amber-600/20 text-amber-300 hover:bg-amber-600/30 border border-amber-500/30 flex items-center justify-center gap-1.5">
+            <i data-lucide="lock" class="w-3.5 h-3.5"></i> 人工接管锁定
+          </button>
+        </div>
+      </div>
+
+      <!-- Real-time Event Stream -->
+      <div class="glass-panel p-5 rounded-2xl shadow-lg border border-slate-700/50 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm font-semibold text-slate-300">
+            <i data-lucide="activity" class="w-4 h-4 text-indigo-400"></i>
+            <span>实时系统事件日志</span>
+          </div>
+          <span class="text-[10px] text-slate-500">最近 10 条</span>
+        </div>
+
+        <div id="eventLogList" class="space-y-2 max-h-[300px] overflow-y-auto pr-1 text-xs">
+          <!-- Dynamically populated events -->
+          <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/80">
+            <div class="flex items-center justify-between text-slate-400 text-[11px]">
+              <span>system_boot</span>
+              <span class="font-mono">--:--:--</span>
+            </div>
+            <div class="text-slate-200 mt-1">Observer UI 已就绪</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <section class="w-full max-w-[1800px] mx-auto px-6 pb-8" aria-label="ROM 地图工作台">
+    <div id="world-viewer" data-world-viewer data-world-mode="schematic" class="glass-panel rounded-2xl p-4">
+      <div class="flex items-start justify-between gap-4 pb-3 border-b border-slate-800 flex-wrap">
+        <div>
+          <h2 class="text-sm font-bold text-white flex items-center gap-2"><i data-lucide="box" class="w-4 h-4 text-cyan-300"></i> ROM 地图工作台 <span class="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20">ROM + ARM9</span></h2>
+          <p class="text-xs text-slate-400 mt-1">结构图只读取无贴图 BMD0 几何和原始代码；只有验证了瓦片到 BMD0 表面的变换后才显示玩家圆环；实际图按需读取官方材质；未验证通行性保持 unknown。</p>
+        </div>
+        <div class="flex gap-1 p-1 rounded-lg bg-slate-950 border border-slate-700" role="tablist" aria-label="地图显示模式">
+          <button data-world-mode="schematic" class="px-2 py-1 text-[11px] rounded bg-cyan-700 text-white" aria-pressed="true">示意图</button>
+          <button data-world-mode="actual" class="px-2 py-1 text-[11px] rounded text-slate-300 hover:bg-slate-800" aria-pressed="false">实际图</button>
+          <button data-world-mode="overlay" class="px-2 py-1 text-[11px] rounded text-slate-300 hover:bg-slate-800" aria-pressed="false">叠加模式</button>
+          <button data-world-mode="machine" class="px-2 py-1 text-[11px] rounded text-slate-300 hover:bg-slate-800" aria-pressed="false">AI 数据</button>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-3 py-3 flex-wrap">
+        <span data-world="status" class="text-xs text-slate-300">打开后读取当前 BMD0 结构图…</span>
+        <div class="flex gap-1 flex-wrap">
+          <select data-world="variant" hidden aria-label="官方材质候选"></select>
+          <button data-world="zoom-out" class="px-2 py-1 text-xs rounded bg-slate-800 border border-slate-700">−</button><button data-world="zoom-in" class="px-2 py-1 text-xs rounded bg-slate-800 border border-slate-700">＋</button>
+          <button data-world="rotate-left" class="px-2 py-1 text-xs rounded bg-slate-800 border border-slate-700">↶</button><button data-world="rotate-right" class="px-2 py-1 text-xs rounded bg-slate-800 border border-slate-700">↷</button>
+          <button data-world="top" class="px-2 py-1 text-[11px] rounded bg-slate-800 border border-slate-700">俯视</button><button data-world="iso" class="px-2 py-1 text-[11px] rounded bg-slate-800 border border-slate-700">斜视</button><button data-world="fit" class="px-2 py-1 text-[11px] rounded bg-slate-800 border border-slate-700">适应</button><button data-world="toggle-nav" class="px-2 py-1 text-[11px] rounded bg-emerald-950/80 text-emerald-300 border border-emerald-700 hover:bg-emerald-900 font-medium" aria-pressed="true">可通行路径: 开</button><button data-world="toggle-axes" class="px-2 py-1 text-[11px] rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700 hover:bg-cyan-900 font-medium" aria-pressed="true">坐标尺: 开</button><button data-world="refresh" class="px-2 py-1 text-[11px] rounded bg-slate-800 border border-slate-700">重新读取</button>
+        </div>
+      </div>
+      <div class="world-shell">
+        <div data-world="stage" class="world-stage">
+          <canvas data-world="canvas" class="world-canvas" hidden></canvas>
+          <canvas data-world="geometry-canvas" class="world-geometry-canvas" hidden></canvas>
+          <canvas data-world="schematic-canvas" class="world-schematic-canvas" hidden></canvas>
+          <pre data-world="machine" class="world-machine" hidden></pre>
+          <div data-world="hint" class="world-hint">3D 操作：滑轮按下拖拽平移 · 左/右键拖拽翻转视角 · 滚轮缩放 · 单击选点</div>
+          <div data-world="selection-panel" class="world-selection" hidden>
+            <div class="flex items-center justify-between gap-3 pb-2 border-b border-slate-700/60 flex-wrap">
+              <strong class="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
+                <i data-lucide="crosshair" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span>瓦片核对与素材清单</span>
+              </strong>
+              <div class="flex items-center gap-1">
+                <!-- Area size selector -->
+                <span class="text-[10px] text-slate-400">范围:</span>
+                <button data-area-size="1" class="px-1.5 py-0.5 text-[10px] rounded bg-cyan-800 text-white border border-cyan-600 font-bold area-size-btn">1×1</button>
+                <button data-area-size="3" class="px-1.5 py-0.5 text-[10px] rounded bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 area-size-btn">3×3</button>
+                <button data-area-size="5" class="px-1.5 py-0.5 text-[10px] rounded bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 area-size-btn">5×5</button>
+                <button data-world="clear-selection" class="ml-1 px-1.5 py-0.5 text-[10px] rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600">清除</button>
+              </div>
+            </div>
+
+            <pre data-world="selection" class="mt-2 text-xs font-mono text-cyan-100 bg-slate-950/80 p-2.5 rounded-lg border border-slate-800 leading-relaxed whitespace-pre-wrap">尚未选择地图表面。</pre>
+
+            <!-- Dynamic Material List in Selected Area -->
+            <div class="mt-2.5 pt-2 border-t border-slate-800/80">
+              <div class="flex items-center justify-between text-[10px] text-slate-400 font-semibold mb-1">
+                <span>该区域包含的素材清单 (点击任一素材直接复制):</span>
+                <button data-world="copy-all-materials" class="text-cyan-400 hover:underline">复制全清单</button>
+              </div>
+              <div data-world="materials-list" class="max-h-36 overflow-y-auto space-y-1 text-xs">
+                <div class="text-slate-500 italic text-[11px]">点击地图后自动列出该区域全部素材</div>
+              </div>
+            </div>
+
+            <!-- Quick Tag Buttons -->
+            <div class="mt-2.5 pt-2 border-t border-slate-800/80">
+              <div class="text-[10px] text-slate-400 font-semibold mb-1">
+                <span>自定义地貌标注 (点击即复制):</span>
+              </div>
+              <div class="grid grid-cols-3 gap-1.5 text-[11px]">
+                <button data-tag-terrain="草坪/草丛(可能遇敌)" class="px-1.5 py-1 rounded bg-emerald-950/80 hover:bg-emerald-900 text-emerald-200 border border-emerald-700/60 text-center truncate">草坪</button>
+                <button data-tag-terrain="道路/石砖路(可通行)" class="px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 text-center truncate">道路</button>
+                <button data-tag-terrain="水面/水域(需冲浪)" class="px-1.5 py-1 rounded bg-sky-950/80 hover:bg-sky-900 text-sky-200 border border-sky-700/60 text-center truncate">水面</button>
+                <button data-tag-terrain="固体阻挡/树木/墙体" class="px-1.5 py-1 rounded bg-rose-950/80 hover:bg-rose-900 text-rose-200 border border-rose-700/60 text-center truncate">障碍</button>
+                <button data-tag-terrain="高低差跳台/台阶(单向)" class="px-1.5 py-1 rounded bg-amber-950/80 hover:bg-amber-900 text-amber-200 border border-amber-700/60 text-center truncate">跳台</button>
+                <button data-tag-terrain="建筑/室内出入口Warp" class="px-1.5 py-1 rounded bg-purple-950/80 hover:bg-purple-900 text-purple-200 border border-purple-700/60 text-center truncate">入口</button>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-2.5 flex items-center gap-2">
+              <button data-world="copy-selection-code" class="flex-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-200 border border-cyan-500/50 flex items-center justify-center gap-1">
+                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                <span>复制代号</span>
+              </button>
+              <button data-world="copy-selection" class="px-2 py-1.5 text-xs rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600">
+                JSON
+              </button>
+              <button data-world="set-player-anchor" class="px-2 py-1.5 text-xs rounded-lg bg-emerald-900/60 hover:bg-emerald-800 text-emerald-200 border border-emerald-600">
+                设为主角
+              </button>
+            </div>
+          </div>
+          <div data-world="overlay-panel" class="world-overlay-panel"><strong class="text-xs text-cyan-200">ROM 事件叠加 · 坐标证据</strong><div data-world="overlay-list" class="mt-2"></div></div>
+        </div>
+        <aside class="world-inspector">
+          <div class="world-fact"><span>地图定义</span><span data-world="map-id">—</span></div><div class="world-fact"><span>矩阵</span><span data-world="matrix">—</span></div><div class="world-fact"><span>玩家块</span><span data-world="chunk">—</span></div><div class="world-fact"><span>玩家模型</span><span data-world="model">—</span></div><div class="world-fact"><span>官方贴图</span><span data-world="texture">实际图按需读取</span></div><div class="world-fact"><span>验证状态</span><span data-world="verified">—</span></div>
+          <div class="world-evidence world-player-coordinate"><h3>人物 XYZ</h3><pre data-world="player-xyz" class="world-data">游戏：等待 ARM9 玩家坐标。\n实际图 XYZ：未人工确认。</pre></div>
+          <pre data-world="source" class="world-data">等待 ARM9 场景证据…</pre>
+          <div class="world-evidence"><h3>3D 结构编码</h3><pre data-world="geometry-codes" class="world-data">M&lt;模型&gt;.T&lt;槽位&gt; 是原始材质编码，后续可由实测定义。</pre></div>
+          <div class="world-evidence"><h3>原始交互记录</h3><select data-world="collision-plane" class="w-full text-xs rounded bg-slate-800 border border-slate-700 p-1"><option value="all">全部原始平面</option></select><p data-world="logic-status" class="mt-2">等待已验证地图坐标后绘制颜色标记。</p><p data-world="event-counts" class="mt-2">等待当前地图事件…</p><pre data-world="event-list" class="world-data">等待实机地图资源…</pre><h3 class="mt-3">碰撞 / 高度原始记录</h3><p data-world="collision">尚未定位当前地图碰撞模型；不把未知 permission byte 解释为可走或阻挡。</p><div class="flex gap-1 mt-2"><button data-world-probe="UP" class="px-2 py-1 text-xs rounded bg-slate-800">↑</button><button data-world-probe="DOWN" class="px-2 py-1 text-xs rounded bg-slate-800">↓</button><button data-world-probe="LEFT" class="px-2 py-1 text-xs rounded bg-slate-800">←</button><button data-world-probe="RIGHT" class="px-2 py-1 text-xs rounded bg-slate-800">→</button></div><pre data-world="probe" class="world-data">尚未执行移动探针。</pre><h3 class="mt-3">AI 地图代码</h3><pre data-world="knowledge" class="world-data">尚未请求当前地图知识。</pre><button data-world="refresh-knowledge" class="mt-2 px-2 py-1 text-[11px] rounded bg-slate-800 border border-slate-700">读取原始交互记录</button></div>
+        </aside>
+      </div>
+      <details class="mt-3"><summary class="text-xs text-slate-300 cursor-pointer">结构视图设置</summary><div class="flex gap-2 flex-wrap pt-2"><button data-world="compact" class="px-2 py-1 text-[11px] rounded bg-slate-800 border border-slate-700">信息面板：标准</button><button data-world="raw" class="px-2 py-1 text-[11px] rounded bg-slate-800 border border-slate-700">刷新 Pxx 原始格</button><span class="text-[11px] text-slate-400 self-center">颜色 = 原始材质槽位，不是地貌</span></div></details>
+    </div>
+  </section>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let autoPollActive = true;
+    let isHumanLocked = false;
+    let pollStateInFlight = false;
+
+    // Initialize Lucide icons safely
+    if (window.lucide && typeof lucide.createIcons === 'function') {
+      try { lucide.createIcons(); } catch (_) {}
+    }
+
+    // Polling Loop
+    async function pollState() {
+      // The observer endpoint can wait for BizHawk.  Do not stack three more
+      // requests every half second while the last observation is still alive:
+      // that exhausts the browser connection pool and starves map assets.
+      if (!autoPollActive || pollStateInFlight) return;
+      pollStateInFlight = true;
+
+      try {
+        const [statusRes, stateRes, presRes] = await Promise.all([
+          fetch(`${API_BASE}/api/bizhawk/status`).then(r => r.json()),
+          fetch(`${API_BASE}/api/state`).then(r => r.json()),
+          fetch(`${API_BASE}/api/observer/presentation`).then(r => r.json())
+        ]);
+
+        updateHeader(statusRes);
+        updateGameState(stateRes);
+        updatePresentation(presRes);
+
+      } catch (err) {
+        document.getElementById('statusBadge').className = 'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-950/60 border border-rose-800 text-rose-300';
+        document.getElementById('statusText').innerText = '后台离线';
+      } finally {
+        pollStateInFlight = false;
+      }
+    }
+
+    function updateHeader(status) {
+      const badge = document.getElementById('statusBadge');
+      const text = document.getElementById('statusText');
+      const counter = document.getElementById('frameCounter');
+
+      if (status.connected) {
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-emerald-950/60 border border-emerald-700/60 text-emerald-300';
+        text.innerText = 'BizHawk 已连接';
+      } else if (status.running) {
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-amber-950/60 border border-amber-700/60 text-amber-300';
+        text.innerText = '模拟器运行中 (等待 Lua)';
+      } else {
+        badge.className = 'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-rose-950/60 border border-rose-800 text-rose-300';
+        text.innerText = '未检测到模拟器';
+      }
+
+      counter.innerText = status.frame || 0;
+      if (status.pid) {
+        document.getElementById('bizhawkPid').innerText = `${status.pid} (${status.exe_path ? status.exe_path.split('\\').pop() : 'EmuHawk.exe'})`;
+      }
+      if (status.bridge_version) {
+        document.getElementById('bridgeProto').innerText = `${status.bridge_version} (TCP)`;
+      }
+    }
+
+    function updateGameState(st) {
+      if (!st) return;
+      document.getElementById('locationZh').innerText = st.location || "未知位置";
+      document.getElementById('playerName').innerText = `${st.player_name || "zero"} (${st.gender || "男"})`;
+      document.getElementById('playerMoney').innerText = `¥ ${(st.money || 0).toLocaleString()}`;
+      document.getElementById('playerBadges').innerText = `${st.badges || 0} 枚`;
+      const partyEl = document.getElementById('playerParty');
+      if (partyEl) partyEl.innerText = `${st.party_count || 0} 只`;
+
+      if (st.context) {
+        const badge = document.getElementById('screenTypeBadge');
+        const stType = st.context.screen_type || "OVERWORLD";
+        const screenLabels = {
+          'MAIN_MENU': '主菜单',
+          'TITLE_SCREEN': '标题画面',
+          'NAME_INPUT': '起名输入',
+          'DIALOGUE_CHOICE': '分支选择',
+          'DIALOGUE_ACTIVE': '对话中',
+          'OVERWORLD': '大地图探索',
+          'BATTLE': '战斗中',
+        };
+        badge.innerText = screenLabels[stType] || stType;
+        if (stType === 'MAIN_MENU' || stType === 'TITLE_SCREEN') {
+          badge.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold';
+        } else if (stType.includes('DIALOGUE') || stType.includes('CHOICE')) {
+          badge.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/40 font-bold animate-pulse';
+        } else {
+          badge.className = 'text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30';
+        }
+
+        // Contextual Smart Interaction View Switcher
+        const interactionBadge = document.getElementById('interactionModeBadge');
+        if (interactionBadge) {
+          const modeLabels = {
+            'MAIN_MENU': '主菜单选择',
+            'TITLE_SCREEN': '标题画面',
+            'NAME_INPUT': '起名输入',
+            'DIALOGUE_CHOICE': '对话选项选择',
+            'DIALOGUE_ACTIVE': '对话进行中',
+            'OVERWORLD': '自由探索中',
+            'BATTLE': '战斗进行中',
+          };
+          const zhLabel = modeLabels[stType] || (stType.includes('DIALOGUE') ? '对话中' : stType);
+          interactionBadge.innerText = `当前状态: ${zhLabel}`;
+          if (stType === 'MAIN_MENU' || stType === 'TITLE_SCREEN') {
+            interactionBadge.className = 'text-[10px] font-medium px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-700 font-semibold';
+          } else if (stType === 'NAME_INPUT') {
+            interactionBadge.className = 'text-[10px] font-medium px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-700 font-semibold';
+          } else if (stType.includes('CHOICE') || stType.includes('DIALOGUE')) {
+            interactionBadge.className = 'text-[10px] font-medium px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-700 font-semibold animate-pulse';
+          } else {
+            interactionBadge.className = 'text-[10px] font-medium px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700 font-semibold';
+          }
+        }
+
+        const mmView = document.getElementById('mainMenuActionView');
+        const nameView = document.getElementById('nameInputActionView');
+        const choiceView = document.getElementById('dialogueChoiceActionView');
+        const normalDlgView = document.getElementById('dialogueNormalActionView');
+        const overworldView = document.getElementById('overworldActionView');
+
+        const isMainMenu = (stType === 'MAIN_MENU' || stType === 'TITLE_SCREEN');
+        const isNameInput = (stType === 'NAME_INPUT');
+        const isChoice = (stType === 'DIALOGUE_CHOICE');
+        const isNormalDlg = (stType === 'DIALOGUE_ACTIVE');
+        const isOverworld = !isMainMenu && !isNameInput && !isChoice && !isNormalDlg;
+
+        if (mmView) mmView.classList.toggle('hidden', !isMainMenu);
+        if (nameView) nameView.classList.toggle('hidden', !isNameInput);
+        if (choiceView) {
+          choiceView.classList.toggle('hidden', !isChoice);
+          if (isChoice && st.context?.choices?.length) {
+            const list = document.getElementById('dialogueChoiceButtonsList');
+            if (list) {
+              list.innerHTML = st.context.choices.map(c => `
+                <button onclick="selectDialogueChoice(${c.index})" class="btn-key p-3 rounded-xl ${c.selected ? 'bg-purple-600/40 border-purple-400 text-purple-100 font-bold ring-1 ring-purple-400' : 'bg-slate-900/80 hover:bg-slate-800 border-slate-700 text-slate-200'} border flex items-center justify-between shadow-lg">
+                  <span class="text-xs font-semibold">${c.label}</span>
+                  <span class="text-[10px] ${c.selected ? 'text-purple-300 font-bold' : 'text-slate-500'}">${c.selected ? '▶ [当前选中]' : '点击选择'}</span>
+                </button>
+              `).join('');
+            }
+          }
+        }
+        if (normalDlgView) normalDlgView.classList.toggle('hidden', !isNormalDlg);
+        if (overworldView) overworldView.classList.toggle('hidden', !isOverworld);
+      }
+    }
+
+    let lastVerifiedPresentationPosition = null;
+
+    function updatePresentation(pres) {
+      if (!pres) return;
+      document.getElementById('locationEn').innerText = pres.location_en || "";
+      const position = pres.world_pos;
+      const validPosition = Boolean(pres.position_verified)
+        && Number.isFinite(Number(position?.x))
+        && Number.isFinite(Number(position?.y));
+      if (validPosition) {
+        if (!lastVerifiedPresentationPosition || lastVerifiedPresentationPosition.x !== position.x || lastVerifiedPresentationPosition.y !== position.y) {
+          try {
+            if (nativeWorldViewer && typeof nativeWorldViewer.refreshPlayer === 'function') {
+              nativeWorldViewer.refreshPlayer();
+            }
+          } catch (_) {}
+        }
+        lastVerifiedPresentationPosition = position;
+        document.getElementById('playerCoord').innerText = `X: ${position.x}, Y: ${position.y}`;
+        const elev = position.z != null ? `L=${position.z}` : '--';
+        document.getElementById('playerElevation').innerText = elev;
+      } else if (lastVerifiedPresentationPosition) {
+        const previous = lastVerifiedPresentationPosition;
+        document.getElementById('playerCoord').innerText = `上次 X: ${previous.x}, Y: ${previous.y}`;
+        const elev = previous.z != null ? `L=${previous.z}` : '--';
+        document.getElementById('playerElevation').innerText = elev;
+      } else {
+        document.getElementById('playerCoord').innerText = '未验证';
+        document.getElementById('playerElevation').innerText = 'Elev --';
+      }
+      if (pres.facing) {
+        document.getElementById('playerFacing').innerText = pres.facing;
+      }
+      const motionBadge = document.getElementById('playerMotionBadge');
+      if (motionBadge && pres.player_control) {
+        motionBadge.innerText = pres.player_control;
+        const isMoving = pres.player_control.includes('Moving') || pres.player_control.includes('行走');
+        motionBadge.className = isMoving
+          ? 'text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-700/60 font-semibold animate-pulse'
+          : 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700/60 font-semibold';
+      }
+
+      // Three-Tier Goal Memory & AI Action Directive
+      if (pres.goals) {
+        const immEl = document.getElementById('goalImmediateText');
+        const midEl = document.getElementById('goalMidTermText');
+        const longEl = document.getElementById('goalLongTermText');
+        const dirEl = document.getElementById('aiActionDirectiveText');
+        if (immEl) immEl.innerText = pres.goals.immediate || "自由探索";
+        if (midEl) midEl.innerText = pres.goals.mid_term || "推进主线剧情";
+        if (longEl) longEl.innerText = pres.goals.long_term || "挑战联盟冠军";
+        if (dirEl) dirEl.innerText = pres.goals.action_directive || "【行动指令】: 自由探索";
+      }
+
+      // Dialogue
+      const dlgBox = document.getElementById('dialogueBox');
+      const dlgBadge = document.getElementById('dialogueActiveBadge');
+      const dlgSpeaker = document.getElementById('dialogueSpeakerText');
+      const dlgTime = document.getElementById('dialogueTimeDisplay');
+      const dlgDuration = document.getElementById('dialogueDurationDisplay');
+      const dlgPtrBadge = document.getElementById('dialoguePtrBadge');
+
+      if (dlgPtrBadge) {
+        if (pres.dialogue_active_pointer) {
+          dlgPtrBadge.innerText = `(${pres.dialogue_active_pointer})`;
+        } else {
+          dlgPtrBadge.innerText = '';
+        }
+      }
+
+      if (dlgTime && pres.current_time) {
+        dlgTime.innerText = `时间: ${pres.current_time.split(' ')[1] || pres.current_time}`;
+      }
+
+      if (dlgSpeaker) {
+        if (pres.dialogue_speaker) {
+          dlgSpeaker.innerText = pres.dialogue_speaker;
+          if (pres.dialogue_speaker_category === 'SIGNPOST') {
+            dlgSpeaker.className = 'font-bold text-amber-300';
+          } else if (pres.dialogue_speaker_category === 'MAIN_NPC') {
+            dlgSpeaker.className = 'font-bold text-purple-300';
+          } else if (pres.dialogue_speaker_category === 'SYSTEM') {
+            dlgSpeaker.className = 'font-bold text-cyan-300';
+          } else if (pres.dialogue_speaker_category === 'PROMPT') {
+            dlgSpeaker.className = 'font-bold text-emerald-300';
+          } else {
+            dlgSpeaker.className = 'font-bold text-indigo-300';
+          }
+        } else {
+          dlgSpeaker.innerText = '无活跃对话';
+          dlgSpeaker.className = 'font-bold text-slate-400';
+        }
+      }
+
+      if (dlgBadge && dlgBox) {
+        if (pres.primary_context === 'TITLE_AND_LOGIN' || (pres.modal_stack && pres.modal_stack.includes('MAIN_MENU'))) {
+          dlgBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold';
+          dlgBadge.innerText = '🎮 主菜单 (RAM 实时解析)';
+          if (pres.dialogue_choices && pres.dialogue_choices.length > 0) {
+            dlgBox.innerHTML = `
+              <div class="space-y-1.5 font-mono text-xs">
+                <div class="text-slate-400 font-semibold mb-2">主菜单实时选项 (RAM 0x0223B630):</div>
+                ${pres.dialogue_choices.map(c => `
+                  <div class="p-2 rounded-lg border flex items-center justify-between ${c.selected ? 'bg-cyan-950/80 border-cyan-500 text-cyan-200 font-bold shadow-lg shadow-cyan-950/50' : 'bg-slate-900/50 border-slate-800 text-slate-400'}">
+                    <span class="flex items-center gap-2">
+                      <span class="${c.selected ? 'text-cyan-400 font-bold' : 'text-slate-600'}">${c.selected ? '▶' : '·'}</span>
+                      <span>${c.label}</span>
+                    </span>
+                    <span class="text-[10px] ${c.selected ? 'text-cyan-300 font-bold' : 'text-slate-600'}">${c.selected ? '[当前选中]' : ''}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          } else {
+            dlgBox.innerText = pres.story_objective || "主菜单等待输入";
+          }
+          if (dlgDuration) dlgDuration.classList.add('hidden');
+        } else if (pres.dialogue_active) {
+          dlgBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold animate-pulse';
+          dlgBadge.innerText = '🟢 对话进行中 (RAM 实时分行)';
+
+          const rawText = pres.dialogue_text || '';
+          const lines = rawText.split('\n').filter(Boolean);
+          if (lines.length > 0) {
+            dlgBox.innerHTML = `
+              <div class="space-y-1.5 font-sans">
+                ${lines.map((l, i) => `
+                  <div class="flex items-start gap-2 py-1.5 px-2.5 rounded-lg bg-slate-900/90 border border-emerald-500/30">
+                    <span class="text-[10px] font-mono font-bold text-emerald-400 bg-emerald-950/80 px-1.5 py-0.5 rounded border border-emerald-800/60 mt-0.5">第 ${i+1} 行</span>
+                    <span class="text-slate-100 text-sm font-semibold tracking-wide flex-1">${escapeHtml(l)}</span>
+                  </div>
+                `).join('')}
+              </div>
+            `;
+          } else {
+            dlgBox.innerText = rawText;
+          }
+
+          if (dlgDuration && pres.dialogue_duration_sec !== undefined) {
+            dlgDuration.classList.remove('hidden');
+            dlgDuration.innerText = `⏱️ ${pres.dialogue_duration_sec.toFixed(1)}s`;
+          }
+        } else {
+          if (pres.dialogue_text && pres.dialogue_text !== "[当前未处于剧情对话中]") {
+            dlgBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+            dlgBadge.innerText = '⚪ 待机 (历史缓存)';
+            dlgBox.innerText = pres.dialogue_text;
+          } else {
+            dlgBadge.className = 'text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+            dlgBadge.innerText = '未在对话中';
+            dlgBox.innerText = "[当前未处于剧情对话中]";
+          }
+          if (dlgDuration) dlgDuration.classList.add('hidden');
+        }
+      }
+
+      // Dialogue Timeline List (梳理说话顺序)
+      if (pres.dialogue_history && Array.isArray(pres.dialogue_history)) {
+        const countBadge = document.getElementById('dialogueCountBadge');
+        if (countBadge) countBadge.innerText = `${pres.dialogue_history.length} 条记录`;
+
+        const timelineList = document.getElementById('dialogueTimelineList');
+        if (timelineList) {
+          if (pres.dialogue_history.length === 0) {
+            timelineList.innerHTML = `<div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/60 text-slate-500 text-center text-xs">暂无历史对话记录，进行游戏互动时将自动捕获</div>`;
+          } else {
+            timelineList.innerHTML = pres.dialogue_history.map(item => {
+              const activeClass = item.is_active
+                ? 'border-emerald-500/50 bg-emerald-950/30 ring-1 ring-emerald-500/30'
+                : 'border-slate-800/80 bg-slate-900/60';
+              const speakerBadgeColor = item.speaker_category === 'SIGNPOST' ? 'text-amber-300 bg-amber-950/60 border-amber-800/60'
+                : item.speaker_category === 'MAIN_NPC' ? 'text-purple-300 bg-purple-950/60 border-purple-800/60'
+                : item.speaker_category === 'SYSTEM' ? 'text-cyan-300 bg-cyan-950/60 border-cyan-800/60'
+                : 'text-indigo-300 bg-indigo-950/60 border-indigo-800/60';
+
+              const statusBadge = item.is_active
+                ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/40 animate-pulse">说话中</span>`
+                : `<span class="text-[10px] text-slate-500 font-mono">${item.duration_seconds ? item.duration_seconds.toFixed(1) + 's' : '已结束'}</span>`;
+
+              return `
+                <div class="p-2.5 rounded-xl border ${activeClass} space-y-1.5 transition">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-1.5">
+                      <span class="font-mono text-[10px] text-slate-500">#${item.id}</span>
+                      <span class="text-[11px] font-bold px-1.5 py-0.5 rounded border ${speakerBadgeColor}">${item.speaker}</span>
+                      <span class="text-[10px] text-slate-400">@ ${item.location}</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                      <span class="font-mono text-[10px] text-slate-500">${item.start_time ? item.start_time.split(' ')[1] : ''}</span>
+                      ${statusBadge}
+                    </div>
+                  </div>
+                  <div class="text-slate-200 text-xs font-sans leading-relaxed pl-1 select-text">${item.text}</div>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+      }
+
+      // Event Logs
+      if (pres.recent_events && pres.recent_events.length > 0) {
+        const list = document.getElementById('eventLogList');
+        list.innerHTML = pres.recent_events.map(ev => `
+          <div class="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80">
+            <div class="flex items-center justify-between text-slate-400 text-[11px]">
+              <span class="font-mono text-indigo-400">${ev.event_type}</span>
+              <span class="font-mono text-[10px]">${ev.timestamp}</span>
+            </div>
+            <div class="text-slate-200 mt-1">${ev.description}</div>
+          </div>
+        `).join('');
+      }
+    }
+
+    // Actions
+    async function pressKey(button) {
+      try {
+        await fetch(`${API_BASE}/api/actions/press`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ button: button, frames: 6 })
+        });
+        pollState();
+      } catch (e) {
+        console.error("Press failed:", e);
+      }
+    }
+
+    async function advanceDialogue(steps = 1) {
+      try {
+        await fetch(`${API_BASE}/api/actions/dialogue/advance?steps=${steps}`, { method: 'POST' });
+        setTimeout(pollState, 300);
+      } catch (e) {
+        console.error("Advance dialogue failed:", e);
+      }
+    }
+
+    async function scanDialogueStrings() {
+      try {
+        const res = await fetch(`${API_BASE}/api/actions/dialogue/scan_text`).then(r => r.json());
+        const cont = document.getElementById('scannedStringsContainer');
+        const list = document.getElementById('scannedStringsList');
+        cont.classList.remove('hidden');
+        if (res.strings && res.strings.length > 0) {
+          list.innerHTML = res.strings.map(s => `<div class="p-1.5 rounded bg-slate-800/80 font-sans border border-slate-700/50">${s}</div>`).join('');
+        } else {
+          list.innerHTML = '<div class="text-slate-500">未扫描到新文本</div>';
+        }
+      } catch (e) {
+        console.error("Scan strings failed:", e);
+      }
+    }
+
+    async function clearDialogueTimeline() {
+      try {
+        await fetch(`${API_BASE}/api/dialogue/clear`, { method: 'POST' });
+        pollState();
+      } catch (e) {
+        console.error("Clear dialogue failed:", e);
+      }
+    }
+
+    // Navigation & Reachability Controller
+    let currentNavMode = 'run';
+    let navCatalog = [];
+    let isNavigating = false;
+    let navReachabilityDebounce = null;
+
+    async function loadNavCatalog() {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/nav/catalog`).then(r => r.json());
+        if (res.landmarks && Array.isArray(res.landmarks)) {
+          navCatalog = res.landmarks;
+          const sel = document.getElementById('navLandmarkSelect');
+          if (sel) {
+            sel.innerHTML = '<option value="">-- 选择目标地标 (自动填充坐标) --</option>' +
+              navCatalog.map(lm => `
+                <option value="${lm.id}">[${lm.category.toUpperCase()}] ${lm.name_zh} (X=${lm.coords.x}, Y=${lm.coords.y})</option>
+              `).join('');
+          }
+        }
+      } catch (e) {
+        console.error("Load nav catalog failed:", e);
+      }
+    }
+
+    function onNavLandmarkSelected() {
+      const sel = document.getElementById('navLandmarkSelect');
+      const lmId = sel ? sel.value : "";
+      if (!lmId) return;
+      const targetLm = navCatalog.find(l => l.id === lmId);
+      if (targetLm) {
+        document.getElementById('navGoalX').value = targetLm.coords.x;
+        document.getElementById('navGoalY').value = targetLm.coords.y;
+        if (targetLm.recommended_mode) {
+          setNavMode(targetLm.recommended_mode);
+        }
+        checkReachability(targetLm.coords.x, targetLm.coords.y);
+      }
+    }
+
+    function onNavCoordsChanged() {
+      clearTimeout(navReachabilityDebounce);
+      navReachabilityDebounce = setTimeout(() => {
+        const gx = parseInt(document.getElementById('navGoalX').value, 10);
+        const gy = parseInt(document.getElementById('navGoalY').value, 10);
+        if (!isNaN(gx) && !isNaN(gy)) {
+          checkReachability(gx, gy);
+        }
+      }, 300);
+    }
+
+    async function checkReachability(goalX, goalY) {
+      const badge = document.getElementById('navReachabilityBadge');
+      const distEl = document.getElementById('navDistanceText');
+      const terrainEl = document.getElementById('navTerrainText');
+      const reasonEl = document.getElementById('navReasonText');
+      const currentPosEl = document.getElementById('navCurrentPosText');
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/nav/reachability`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goal_x: goalX, goal_y: goalY, mode: currentNavMode })
+        }).then(r => r.json());
+
+        if (currentPosEl && res.start) {
+          currentPosEl.innerText = `(${res.start.x}, ${res.start.y})`;
+        }
+        if (distEl) {
+          distEl.innerText = `${res.tile_distance_manhattan} 格 (预计 ${res.path_steps_count} 步)`;
+        }
+        if (terrainEl) {
+          terrainEl.innerText = res.terrain_type || "陆地道路";
+        }
+        if (reasonEl) {
+          reasonEl.innerText = res.reason || "";
+        }
+        if (badge) {
+          if (res.is_reachable) {
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700 font-bold';
+            badge.innerText = '🟢 可到达 (Reachable)';
+          } else {
+            badge.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700 font-bold';
+            badge.innerText = '🔴 不可通行 / 障碍阻挡';
+          }
+        }
+      } catch (e) {
+        console.error("Check reachability failed:", e);
+      }
+    }
+
+    function setNavMode(mode) {
+      currentNavMode = mode;
+      const modes = ['walk', 'run', 'bike', 'surf'];
+      modes.forEach(m => {
+        const btn = document.getElementById(`modeBtn_${m}`);
+        if (btn) {
+          if (m === mode) {
+            btn.className = 'p-2 rounded-lg bg-cyan-900/80 border border-cyan-500 text-cyan-200 text-center font-bold ring-1 ring-cyan-500';
+          } else {
+            btn.className = 'p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 text-center font-medium';
+          }
+        }
+      });
+      const gx = parseInt(document.getElementById('navGoalX').value, 10);
+      const gy = parseInt(document.getElementById('navGoalY').value, 10);
+      if (!isNaN(gx) && !isNaN(gy)) checkReachability(gx, gy);
+    }
+
+    async function startAutoNavigation() {
+      const gx = parseInt(document.getElementById('navGoalX').value, 10);
+      const gy = parseInt(document.getElementById('navGoalY').value, 10);
+      if (isNaN(gx) || isNaN(gy)) {
+        alert("请输入有效的数字坐标！");
+        return;
+      }
+
+      isNavigating = true;
+      const startBtn = document.getElementById('startNavBtn');
+      const progBox = document.getElementById('navProgressContainer');
+      const progStep = document.getElementById('navProgressStepText');
+      const progStatus = document.getElementById('navProgressStatusText');
+      const progBar = document.getElementById('navProgressBar');
+
+      if (progBox) progBox.classList.remove('hidden');
+      if (startBtn) {
+        startBtn.innerHTML = '<span class="animate-spin">⏳</span> <span>正在执行纯内存寻路...</span>';
+        startBtn.classList.add('opacity-75');
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/nav/navigate_to`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ goal_x: gx, goal_y: gy, mode: currentNavMode, max_steps: 120 })
+        }).then(r => r.json());
+
+        if (progStep) progStep.innerText = `执行完成: 共 ${res.executed_steps || 0} 步`;
+        if (progStatus) {
+          if (res.status === 'completed') {
+            progStatus.innerText = '✅ 已到达目标！';
+            progStatus.className = 'text-emerald-400 font-bold';
+          } else if (res.status === 'interrupted_by_dialogue') {
+            progStatus.innerText = `💬 触发对话: [${res.speaker}]`;
+            progStatus.className = 'text-purple-400 font-bold';
+          } else {
+            progStatus.innerText = res.message || '寻路结束';
+            progStatus.className = 'text-slate-400';
+          }
+        }
+        if (progBar) progBar.style.width = '100%';
+        pollState();
+      } catch (e) {
+        console.error("Navigation error:", e);
+      } finally {
+        isNavigating = false;
+        if (startBtn) {
+          startBtn.innerHTML = '<i data-lucide="play" class="w-4 h-4"></i> <span>🚀 开始纯内存自动寻路</span>';
+          startBtn.classList.remove('opacity-75');
+          if (window.lucide) lucide.createIcons();
+        }
+      }
+    }
+
+    function stopAutoNavigation() {
+      isNavigating = false;
+      const progStatus = document.getElementById('navProgressStatusText');
+      if (progStatus) progStatus.innerText = '⏹️ 已手动中止';
+    }
+
+    async function triggerAutoNavigate() {
+      const gx = parseInt(document.getElementById('navGoalX').value, 10) || 16;
+      const gy = parseInt(document.getElementById('navGoalY').value, 10) || 705;
+      await startAutoNavigation();
+    }
+
+    async function selectDialogueChoice(index) {
+      try {
+        await fetch(`${API_BASE}/api/actions/dialogue/choice`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ index: index })
+        });
+        setTimeout(pollState, 400);
+      } catch (e) {
+        console.error("Select dialogue choice failed:", e);
+      }
+    }
+
+    async function selectMenuDirect(index) {
+      try {
+        await fetch(`${API_BASE}/api/actions/menu_select`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ index: index })
+        });
+        setTimeout(pollState, 400);
+      } catch (e) {
+        console.error("Select menu direct failed:", e);
+      }
+    }
+
+    async function submitDirectName() {
+      const input = document.getElementById('directNameInput');
+      const name = (input ? input.value : "zero") || "zero";
+      try {
+        await fetch(`${API_BASE}/api/actions/enter_name`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name })
+        });
+        setTimeout(pollState, 500);
+      } catch (e) {
+        console.error("Direct name submit failed:", e);
+      }
+    }
+
+    async function setAndSubmitName(name) {
+      const input = document.getElementById('directNameInput');
+      if (input) input.value = name;
+      await submitDirectName();
+    }
+
+    function toggleTouchCanvas() {
+      const el = document.getElementById('rawTouchCanvasContainer');
+      const btn = document.getElementById('touchModeToggleBtn');
+      if (el) {
+        const isHidden = el.classList.contains('hidden');
+        if (isHidden) {
+          el.classList.remove('hidden');
+          if (btn) btn.innerText = '收起原始触控';
+        } else {
+          el.classList.add('hidden');
+          if (btn) btn.innerText = '切换原始触控';
+        }
+      }
+    }
+
+    async function triggerAction(actionName) {
+      try {
+        await fetch(`${API_BASE}/api/actions/${actionName}`, { method: 'POST' });
+        setTimeout(pollState, 400);
+      } catch (e) {
+        console.error("Action trigger failed:", e);
+      }
+    }
+
+    async function triggerOnboarding() {
+      if (!confirm("是否开始执行全自动新游戏开局流程？")) return;
+      try {
+        alert("已触发自动开局流程！请观察模拟器或对话框。");
+        await fetch(`${API_BASE}/api/actions/onboarding`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ player_name: "zero", gender: "male" })
+        });
+        pollState();
+      } catch (e) {
+        console.error("Onboarding failed:", e);
+      }
+    }
+
+    async function handleScreenTouch(event) {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const x = Math.floor((event.clientX - rect.left) / rect.width * 256);
+      const y = Math.floor((event.clientY - rect.top) / rect.height * 192);
+
+      // Animate ripple
+      const ripple = document.getElementById('touchRipple');
+      ripple.style.left = `${event.clientX - rect.left}px`;
+      ripple.style.top = `${event.clientY - rect.top}px`;
+      ripple.style.opacity = '1';
+      setTimeout(() => ripple.style.opacity = '0', 250);
+
+      document.getElementById('touchCoordPreview').innerText = `Touch: (${x}, ${y})`;
+
+      try {
+        await fetch(`${API_BASE}/api/actions/touch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x: x, y: y, frames: 6 })
+        });
+      } catch (e) {
+        console.error("Touch send failed:", e);
+      }
+    }
+
+    async function runDoctor() {
+      try {
+        const doc = await fetch(`${API_BASE}/api/bizhawk/doctor`).then(r => r.json());
+        alert(`【系统健康诊断结果】\n状态: ${doc.status}\n\n` + doc.checks.map(c => `[Level ${c.level}] ${c.passed ? '✓' : '✗'} ${c.name}: ${c.message}`).join('\n'));
+      } catch (e) {
+        alert("健康诊断请求失败: " + e);
+      }
+    }
+
+    async function captureSnapshot() {
+      try {
+        const snap = await fetch(`${API_BASE}/api/dev/snapshot`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ label: "Manual Web Snapshot" })
+        }).then(r => r.json());
+        alert(`已成功创建内存快照!\nID: ${snap.id}\nFrame: ${snap.frame}\n大小: ${snap.size} bytes`);
+      } catch (e) {
+        alert("快照捕获失败: " + e);
+      }
+    }
+
+    async function toggleAutomationLock() {
+      isHumanLocked = !isHumanLocked;
+      const btn = document.getElementById('lockBtn');
+      try {
+        await fetch(`${API_BASE}/api/dev/automation_pause`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ paused: isHumanLocked })
+        });
+        if (isHumanLocked) {
+          btn.className = 'flex-1 py-2 px-3 rounded-lg bg-rose-600/30 text-rose-300 hover:bg-rose-600/40 border border-rose-500/40 flex items-center justify-center gap-1.5 font-semibold';
+          btn.innerHTML = '<i data-lucide="unlock" class="w-3.5 h-3.5"></i> 解除人工锁定';
+        } else {
+          btn.className = 'flex-1 py-2 px-3 rounded-lg bg-amber-600/20 text-amber-300 hover:bg-amber-600/30 border border-amber-500/30 flex items-center justify-center gap-1.5';
+          btn.innerHTML = '<i data-lucide="lock" class="w-3.5 h-3.5"></i> 人工接管锁定';
+        }
+        if (window.lucide && typeof lucide.createIcons === 'function') {
+          try { lucide.createIcons(); } catch (_) {}
+        }
+      } catch (e) {
+        console.error("Lock toggle failed:", e);
+      }
+    }
+
+    // Auto Poll
+    document.getElementById('autoPoll').addEventListener('change', (e) => {
+      autoPollActive = e.target.checked;
+    });
+
+    let nativeWorldViewer = null;
+    function initWorldViewer() {
+      if (nativeWorldViewer || !window.NativeWorldViewer || !window.THREE) return;
+      const root = document.getElementById('world-viewer');
+      if (!root) return;
+      nativeWorldViewer = new window.NativeWorldViewer(root);
+      nativeWorldViewer.init();
+    }
+
+    setInterval(pollState, 750);
+    pollState();
+    loadNavCatalog();
+    setTimeout(onNavCoordsChanged, 500);
+    window.addEventListener('load', initWorldViewer, { once: true });
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      setTimeout(initWorldViewer, 60);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pokémon Black 2 实时内存差分追踪器 (Memory Diff Tracer)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background-color: #0b1120; color: #e2e8f0; font-family: ui-monospace, Consolas, monospace; }
+    .changed-cell { background-color: #ef4444 !important; color: #ffffff !important; font-weight: bold; animation: pulse-red 0.8s ease-out; }
+    .changed-green { background-color: #10b981 !important; color: #ffffff !important; font-weight: bold; }
+    @keyframes pulse-red {
+      0% { transform: scale(1.15); background-color: #f43f5e; }
+      100% { transform: scale(1); background-color: #ef4444; }
+    }
+  </style>
+</head>
+<body class="p-6 max-w-7xl mx-auto space-y-6">
+
+  <!-- Header -->
+  <header class="flex items-center justify-between pb-4 border-b border-slate-800 flex-wrap gap-4">
+    <div>
+      <h1 class="text-xl font-bold text-cyan-400 flex items-center gap-2">
+        <span>⚡ 宝可梦黑2 实时内存差分追踪器</span>
+        <span class="text-xs font-normal px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">Memory Diff Tracer</span>
+      </h1>
+      <p class="text-xs text-slate-400 mt-1">自动 300ms/500ms 轮询对比 Main RAM，高亮并捕获所有发生变动的字节偏移与数值</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap text-xs">
+      <a href="/frontend/native-map.html" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">🗺️ 3D地图</a>
+      <a href="/frontend/dialogue-inspector.html" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-purple-300 border border-slate-700">💬 对话</a>
+      <a href="/frontend/controller.html" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-indigo-300 border border-slate-700">🎮 手柄</a>
+      <a href="/frontend/navigation.html" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700">🧭 寻路</a>
+      <a href="/frontend/trainer-state.html" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700">👤 玩家</a>
+      <a href="/" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700">总控制台</a>
+    </div>
+  </header>
+
+  <!-- Controls Panel -->
+  <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
+    <div class="md:col-span-8 p-4 rounded-xl bg-slate-900/80 border border-slate-800 space-y-3">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <strong class="text-xs text-slate-200">监控内存地址范围配置 (可输入多个地址或使用预设):</strong>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="presetPlayer" class="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700">预设: 主角+实体池</button>
+          <button id="presetCameraEntity" class="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-slate-700">预设: 摄像机/主角渲染池 (0x279000~0x279400)</button>
+          <button id="presetFullEntity" class="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700">预设: 全量 13 个候选实体</button>
+        </div>
+      </div>
+      <input id="watchRangesInput" type="text" class="w-full bg-slate-950 text-cyan-300 font-mono text-xs px-3 py-2 rounded-lg border border-slate-700" value="0x279080:64, 0x279140:64, 0x279180:64, 0x279200:64, 0x279340:64, 0x2793C0:64" placeholder="例: 0x143620:32, 0x279440:64">
+      <div class="flex items-center justify-between text-xs text-slate-400">
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" id="autoTraceToggle" checked class="rounded bg-slate-800 border-slate-700 text-cyan-500">
+            <span>开启自动差分追踪 (300ms)</span>
+          </label>
+          <label class="flex items-center gap-1.5 cursor-pointer">
+            <input type="checkbox" id="onlyChangedToggle" class="rounded bg-slate-800 border-slate-700 text-cyan-500">
+            <span>仅显示发生变动的字节</span>
+          </label>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="resetBaselineBtn" class="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700">重置当前为基准线</button>
+          <button id="clearLogBtn" class="px-3 py-1 rounded bg-rose-950 hover:bg-rose-900 text-rose-300 border border-rose-800">清空日志</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div class="md:col-span-4 p-4 rounded-xl bg-slate-900/80 border border-slate-800 flex flex-col justify-between">
+      <div>
+        <div class="text-xs text-slate-400">当前总监控字节数</div>
+        <div id="totalBytesStat" class="text-2xl font-bold text-cyan-400 mt-1">208 字节</div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-3 pt-3 border-t border-slate-800 text-xs">
+        <div>
+          <span class="text-slate-500">累计检测变动:</span>
+          <span id="diffEventsCount" class="font-bold text-amber-400 ml-1">0 次</span>
+        </div>
+        <div>
+          <span class="text-slate-500">最近变动字段:</span>
+          <span id="lastChangedAddr" class="font-bold text-rose-400 ml-1">无</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live Memory Blocks Grid -->
+  <div class="space-y-4">
+    <h2 class="text-sm font-bold text-slate-200 flex items-center justify-between">
+      <span>实时内存块监控视图 (变动实时红绿闪烁):</span>
+      <span id="pollStatus" class="text-xs font-normal text-emerald-400">● 轮询中 (300ms)</span>
+    </h2>
+    <div id="blocksContainer" class="space-y-4">
+      <div class="text-slate-500 italic text-xs">正在连接后台并读取内存...</div>
+    </div>
+  </div>
+
+  <!-- Diff Change Log -->
+  <div class="p-4 rounded-xl bg-slate-900/90 border border-slate-800 space-y-3">
+    <div class="flex items-center justify-between">
+      <h3 class="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+        <span>📋 实时变动记录日志 (每次你在游戏里按键、转向、移动都会精准记录):</span>
+      </h3>
+      <button id="copyLogBtn" class="px-2.5 py-1 text-xs rounded bg-cyan-900/60 hover:bg-cyan-800 text-cyan-200 border border-cyan-700">一键复制日志发给 AI</button>
+    </div>
+    <div id="diffLogContainer" class="max-h-64 overflow-y-auto space-y-1.5 font-mono text-xs bg-slate-950 p-3 rounded-lg border border-slate-800/80">
+      <div class="text-slate-500 italic text-[11px]">暂无内存变动记录。在模拟器中转动方向或移动主角，此处将自动抓取！</div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.origin;
+    let baselineMap = new Map(); // key: addr_str -> [bytes]
+    let prevMap = new Map();     // key: addr_str -> [bytes]
+    let totalDiffCount = 0;
+    let pollTimer = null;
+    let diffLogList = [];
+
+    const PRESET_PLAYER = "0x143620:32, 0x279440:64, 0x2790B0:48, 0x263DE0:32, 0x2700A0:32";
+    const PRESET_ALL_ENTITIES = "0x143620:32, 0x263DE0:32, 0x2700A0:32, 0x2790B0:32, 0x279440:64, 0x279480:48, 0x32CD00:32";
+
+    document.getElementById('presetPlayer').addEventListener('click', () => {
+      document.getElementById('watchRangesInput').value = PRESET_PLAYER;
+      resetBaseline();
+    });
+    document.getElementById('presetFullEntity').addEventListener('click', () => {
+      document.getElementById('watchRangesInput').value = PRESET_ALL_ENTITIES;
+      resetBaseline();
+    });
+    document.getElementById('resetBaselineBtn').addEventListener('click', () => resetBaseline());
+    document.getElementById('clearLogBtn').addEventListener('click', () => {
+      diffLogList = [];
+      document.getElementById('diffLogContainer').innerHTML = '<div class="text-slate-500 italic text-[11px]">日志已清空。</div>';
+    });
+    document.getElementById('copyLogBtn').addEventListener('click', () => {
+      const text = diffLogList.join('\n') || '暂无变动日志';
+      navigator.clipboard.writeText(text);
+      alert('已复制变动日志到剪贴板！');
+    });
+
+    function parseRanges(str) {
+      const parts = str.split(',').map(s => s.trim()).filter(Boolean);
+      const list = [];
+      for (const p of parts) {
+        const [addrStr, lenStr] = p.split(':').map(s => s.trim());
+        let addr = parseInt(addrStr, 16);
+        if (isNaN(addr)) addr = parseInt(addrStr, 10);
+        if (isNaN(addr)) continue;
+        const len = parseInt(lenStr, 10) || 32;
+        list.push({ offset: addr, length: len });
+      }
+      return list;
+    }
+
+    function resetBaseline() {
+      baselineMap.clear();
+      prevMap.clear();
+    }
+
+    async function pollDiff() {
+      if (!document.getElementById('autoTraceToggle').checked) return;
+      const ranges = parseRanges(document.getElementById('watchRangesInput').value);
+      if (!ranges.length) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/map/watch_diff`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ranges })
+        });
+        const data = await res.json();
+        renderBlocks(data.blocks || []);
+      } catch (err) {
+        document.getElementById('pollStatus').textContent = '⚠️ 轮询出错 / 后台离线';
+        document.getElementById('pollStatus').className = 'text-xs font-normal text-rose-400';
+      }
+    }
+
+    function renderBlocks(blocks) {
+      document.getElementById('pollStatus').textContent = '● 实时追踪中 (300ms)';
+      document.getElementById('pollStatus').className = 'text-xs font-normal text-emerald-400';
+
+      const container = document.getElementById('blocksContainer');
+      let totalBytes = 0;
+      let newDiffEvents = 0;
+      const onlyChanged = document.getElementById('onlyChangedToggle').checked;
+
+      const htmlBlocks = blocks.map(block => {
+        totalBytes += block.length;
+        const key = block.arm9_addr;
+        const prevBytes = prevMap.get(key) || block.bytes;
+        const baseBytes = baselineMap.get(key) || block.bytes;
+
+        let hasBlockChange = false;
+        const cells = block.bytes.map((val, idx) => {
+          const prevVal = prevBytes[idx];
+          const baseVal = baseBytes[idx];
+          const isChanged = val !== prevVal;
+          const isDifferentFromBase = val !== baseVal;
+
+          if (isChanged) {
+            hasBlockChange = true;
+            newDiffEvents++;
+            const timeStr = new Date().toLocaleTimeString();
+            const logEntry = `[${timeStr}] 内存变动 @ ${block.arm9_addr}+0x${idx.toString(16).toUpperCase().padStart(2, '0')}: 原值 0x${prevVal.toString(16).toUpperCase().padStart(2, '0')} (${prevVal}) -> 新值 0x${val.toString(16).toUpperCase().padStart(2, '0')} (${val})`;
+            diffLogList.unshift(logEntry);
+            if (diffLogList.length > 200) diffLogList.pop();
+            document.getElementById('lastChangedAddr').textContent = `${block.arm9_addr}+0x${idx.toString(16).toUpperCase()}`;
+          }
+
+          const cellClass = isChanged
+            ? 'changed-cell px-1.5 py-0.5 rounded text-center'
+            : isDifferentFromBase
+              ? 'changed-green px-1.5 py-0.5 rounded text-center'
+              : 'bg-slate-950 text-slate-300 px-1.5 py-0.5 rounded text-center hover:bg-slate-800';
+
+          return `<div class="${cellClass}" title="Offset: +0x${idx.toString(16).toUpperCase()} (${idx})\nDecimal: ${val}">${val.toString(16).toUpperCase().padStart(2, '0')}</div>`;
+        });
+
+        prevMap.set(key, [...block.bytes]);
+        if (!baselineMap.has(key)) baselineMap.set(key, [...block.bytes]);
+
+        if (onlyChanged && !hasBlockChange) return '';
+
+        return `
+          <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-cyan-300">${block.arm9_addr} <span class="text-slate-500 font-normal">(Main RAM 0x${block.offset.toString(16).toUpperCase()})</span></span>
+              <span class="text-slate-400 font-mono text-[11px]">${block.length} 字节</span>
+            </div>
+            <div class="grid grid-cols-8 sm:grid-cols-16 gap-1 font-mono text-xs">
+              ${cells.join('')}
+            </div>
+          </div>
+        `;
+      }).filter(Boolean);
+
+      container.innerHTML = htmlBlocks.join('') || '<div class="text-slate-500 italic text-xs">当前无变动字节显示 (勾选了仅显示变动)。</div>';
+      document.getElementById('totalBytesStat').textContent = `${totalBytes} 字节`;
+
+      if (newDiffEvents > 0) {
+        totalDiffCount += newDiffEvents;
+        document.getElementById('diffEventsCount').textContent = `${totalDiffCount} 次`;
+        const logBox = document.getElementById('diffLogContainer');
+        logBox.innerHTML = diffLogList.slice(0, 30).map(l => `
+          <div class="py-0.5 text-slate-200 border-b border-slate-900/60 last:border-0 hover:text-amber-300">
+            ${l}
+          </div>
+        `).join('');
+      }
+    }
+
+    pollTimer = setInterval(pollDiff, 300);
+    pollDiff();
+  </script>
+</body>
+</html>

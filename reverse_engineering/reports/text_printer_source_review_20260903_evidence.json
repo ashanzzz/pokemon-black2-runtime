@@ -1,0 +1,280 @@
+{
+  "reviewed_at": "2026-09-03T01:29:24.4367642Z",
+  "method": "Source review, historical artifact reads, ROM header/hash reads, and read-only bridge status. No controller input or RAM writes.",
+  "historical_sample": {
+    "sha256": "D90BCF1C8F9D8582DA23C44E1B1ADC36866AAEA960EA4FF95EB6DF60B1186DF9",
+    "path": "reverse_engineering/experiments/EXP_010_text_printer_a_edge/snapshot_after_interaction_start.json",
+    "words": [
+      {
+        "address": "0x022490AC",
+        "word": "0x79D1"
+      },
+      {
+        "address": "0x022490AE",
+        "word": "0x5B66"
+      },
+      {
+        "address": "0x022490B0",
+        "word": "0x7684"
+      },
+      {
+        "address": "0x022490B2",
+        "word": "0x529B"
+      },
+      {
+        "address": "0x022490B4",
+        "word": "0x91CF"
+      },
+      {
+        "address": "0x022490B6",
+        "word": "0x771F"
+      },
+      {
+        "address": "0x022490B8",
+        "word": "0x662F"
+      },
+      {
+        "address": "0x022490BA",
+        "word": "0x60CA"
+      },
+      {
+        "address": "0x022490BC",
+        "word": "0x4EBA"
+      },
+      {
+        "address": "0x022490BE",
+        "word": "0xFF01"
+      },
+      {
+        "address": "0x022490C0",
+        "word": "0xF000"
+      },
+      {
+        "address": "0x022490C2",
+        "word": "0xBE01"
+      },
+      {
+        "address": "0x022490C4",
+        "word": "0x0000"
+      },
+      {
+        "address": "0x022490C6",
+        "word": "0xFFFE"
+      },
+      {
+        "address": "0x022490C8",
+        "word": "0x73B0"
+      },
+      {
+        "address": "0x022490CA",
+        "word": "0x5728"
+      },
+      {
+        "address": "0x022490CC",
+        "word": "0x53EF"
+      },
+      {
+        "address": "0x022490CE",
+        "word": "0x4EE5"
+      },
+      {
+        "address": "0x022490D0",
+        "word": "0x7528"
+      },
+      {
+        "address": "0x022490D2",
+        "word": "0x901A"
+      },
+      {
+        "address": "0x022490D4",
+        "word": "0x4FE1"
+      },
+      {
+        "address": "0x022490D6",
+        "word": "0xFFFE"
+      },
+      {
+        "address": "0x022490D8",
+        "word": "0x548C"
+      },
+      {
+        "address": "0x022490DA",
+        "word": "0xFF11"
+      },
+      {
+        "address": "0x022490DC",
+        "word": "0xFF10"
+      },
+      {
+        "address": "0x022490DE",
+        "word": "0xFF10"
+      },
+      {
+        "address": "0x022490E0",
+        "word": "0x4E2A"
+      },
+      {
+        "address": "0x022490E2",
+        "word": "0x4EBA"
+      },
+      {
+        "address": "0x022490E4",
+        "word": "0xF000"
+      },
+      {
+        "address": "0x022490E6",
+        "word": "0xBE00"
+      },
+      {
+        "address": "0x022490E8",
+        "word": "0x0000"
+      },
+      {
+        "address": "0x022490EA",
+        "word": "0xFFFE"
+      },
+      {
+        "address": "0x022490EC",
+        "word": "0x540C"
+      },
+      {
+        "address": "0x022490EE",
+        "word": "0x65F6"
+      },
+      {
+        "address": "0x022490F0",
+        "word": "0x6E38"
+      },
+      {
+        "address": "0x022490F2",
+        "word": "0x620F"
+      },
+      {
+        "address": "0x022490F4",
+        "word": "0xFF01"
+      },
+      {
+        "address": "0x022490F6",
+        "word": "0xFFFF"
+      }
+    ],
+    "raw_memory_frame": "unresolved: map/watch_diff omitted the bridge frame",
+    "state_frame": 3234823
+  },
+  "runtime_identity": {
+    "memory_domains": [
+      "ARM7 WRAM",
+      "ARM9 System Bus",
+      "Data TCM",
+      "Instruction TCM",
+      "SRAM",
+      "ARM7 BIOS",
+      "Firmware",
+      "Shared WRAM",
+      "ARM7 System Bus",
+      "Main RAM",
+      "ROM",
+      "Waterbox PageData",
+      "ARM9 BIOS"
+    ],
+    "arm9_stored_size": "0x000731D8",
+    "rom_path": "D:\\SynologyDrive\\download\\desmume-0.9.13-win64\\口袋妖怪黑2.nds",
+    "status_frame": 3309340,
+    "reported_bridge_capabilities": {
+      "hash": true,
+      "touch": true,
+      "read_batch": true,
+      "frame_advance": true,
+      "memory_domains": true,
+      "watch_write": false,
+      "savestate": true,
+      "pause_resume": true,
+      "scan_headers": true
+    },
+    "arm9_load_address": "0x02004000",
+    "game_code": "IREJ",
+    "arm9_rom_offset": "0x00004000",
+    "reported_rom_sha1": "8DB71663502BBF3B43AC3C9052EC390C390BE62F",
+    "reported_bizhawk_version": "2.11.1",
+    "local_rom_sha1": "8DB71663502BBF3B43AC3C9052EC390C390BE62F",
+    "jit_enabled": "unresolved",
+    "connected": true,
+    "revision": 1
+  },
+  "sources": [
+    {
+      "repository": "ds-pokemon-hacking/swan",
+      "commit": "4324f73a7659353a21bf4c523905c5d09cf6a066",
+      "files": [
+        "README.md",
+        "IRDO.yml",
+        "IREO.yml",
+        "root.swandb",
+        "gfl/str/gfl_textprint.h",
+        "gfl/g2d/gfl_bitmap.h",
+        "gfl/g2d/gfl_bg_sys.h",
+        "system/gamesystem.h",
+        "field/fieldmap.h",
+        "field/field_player.h",
+        "field/field_mmodel.h"
+      ]
+    },
+    {
+      "repository": "pret/pokeheartgold",
+      "commit": "0985e8718df4f25e64d6507d89c0c97c0d288981",
+      "files": [
+        "include/font_types_def.h",
+        "include/bg_window.h",
+        "include/constants/charcode.h",
+        "src/render_text.c",
+        "src/text.c",
+        "src/bg_window.c",
+        "src/string_control_code.c"
+      ]
+    },
+    {
+      "repository": "pret/pokeplatinum",
+      "commit": "bca37652996330898fdd2408281ea419b8c995c7",
+      "files": [
+        "include/render_text.h",
+        "include/bg_window.h",
+        "include/constants/charcode.h",
+        "src/render_text.c",
+        "src/text.c",
+        "include/script_manager.h",
+        "src/script_manager.c",
+        "src/scrcmd.c"
+      ]
+    },
+    {
+      "repository": "ds-pokemon-hacking/CTRMapV",
+      "commit": "3c2778095867f3007ad48d2c268feb0331d43d70",
+      "files": [
+        "src/ctrmap/formats/pokemon/text/GenVMessageHandler.java",
+        "src/ctrmap/formats/pokemon/text/GenVTextVariableCode.java",
+        "src/ctrmap/resources/scripting/cm_ide/sdk/EV_GEN_V/SDK5-B2W2-Generated.lib"
+      ],
+      "archive_entries_read": [
+        "src/event/dialogs/Message.h",
+        "src/event/actors/Actor.h"
+      ]
+    },
+    {
+      "repository": "ds-pokemon-hacking/CTRMap-CE",
+      "commit": "74e2b035ac730f5cf76d588d597dcb43569d4c4b",
+      "files": [
+        "src/ctrmap/formats/pokemon/text/GFMessageStream.java",
+        "src/ctrmap/formats/pokemon/text/TextVariable.java"
+      ]
+    },
+    {
+      "repository": "TASEmulators/BizHawk",
+      "tag": "2.11.1",
+      "files": [
+        "src/BizHawk.Emulation.Cores/Consoles/Nintendo/NDS/MelonDS.IDebuggable.cs"
+      ],
+      "caveat": "Upstream source; local translated binary behavior still needs a capability check."
+    }
+  ]
+}
+

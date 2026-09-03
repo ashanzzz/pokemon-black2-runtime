@@ -1,0 +1,49 @@
+{
+  "before": "reverse_engineering\\experiments\\EXP_010_text_printer_a_edge\\snapshot_pre_a_edge.json",
+  "after": "reverse_engineering\\experiments\\EXP_010_text_printer_a_edge\\snapshot_step_01_a.json",
+  "changed_byte_count": 6,
+  "changes": [
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C38",
+      "address": "0x02332C38",
+      "before": 1,
+      "after": 2
+    },
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C4C",
+      "address": "0x02332C4C",
+      "before": 236,
+      "after": 246
+    },
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C57",
+      "address": "0x02332C57",
+      "before": 0,
+      "after": 16
+    },
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C5A",
+      "address": "0x02332C5A",
+      "before": 64,
+      "after": 68
+    },
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C6C",
+      "address": "0x02332C6C",
+      "before": 8,
+      "after": 65
+    },
+    {
+      "range": "printer_pointer_candidates",
+      "offset": "0x332C6E",
+      "address": "0x02332C6E",
+      "before": 0,
+      "after": 16
+    }
+  ]
+}

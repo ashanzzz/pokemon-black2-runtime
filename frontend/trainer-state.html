@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>模块测试：玩家属性与队伍状态</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      --bg: #07101c;
+      --panel: #101d31;
+      --line: #2b3a55;
+    }
+    body {
+      background: var(--bg);
+      font-family: ui-monospace, Consolas, monospace;
+    }
+    .glass-panel {
+      background: rgba(16, 29, 49, 0.75);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--line);
+    }
+  </style>
+</head>
+<body class="text-slate-200 min-h-screen p-4 md:p-6 flex flex-col gap-5">
+
+  <!-- 顶部模块导航栏 -->
+  <header class="glass-panel rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-lg">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-amber-600/30 border border-amber-500/50 flex items-center justify-center text-amber-300">
+        <i data-lucide="user" class="w-6 h-6"></i>
+      </div>
+      <div>
+        <h1 class="text-base font-bold text-slate-100 flex items-center gap-2">
+          <span>玩家属性与队伍状态模块</span>
+          <span class="text-xs px-2 py-0.5 rounded bg-amber-900/60 text-amber-300 border border-amber-700/50">独立测试</span>
+        </h1>
+        <p class="text-xs text-slate-400">实时读取 RAM 玩家名字、性别、金钱、徽章数、世界坐标、朝向与队伍宝可梦数据</p>
+      </div>
+    </div>
+    <nav class="flex flex-wrap items-center gap-2 text-xs">
+      <a href="/frontend/native-map.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+        <i data-lucide="map" class="w-3.5 h-3.5 text-cyan-400"></i> 🗺️ 3D地图
+      </a>
+      <a href="/frontend/dialogue-inspector.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+        <i data-lucide="message-square" class="w-3.5 h-3.5 text-purple-400"></i> 💬 对话捕获
+      </a>
+      <a href="/frontend/controller.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+        <i data-lucide="gamepad-2" class="w-3.5 h-3.5 text-indigo-400"></i> 🎮 虚拟手柄
+      </a>
+      <a href="/frontend/navigation.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+        <i data-lucide="navigation" class="w-3.5 h-3.5 text-emerald-400"></i> 🧭 自动寻路
+      </a>
+      <a href="/frontend/trainer-state.html" class="px-3 py-1.5 rounded-lg bg-amber-600/40 text-amber-200 border border-amber-500 flex items-center gap-1.5 font-bold shadow">
+        <i data-lucide="user" class="w-3.5 h-3.5 text-amber-300"></i> 👤 玩家属性
+      </a>
+      <a href="/frontend/memory-tracer.html" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition">
+        <i data-lucide="cpu" class="w-3.5 h-3.5 text-rose-400"></i> 🔍 内存诊断
+      </a>
+    </nav>
+  </header>
+
+  <!-- 主内容 -->
+  <main class="grid grid-cols-1 lg:grid-cols-12 gap-5 flex-1">
+
+    <!-- 训练家与劲敌基本卡片 (6 cols) -->
+    <div class="lg:col-span-6 space-y-5">
+      <div class="glass-panel p-6 rounded-2xl shadow-lg border border-slate-700/60 space-y-5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-12 h-12 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center text-xl">
+              👦
+            </div>
+            <div>
+              <div id="trainerName" class="text-base font-bold text-slate-100">zero</div>
+              <div id="trainerGender" class="text-xs text-slate-400">男孩子 (Male)</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <div class="w-10 h-10 rounded-xl bg-purple-950/80 border border-purple-800/80 flex items-center justify-center text-base">
+              🦹
+            </div>
+            <div>
+              <div class="text-[10px] text-purple-400">劲敌 (Rival)</div>
+              <div id="rivalName" class="text-sm font-bold text-amber-300 font-mono">NO</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 text-center text-xs">
+          <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+            <div class="text-[10px] text-slate-500">持有金钱</div>
+            <div id="moneyText" class="text-base font-bold text-amber-300">¥ 3000</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+            <div class="text-[10px] text-slate-500">道馆徽章</div>
+            <div id="badgeCount" class="text-base font-bold text-emerald-400">0 / 8</div>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1">
+            <div class="text-[10px] text-slate-500">队伍宝可梦</div>
+            <div id="partyCount" class="text-base font-bold text-indigo-300">0 / 6</div>
+          </div>
+        </div>
+
+        <div class="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2 text-xs">
+          <div class="text-slate-400 font-semibold flex items-center gap-1.5">
+            <i data-lucide="compass" class="w-4 h-4 text-cyan-400"></i>
+            <span>大地图实时空间状态:</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-slate-300">
+            <div>世界坐标: <span id="posXYZ" class="font-bold text-slate-100 font-mono">X: 0, Y: 0, Z: 0</span></div>
+            <div>朝向: <span id="facingDir" class="font-bold text-emerald-400 font-mono">South (↓)</span></div>
+            <div>移动状态: <span id="moveState" class="font-bold text-slate-100">Idle (静止)</span></div>
+            <div>当前区域: <span id="mapName" class="font-bold text-indigo-300">大地图</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 队伍槽位详情 (6 cols) -->
+    <div class="lg:col-span-6 space-y-5">
+      <div class="glass-panel p-6 rounded-2xl shadow-lg border border-slate-700/60 space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-bold text-slate-200 flex items-center gap-2">
+            <i data-lucide="shield" class="w-4 h-4 text-purple-400"></i>
+            <span>队伍宝可梦槽位 (Party Pokémon Slots)</span>
+          </div>
+          <span class="text-[10px] text-slate-500">最多 6 只</span>
+        </div>
+
+        <div id="partySlotsList" class="space-y-2 text-xs">
+          <div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-slate-500 text-center">
+            当前队伍中暂无宝可梦（请前往展望台领取初学者宝可梦）
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+    lucide.createIcons();
+    const API_BASE = window.location.origin;
+
+    async function pollTrainer() {
+      try {
+        const res = await fetch(`${API_BASE}/api/state`).then(r => r.json());
+        document.getElementById('trainerName').innerText = res.player_name || 'zero';
+        document.getElementById('trainerGender').innerText = res.gender || '男孩子 (Male)';
+        const rivalEl = document.getElementById('rivalName');
+        if (rivalEl) rivalEl.innerText = res.rival_name || 'NO';
+        document.getElementById('moneyText').innerText = `¥ ${res.money || 0}`;
+        document.getElementById('badgeCount').innerText = `${res.badges || 0} / 8`;
+        document.getElementById('partyCount').innerText = `${res.party_count || 0} / 6`;
+        document.getElementById('frameCounter').innerText = `Frame: ${res.frame || 0}`;
+
+        const pos = res.player_world_pos || {};
+        document.getElementById('posXYZ').innerText = `X: ${pos.x ?? '--'}, Y: ${pos.y ?? '--'}, Z: ${pos.z ?? '--'}`;
+        document.getElementById('facingDir').innerText = res.player_facing || '--';
+        document.getElementById('moveState').innerText = res.movement_state || 'Idle';
+        document.getElementById('mapName').innerText = res.location || '未知区域';
+
+        const partyList = document.getElementById('partySlotsList');
+        if (res.party_count === 0) {
+          partyList.innerHTML = '<div class="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-slate-500 text-center">当前队伍中暂无宝可梦（请前往展望台领取初学者宝可梦）</div>';
+        }
+      } catch (e) {
+        console.error("Poll trainer error:", e);
+      }
+    }
+
+    setInterval(pollTrainer, 400);
+    pollTrainer();
+  </script>
+</body>
+</html>

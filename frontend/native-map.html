@@ -1,0 +1,895 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pokémon Black 2 · ROM 原生 3D 官方材质地图</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Three.js & Controls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b1323; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    body {
+      background: #040914;
+      color: #e2e8f0;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, monospace;
+    }
+  </style>
+</head>
+<body class="h-screen w-screen overflow-hidden flex flex-col select-none">
+
+  <!-- Top Navigation Bar -->
+  <header class="h-14 bg-slate-950/95 border-b border-slate-800 flex items-center justify-between px-4 z-20 shrink-0">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-600 to-blue-700 flex items-center justify-center shadow-lg shadow-cyan-900/40 border border-cyan-500/30">
+        <i data-lucide="box" class="w-4 h-4 text-cyan-100"></i>
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-sm text-cyan-300 tracking-wide">ROM 原生 3D 官方材质地图</h1>
+          <span id="active-mode-badge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">
+            BMD0 网格 + BTX0 官方贴图
+          </span>
+        </div>
+        <p class="text-[11px] text-slate-400">100% 官方 3D 建筑材质 · 室内家具/楼梯/围墙与室外大地图精准对齐</p>
+      </div>
+    </div>
+
+    <!-- Status and Toolbar Controls -->
+    <div class="flex items-center gap-2">
+      <div class="flex items-center bg-slate-900/90 border border-slate-800 rounded-lg p-1 gap-1">
+        <button id="zoom-in" title="放大" class="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 transition">
+          <i data-lucide="zoom-in" class="w-4 h-4"></i>
+        </button>
+        <button id="zoom-out" title="缩小" class="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 transition">
+          <i data-lucide="zoom-out" class="w-4 h-4"></i>
+        </button>
+        <div class="w-[1px] h-4 bg-slate-800 mx-0.5"></div>
+        <button id="rotate-left" title="向左旋转 45°" class="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 transition">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+        <button id="rotate-right" title="向右旋转 45°" class="p-1.5 rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 transition">
+          <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+        </button>
+        <div class="w-[1px] h-4 bg-slate-800 mx-0.5"></div>
+        <button id="view-top" title="俯视角" class="px-2 py-1 text-xs rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 font-medium transition">
+          俯视
+        </button>
+        <button id="view-iso" title="经典 2.5D/3D 斜视角" class="px-2 py-1 text-xs rounded hover:bg-slate-800 text-slate-300 hover:text-cyan-300 font-medium transition">
+          斜视
+        </button>
+        <button id="btn-fit" title="居中适应窗口" class="px-2 py-1 text-xs rounded bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/60 font-medium transition">
+          重置视角
+        </button>
+      </div>
+
+      <div class="w-[1px] h-6 bg-slate-800 mx-1"></div>
+
+      <!-- Quick Nav Buttons -->
+      <a href="/" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/60 transition">
+        <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> 总控制台
+      </a>
+      <button id="reload-btn" title="重新从 RAM 扫描加载" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition">
+        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main View Container (Left 3D Canvas, Right Status Panel) -->
+  <div class="flex-1 flex overflow-hidden relative">
+
+    <!-- Viewport Container (Left 3D) -->
+    <div class="flex-1 relative bg-slate-950 min-w-0 flex items-center justify-center overflow-hidden">
+      <canvas id="map-canvas" class="w-full h-full block focus:outline-none cursor-grab"></canvas>
+
+      <!-- Top Overlay Badge -->
+      <div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
+        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono backdrop-blur-md shadow-lg">
+          <span id="live-indicator" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span id="scene-type-badge" class="font-bold text-purple-300">INTERIOR (室内场景 #426)</span>
+          <span class="text-slate-600">|</span>
+          <span id="map-size-badge" class="text-slate-400">BMD0 官方 3D 模型已对齐</span>
+        </div>
+      </div>
+
+      <!-- Bottom Hint Bar -->
+      <div class="absolute bottom-3 left-3 max-w-[600px] pointer-events-none">
+        <div id="hint-box" class="px-3.5 py-2 rounded-lg bg-slate-900/90 border border-slate-800 text-xs text-slate-400 backdrop-blur-md shadow-lg flex items-center gap-2">
+          <i data-lucide="mouse-pointer" class="w-4 h-4 text-cyan-400 shrink-0"></i>
+          <span id="hint-text">鼠标左键旋转视角 · 滚轮缩放 · 鼠标右键平移 · 官方 3D 室内外模型与材质全自动渲染</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Structured Live Status & Metadata Panel (Width 390px) -->
+    <aside class="w-[390px] h-full bg-slate-950/95 border-l border-slate-800/80 flex flex-col shrink-0 overflow-y-auto z-10">
+
+      <!-- Section 1: Player Real-time Runtime State -->
+      <div class="p-4 border-b border-slate-800/80 space-y-3 bg-slate-900/40">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="user-check" class="w-4 h-4 text-emerald-400"></i>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">玩家实时运行状态</h2>
+          </div>
+          <span id="player-verified-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono font-semibold flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Verified ✓
+          </span>
+        </div>
+
+        <!-- Coordinates Hero Cards -->
+        <div class="grid grid-cols-2 gap-2.5">
+          <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col items-center justify-center">
+            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">世界坐标 X</span>
+            <span id="player-x-val" class="text-3xl font-black font-mono text-cyan-300 mt-0.5">--</span>
+            <span id="player-chunk-x" class="text-[10px] text-slate-500 font-mono mt-0.5">Chunk: 0 · Local: --</span>
+          </div>
+          <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex flex-col items-center justify-center">
+            <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">世界坐标 Y</span>
+            <span id="player-y-val" class="text-3xl font-black font-mono text-cyan-300 mt-0.5">--</span>
+            <span id="player-chunk-y" class="text-[10px] text-slate-500 font-mono mt-0.5">Chunk: 0 · Local: --</span>
+          </div>
+        </div>
+
+        <!-- Elevation, Facing, Movement State Grid -->
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <!-- Elevation (Z) -->
+          <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800/80 flex flex-col items-center">
+            <span class="text-[10px] text-slate-400 flex items-center gap-1">
+              <i data-lucide="layers" class="w-3 h-3 text-purple-400"></i> 高程 (Z)
+            </span>
+            <span id="player-z-val" class="text-sm font-bold font-mono text-purple-300 mt-1">--</span>
+          </div>
+
+          <!-- Facing Direction -->
+          <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800/80 flex flex-col items-center">
+            <span class="text-[10px] text-slate-400 flex items-center gap-1">
+              <i data-lucide="compass" class="w-3 h-3 text-amber-400"></i> 朝向 (Dir)
+            </span>
+            <span id="player-facing-val" class="text-sm font-bold text-amber-300 mt-1 flex items-center gap-0.5">
+              <span id="player-facing-icon">↑</span> <span id="player-facing-text">北</span>
+            </span>
+          </div>
+
+          <!-- Movement State -->
+          <div class="p-2 rounded-lg bg-slate-900/80 border border-slate-800/80 flex flex-col items-center">
+            <span class="text-[10px] text-slate-400 flex items-center gap-1">
+              <i data-lucide="activity" class="w-3 h-3 text-emerald-400"></i> 移动状态
+            </span>
+            <span id="player-movement-val" class="text-[11px] font-semibold text-emerald-300 mt-1 truncate max-w-[90px]" title="Standing (静止)">
+              静止站立
+            </span>
+          </div>
+        </div>
+
+        <!-- Location Name Bar -->
+        <div class="p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 flex items-center justify-between text-xs">
+          <div class="flex items-center gap-2">
+            <i data-lucide="map-pin" class="w-3.5 h-3.5 text-rose-400"></i>
+            <span class="text-slate-400">当前区域:</span>
+          </div>
+          <span id="player-location-val" class="font-bold text-slate-200">桧扇市 室内房间 (Header #426)</span>
+        </div>
+      </div>
+
+      <!-- Section 2: Room Material & Entity Layout List -->
+      <div class="p-4 border-b border-slate-800/80 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="shapes" class="w-4 h-4 text-amber-400"></i>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">ROM 静态事件记录（非 Runtime Actor）</h2>
+          </div>
+          <span id="events-count-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+            已定位素材
+          </span>
+        </div>
+
+        <div id="warps-list-container" class="space-y-1.5 max-h-56 overflow-y-auto text-xs pr-1">
+          <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60 text-slate-500 text-center text-xs">
+            正在读取当前 Map Header 的 ROM 原始事件记录...
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3: ROM 3D Matrix & Model Metadata -->
+      <div class="p-4 border-b border-slate-800/80 space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="box" class="w-4 h-4 text-purple-400"></i>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">底层 ROM 资源元数据</h2>
+          </div>
+          <span id="matrix-badge" class="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">
+            Matrix #45 (1×1)
+          </span>
+        </div>
+
+        <div class="space-y-1 text-xs">
+          <div class="flex items-center justify-between py-1 border-b border-slate-900">
+            <span class="text-slate-400">BMD0 建筑网格:</span>
+            <span id="meta-bmd-val" class="font-mono text-slate-200 font-semibold">#847 (m_h02_00_00)</span>
+          </div>
+          <div class="flex items-center justify-between py-1 border-b border-slate-900">
+            <span class="text-slate-400">BTX0 官方纹理:</span>
+            <span id="meta-btx-val" class="font-mono text-cyan-300 font-semibold">#282 · 12/12 材质精准匹配</span>
+          </div>
+          <div class="flex items-center justify-between py-1">
+            <span class="text-slate-400">地图规模:</span>
+            <span id="meta-size-val" class="font-mono text-slate-300">1 × 1 Chunks (32×32 Tiles)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 4: Live AI Map Knowledge Log -->
+      <div class="p-4 flex-1 flex flex-col space-y-2.5">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <i data-lucide="file-code-2" class="w-4 h-4 text-cyan-400"></i>
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">AI 语义地图知识库</h2>
+          </div>
+          <button id="refresh-knowledge-btn" class="text-[11px] px-2 py-1 rounded bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 border border-slate-800 transition flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3 h-3"></i> 刷新
+          </button>
+        </div>
+
+        <pre id="knowledge-pre" class="flex-1 min-h-[140px] max-h-[220px] p-3 rounded-xl bg-slate-900/90 border border-slate-800 text-[11px] font-mono leading-relaxed text-slate-300 overflow-y-auto whitespace-pre-wrap select-text">正在从 ARM9 读取当前地图语义知识...</pre>
+      </div>
+
+    </aside>
+  </div>
+
+  <script>
+    lucide.createIcons();
+
+    let visualData = null;
+    let livePlayer = { x: 6, y: 11, elevation: 11, facing: 'North' };
+    let lastLoadedSceneKey = "";
+    let isLoadBusy = false;
+
+    // 3D Three.js State
+    const canvas3D = document.getElementById('map-canvas');
+    let scene3D, camera3D, renderer3D, controls3D, group3D, marker3D, entitiesGroup3D;
+    let canvasResizeObserver;
+    const loader3D = new THREE.GLTFLoader();
+    const modelCache = new Map();
+    const WORLD_UNITS_PER_TILE = 16;
+    let meshOffsetOrigin = new THREE.Vector3(0, 0, 0);
+
+    function isInteriorScene(data) {
+      const matrix = data?.matrix_id;
+      const size = data?.matrix_size || {};
+      return data?.scene_type === 'INTERIOR' || matrix === 45 || (size.width === 1 && size.height === 1);
+    }
+
+    // Event records are static ROM data.  Convert the Map Header's local plane
+    // coordinates into the already-verified matrix coordinates for display, but
+    // never invent a semantic object type or a live Actor position.
+    function normalizedStaticEvents(data) {
+      const source = data.entities || {};
+      const bounds = data.map_definition_bounds || {};
+      const tileSize = data.chunk_tile_size || { width: 32, height: 32 };
+      const usesLocalPlane = source.coordinate_space === 'map_definition_local_map_plane';
+      const originX = usesLocalPlane ? (bounds.min_chunk_x || 0) * tileSize.width : 0;
+      const originY = usesLocalPlane ? (bounds.min_chunk_y || 0) * tileSize.height : 0;
+      const at = (record) => ({
+        ...record,
+        tile_x: Number(record.tile_x) + originX,
+        tile_y: Number(record.tile_y) + originY,
+        coordinate_space: source.coordinate_space || 'unverified',
+      });
+      const valid = (record) => Number.isFinite(record.tile_x) && Number.isFinite(record.tile_y);
+
+      return {
+        npcs: (source.npcs || []).map(record => ({
+          ...at(record), category: 'npc', name: `NPC #${record.id} · sprite ${record.sprite_id ?? 'unknown'}`,
+        })).filter(valid),
+        furniture: (source.furniture || []).map(record => ({
+          ...at(record), category: 'furniture', name: `Furniture #${record.id} · script ${record.script_id ?? 'unknown'}`,
+        })).filter(valid),
+        warps: (source.warps || []).map(record => ({
+          ...at(record), category: 'warp', name: `Warp #${record.id} → map ${record.target_map_id ?? 'unknown'} / ${record.target_warp_id ?? 'unknown'}`,
+        })).filter(valid),
+        triggers: (source.triggers || []).map(record => ({
+          ...at(record), category: 'trigger', name: `Trigger #${record.id} · ref ${record.reference ?? 'unknown'}`,
+        })).filter(valid),
+        source: source.source || 'unresolved',
+        coordinateSpace: source.coordinate_space || 'unverified',
+      };
+    }
+
+    // --- 1. 3D WebGL Three.js Scene Setup ---
+    function init3D() {
+      scene3D = new THREE.Scene();
+      scene3D.background = new THREE.Color(0x040914);
+
+      camera3D = new THREE.PerspectiveCamera(45, canvas3D.clientWidth / canvas3D.clientHeight, 0.5, 10000);
+      renderer3D = new THREE.WebGLRenderer({ canvas: canvas3D, antialias: true, powerPreference: 'high-performance' });
+      renderer3D.setPixelRatio(window.devicePixelRatio || 1);
+      renderer3D.outputEncoding = THREE.sRGBEncoding;
+
+      // The canvas is sized by Tailwind (`w-full h-full`), but WebGL's drawing
+      // buffer otherwise remains its HTML default of 300×150.  The browser then
+      // upscales that tiny buffer to the viewport, making every BMD0 building
+      // texture look blurry.  Size it immediately and whenever the panel changes.
+      onWindowResize3D();
+      canvasResizeObserver = new ResizeObserver(onWindowResize3D);
+      canvasResizeObserver.observe(canvas3D.parentElement);
+
+      controls3D = new THREE.OrbitControls(camera3D, canvas3D);
+      controls3D.enableDamping = true;
+      controls3D.dampingFactor = 0.08;
+      controls3D.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      controls3D.mouseButtons.MIDDLE = THREE.MOUSE.ROTATE;
+      controls3D.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+
+      // Natural crisp lighting for official Nintendo textures
+      const amb = new THREE.AmbientLight(0xffffff, 1.8);
+      scene3D.add(amb);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x475569, 1.4);
+      scene3D.add(hemi);
+
+      const dir1 = new THREE.DirectionalLight(0xfff8e7, 1.6);
+      dir1.position.set(150, 300, 150);
+      scene3D.add(dir1);
+
+      const dir2 = new THREE.DirectionalLight(0x93c5fd, 1.0);
+      dir2.position.set(-150, 100, -150);
+      scene3D.add(dir2);
+
+      group3D = new THREE.Group();
+      scene3D.add(group3D);
+
+      entitiesGroup3D = new THREE.Group();
+      scene3D.add(entitiesGroup3D);
+
+      // Player 3D Indicator Marker
+      marker3D = new THREE.Group();
+      const sp = new THREE.Mesh(new THREE.SphereGeometry(3.0, 24, 24), new THREE.MeshBasicMaterial({ color: 0x38bdf8 }));
+      sp.position.y = 8;
+      marker3D.add(sp);
+
+      const ring = new THREE.Mesh(new THREE.RingGeometry(3.5, 6.0, 32), new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide }));
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.2;
+      marker3D.add(ring);
+
+      const arrowCone = new THREE.Mesh(new THREE.ConeGeometry(2.5, 6.5, 16), new THREE.MeshBasicMaterial({ color: 0xf43f5e }));
+      arrowCone.rotation.x = Math.PI / 2;
+      arrowCone.position.set(0, 0.5, 8.5);
+      const headingGroup = new THREE.Group();
+      headingGroup.name = 'headingArrow';
+      headingGroup.add(arrowCone);
+      marker3D.add(headingGroup);
+
+      marker3D.visible = false;
+      scene3D.add(marker3D);
+
+      window.addEventListener('resize', onWindowResize3D);
+      animate3D();
+    }
+
+    function onWindowResize3D() {
+      if (!renderer3D) return;
+      const rect = canvas3D.parentElement.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return;
+      renderer3D.setSize(rect.width, rect.height, false);
+      camera3D.aspect = rect.width / rect.height;
+      camera3D.updateProjectionMatrix();
+    }
+
+    function animate3D() {
+      requestAnimationFrame(animate3D);
+      controls3D?.update();
+      renderer3D?.render(scene3D, camera3D);
+    }
+
+    function frameCamera3D(topDown = false) {
+      group3D?.updateMatrixWorld(true);
+      const bounds = new THREE.Box3().setFromObject(group3D);
+      if (bounds.isEmpty()) return;
+
+      const center = bounds.getCenter(new THREE.Vector3());
+      const size = bounds.getSize(new THREE.Vector3());
+      const maxDim = Math.max(size.x, size.z, 60);
+      const fov = THREE.MathUtils.degToRad(camera3D.fov);
+      const dist = (maxDim / (2 * Math.tan(fov / 2))) * 1.25;
+
+      if (topDown) {
+        camera3D.up.set(0, 0, -1);
+        camera3D.position.set(center.x, center.y + dist * 1.5, center.z);
+      } else {
+        // Classic 2.5D Pokémon camera angle
+        camera3D.up.set(0, 1, 0);
+        camera3D.position.set(center.x - dist * 0.65, center.y + dist * 0.72, center.z + dist * 0.65);
+      }
+
+      controls3D.target.copy(center);
+      controls3D.minDistance = 15;
+      controls3D.maxDistance = 3500;
+      controls3D.update();
+    }
+
+    // --- 2. Load & Render 3D Models with Exact Alignment ---
+    async function loadMapVisual(forceRefit = false) {
+      if (isLoadBusy) return;
+      isLoadBusy = true;
+
+      try {
+        const res = await fetch('/api/v1/map/visual', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        visualData = data;
+
+        const sceneKey = `${data.matrix_id}_${(data.models || []).map(m => m.model_id).join(',')}_${data.player_chunk?.x}_${data.player_chunk?.y}`;
+        const isSceneChanged = (sceneKey !== lastLoadedSceneKey);
+        lastLoadedSceneKey = sceneKey;
+
+        const modelsList = data.models || [];
+        if (modelsList.length === 0) return;
+
+        // Load all GLTF assets in parallel
+        const loadedEntries = await Promise.all(modelsList.map(async item => {
+          let glbAsset = modelCache.get(item.asset_url);
+          if (!glbAsset) {
+            glbAsset = await new Promise((resolve, reject) => {
+              loader3D.load(item.asset_url, resolve, undefined, reject);
+            });
+            modelCache.set(item.asset_url, glbAsset);
+          }
+          return { item, asset: glbAsset };
+        }));
+
+        const newGroup = new THREE.Group();
+        const chunkSize = data.chunk_tile_size?.width || 32;
+        const unit = chunkSize * WORLD_UNITS_PER_TILE;
+        const isInterior = isInteriorScene(data);
+
+        loadedEntries.forEach(({ item, asset }) => {
+          const cloned = THREE.SkeletonUtils?.clone ? THREE.SkeletonUtils.clone(asset.scene) : asset.scene.clone(true);
+          cloned.traverse(c => {
+            if (c.isMesh && c.material) {
+              c.material.side = THREE.DoubleSide;
+              c.material.needsUpdate = true;
+              // Pixel-perfect crisp texture filtering (NearestFilter)
+              if (c.material.map) {
+                c.material.map.magFilter = THREE.NearestFilter;
+                c.material.map.minFilter = THREE.NearestFilter;
+                c.material.map.generateMipmaps = false;
+                c.material.map.needsUpdate = true;
+              }
+            }
+          });
+
+          if (isInterior) {
+            // Interior: center room model directly at origin
+            cloned.position.set(0, 0, 0);
+          } else if (data.player_alignment?.verified && item.cell) {
+            cloned.position.set(
+              (item.cell.x - data.player_chunk.x) * unit,
+              0,
+              (item.cell.y - data.player_chunk.y) * unit
+            );
+          }
+          newGroup.add(cloned);
+        });
+
+        while (group3D.children.length) group3D.remove(group3D.children[0]);
+        while (newGroup.children.length) group3D.add(newGroup.children[0]);
+
+        // Calculate mesh bounding box center for accurate local alignment
+        group3D.updateMatrixWorld(true);
+        const meshBox = new THREE.Box3().setFromObject(group3D);
+        if (isInterior && !meshBox.isEmpty()) {
+          meshOffsetOrigin = meshBox.min.clone();
+        } else {
+          meshOffsetOrigin.set(0, 0, 0);
+        }
+
+        // Render 3D Real Overworld & Interior Entities (NPCs, Plants, Doors, Furniture)
+        render3DEntities(data, meshBox);
+
+        // Update UI Metadata
+        updateMetadataUI(data);
+
+        // Frame camera on group
+        if (isSceneChanged || forceRefit) {
+          frameCamera3D();
+        }
+
+        // Position player marker
+        updatePlayerMarker(data.live_player || livePlayer);
+
+      } catch (err) {
+        console.error("Load map visual error:", err);
+      } finally {
+        isLoadBusy = false;
+      }
+    }
+
+    function render3DEntities(data, meshBox) {
+      if (!entitiesGroup3D) return;
+      while (entitiesGroup3D.children.length) entitiesGroup3D.remove(entitiesGroup3D.children[0]);
+
+      const entities = normalizedStaticEvents(data);
+      const chunkSize = data.chunk_tile_size?.width || 32;
+      const playerChunk = data.player_chunk || { x: 0, y: 0 };
+      const isInterior = isInteriorScene(data);
+
+      function get3DPos(tileX, tileY, yOffset = 0) {
+        if (isInterior && !meshBox.isEmpty()) {
+          // Precise local tile projection inside official room bounding box
+          const localX = (tileX % 12);
+          const localY = (tileY % 12);
+          const roomW = meshBox.max.x - meshBox.min.x;
+          const roomH = meshBox.max.z - meshBox.min.z;
+          const posX = meshBox.min.x + (localX / 11) * roomW;
+          const posZ = meshBox.min.z + (localY / 11) * roomH;
+          return new THREE.Vector3(posX, meshBox.min.y + yOffset, posZ);
+        }
+
+        const chunkX = Math.floor(tileX / chunkSize);
+        const chunkY = Math.floor(tileY / chunkSize);
+        const localX = (tileX % chunkSize);
+        const localY = (tileY % chunkSize);
+        const posX = ((chunkX - playerChunk.x) * chunkSize + (localX - chunkSize / 2) + 0.5) * WORLD_UNITS_PER_TILE;
+        const posZ = ((chunkY - playerChunk.y) * chunkSize + (localY - chunkSize / 2) + 0.5) * WORLD_UNITS_PER_TILE;
+        return new THREE.Vector3(posX, yOffset, posZ);
+      }
+
+      // 1. Render NPCs
+      (entities.npcs || []).forEach(npc => {
+        const npcGroup = new THREE.Group();
+        const pos = get3DPos(npc.tile_x, npc.tile_y, 0);
+
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(1.8, 1.8, 7, 16), new THREE.MeshLambertMaterial({ color: 0xa855f7 }));
+        body.position.y = 3.5;
+        npcGroup.add(body);
+
+        const head = new THREE.Mesh(new THREE.SphereGeometry(2.2, 16, 16), new THREE.MeshBasicMaterial({ color: 0xd8b4fe }));
+        head.position.y = 8;
+        npcGroup.add(head);
+
+        const halo = new THREE.Mesh(new THREE.RingGeometry(2.4, 3.8, 24), new THREE.MeshBasicMaterial({ color: 0x9333ea, side: THREE.DoubleSide }));
+        halo.rotation.x = -Math.PI / 2;
+        halo.position.y = 0.1;
+        npcGroup.add(halo);
+
+        npcGroup.position.copy(pos);
+        entitiesGroup3D.add(npcGroup);
+      });
+
+      // 2. Render Furniture, Items, Boulders, Trees & Plants
+      (entities.furniture || []).forEach(item => {
+        const itemGroup = new THREE.Group();
+        const pos = get3DPos(item.tile_x, item.tile_y, 0);
+
+        if (item.type === 'item_ball') {
+          // 🔴 PokéBall / Item Ball in Overworld: Red & White sphere with glowing beacon
+          const topBall = new THREE.Mesh(new THREE.SphereGeometry(2.4, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
+          topBall.position.y = 2.4;
+          itemGroup.add(topBall);
+
+          const btmBall = new THREE.Mesh(new THREE.SphereGeometry(2.4, 16, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xffffff }));
+          btmBall.position.y = 2.4;
+          itemGroup.add(btmBall);
+
+          // Glowing beacon ring
+          const itemHalo = new THREE.Mesh(new THREE.RingGeometry(2.8, 4.2, 24), new THREE.MeshBasicMaterial({ color: 0xef4444, side: THREE.DoubleSide }));
+          itemHalo.rotation.x = -Math.PI / 2;
+          itemHalo.position.y = 0.1;
+          itemGroup.add(itemHalo);
+
+        } else if (item.type === 'boulder') {
+          // 🪨 Strength Boulder: Brown/Amber rocky dodecahedron
+          const boulder = new THREE.Mesh(new THREE.DodecahedronGeometry(4.0), new THREE.MeshLambertMaterial({ color: 0xd97706 }));
+          boulder.position.y = 3.8;
+          itemGroup.add(boulder);
+
+        } else if (item.type === 'cut_tree') {
+          // 🪵 Cut Tree: Wood trunk + green foliage
+          const trunk = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2, 4, 12), new THREE.MeshLambertMaterial({ color: 0x78350f }));
+          trunk.position.y = 2;
+          itemGroup.add(trunk);
+
+          const leaves = new THREE.Mesh(new THREE.ConeGeometry(4.5, 6, 12), new THREE.MeshLambertMaterial({ color: 0x15803d }));
+          leaves.position.y = 6.5;
+          itemGroup.add(leaves);
+
+        } else if (item.type === 'plant') {
+          const pot = new THREE.Mesh(new THREE.CylinderGeometry(2, 1.5, 3.5, 12), new THREE.MeshLambertMaterial({ color: 0x78350f }));
+          pot.position.y = 1.75;
+          itemGroup.add(pot);
+
+          const leaf = new THREE.Mesh(new THREE.SphereGeometry(3, 16, 16), new THREE.MeshLambertMaterial({ color: 0x10b981 }));
+          leaf.position.y = 5.5;
+          itemGroup.add(leaf);
+        } else {
+          const box = new THREE.Mesh(new THREE.BoxGeometry(6, 5, 5), new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
+          box.position.y = 2.5;
+          itemGroup.add(box);
+        }
+
+        itemGroup.position.copy(pos);
+        entitiesGroup3D.add(itemGroup);
+      });
+
+      // 3. Render Doors & Warps
+      (entities.warps || []).forEach(warp => {
+        const warpGroup = new THREE.Group();
+        const pos = get3DPos(warp.tile_x, warp.tile_y, 0);
+
+        const warpRing = new THREE.Mesh(new THREE.RingGeometry(2.5, 5.5, 24), new THREE.MeshBasicMaterial({ color: 0xf59e0b, side: THREE.DoubleSide, transparent: true, opacity: 0.85 }));
+        warpRing.rotation.x = -Math.PI / 2;
+        warpRing.position.y = 0.15;
+        warpGroup.add(warpRing);
+
+        const arch = new THREE.Mesh(new THREE.TorusGeometry(3.5, 0.4, 8, 24, Math.PI), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+        arch.position.y = 3.5;
+        warpGroup.add(arch);
+
+        warpGroup.position.copy(pos);
+        entitiesGroup3D.add(warpGroup);
+      });
+    }
+
+    function updatePlayerMarker(player) {
+      if (!visualData || player.x === undefined || player.x === null) {
+        marker3D.visible = false;
+        return;
+      }
+
+      const chunkSize = visualData.chunk_tile_size?.width || 32;
+      const isInterior = isInteriorScene(visualData);
+
+      group3D.updateMatrixWorld(true);
+      const meshBox = new THREE.Box3().setFromObject(group3D);
+
+      if (isInterior && !meshBox.isEmpty()) {
+        const localX = (player.x % 12);
+        const localY = (player.y % 12);
+        const roomW = meshBox.max.x - meshBox.min.x;
+        const roomH = meshBox.max.z - meshBox.min.z;
+        const posX = meshBox.min.x + (localX / 11) * roomW;
+        const posZ = meshBox.min.z + (localY / 11) * roomH;
+        marker3D.position.set(posX, meshBox.min.y, posZ);
+      } else {
+        const chunkX = Math.floor(player.x / chunkSize);
+        const chunkY = Math.floor(player.y / chunkSize);
+        const localX = (player.x % chunkSize);
+        const localY = (player.y % chunkSize);
+        const playerChunk = visualData.player_chunk || { x: chunkX, y: chunkY };
+        const posX = ((chunkX - playerChunk.x) * chunkSize + (localX - chunkSize / 2) + 0.5) * WORLD_UNITS_PER_TILE;
+        const posZ = ((chunkY - playerChunk.y) * chunkSize + (localY - chunkSize / 2) + 0.5) * WORLD_UNITS_PER_TILE;
+        marker3D.position.set(posX, 0, posZ);
+      }
+
+      // Rotate Heading Arrow
+      const headingArrow = marker3D.getObjectByName('headingArrow');
+      if (headingArrow) {
+        const facing = String(player.facing || 'North').toLowerCase();
+        if (facing.includes('north')) headingArrow.rotation.y = Math.PI;
+        else if (facing.includes('south')) headingArrow.rotation.y = 0;
+        else if (facing.includes('west')) headingArrow.rotation.y = Math.PI / 2;
+        else if (facing.includes('east')) headingArrow.rotation.y = -Math.PI / 2;
+      }
+
+      marker3D.visible = true;
+    }
+
+    function updateMetadataUI(data) {
+      const isInterior = isInteriorScene(data);
+      const badge = document.getElementById('scene-type-badge');
+      if (badge) {
+        badge.innerText = isInterior
+          ? `INTERIOR (Matrix #${data.matrix_id ?? 'unknown'})`
+          : `OVERWORLD (Matrix #${data.matrix_id ?? 'unknown'})`;
+        badge.className = isInterior ? 'font-bold text-purple-300' : 'font-bold text-emerald-300';
+      }
+
+      const sizeBadge = document.getElementById('map-size-badge');
+      if (sizeBadge) {
+        const bounds = data.map_definition_bounds || {};
+        sizeBadge.innerText = bounds.width && bounds.height
+          ? `${bounds.width} × ${bounds.height} 已确认 BMD0 Chunk`
+          : 'BMD0 模型已对齐；地图范围待确认';
+      }
+
+      const matrixBadge = document.getElementById('matrix-badge');
+      if (matrixBadge) {
+        matrixBadge.innerText = `Matrix #${data.matrix_id ?? 'unknown'} (${data.matrix_size?.width ?? '?'}×${data.matrix_size?.height ?? '?'})`;
+      }
+
+      const metaBmd = document.getElementById('meta-bmd-val');
+      if (metaBmd && data.models?.[0]) {
+        metaBmd.innerText = `#${data.models[0].model_id} (${data.models[0].glb || 'model.bmd0'})`;
+      }
+
+      const metaBtx = document.getElementById('meta-btx-val');
+      if (metaBtx && data.models?.[0]) {
+        metaBtx.innerText = `#${data.models[0].texture_id ?? 'unknown'} · ${data.models[0].texture_match || 'ROM material match'}`;
+      }
+
+      const metaSize = document.getElementById('meta-size-val');
+      const bounds = data.map_definition_bounds || {};
+      const tileSize = data.chunk_tile_size || {};
+      if (metaSize) {
+        metaSize.innerText = bounds.width && bounds.height && tileSize.width && tileSize.height
+          ? `${bounds.width} × ${bounds.height} Chunks (${bounds.width * tileSize.width}×${bounds.height * tileSize.height} Tiles)`
+          : '范围待确认';
+      }
+
+      // Update Overworld Entities list in right sidebar
+      const warpsContainer = document.getElementById('warps-list-container');
+      const warpsCountBadge = document.getElementById('events-count-badge');
+      const entities = normalizedStaticEvents(data);
+      const allEntities = [
+        ...entities.furniture,
+        ...entities.warps,
+        ...entities.npcs,
+        ...entities.triggers,
+      ];
+
+      if (warpsCountBadge) warpsCountBadge.innerText = `${allEntities.length} 条 ROM 记录`;
+
+      if (warpsContainer) {
+        if (allEntities.length > 0) {
+          warpsContainer.innerHTML = allEntities.map(e => {
+            let icon = 'box';
+            let colorClass = 'text-blue-300';
+            let bgClass = 'bg-slate-900';
+            if (e.category === 'npc') {
+              icon = 'user';
+              colorClass = 'text-purple-300 font-semibold';
+            } else if (e.category === 'warp') {
+              icon = 'door-open';
+              colorClass = 'text-amber-300 font-semibold';
+              bgClass = 'bg-amber-950/40 border-amber-900/60';
+            } else if (e.category === 'trigger') {
+              icon = 'zap';
+              colorClass = 'text-rose-300 font-semibold';
+            }
+
+            return `
+              <div class="p-2 rounded-lg ${bgClass} border border-slate-800 flex items-center justify-between">
+                <span class="flex items-center gap-2 ${colorClass}">
+                  <i data-lucide="${icon}" class="w-3.5 h-3.5"></i>
+                  <span>${e.name}</span>
+                </span>
+                <span class="text-[10px] text-slate-400 font-mono">X:${e.tile_x}, Y:${e.tile_y}</span>
+              </div>
+            `;
+          }).join('');
+          lucide.createIcons();
+        } else {
+          warpsContainer.innerHTML = `
+            <div class="p-2.5 rounded-lg bg-slate-900/60 border border-slate-800/60 text-slate-500 text-center text-xs">
+              当前 Map Header 没有可安全映射到画面的 ROM 静态事件记录。
+            </div>`;
+        }
+      }
+    }
+
+    async function refreshPlayerLive() {
+      try {
+        const res = await fetch('/api/v1/map/current', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const p = data.player || {};
+        livePlayer = p;
+
+        // Update Right Sidebar Stats
+        const xVal = document.getElementById('player-x-val');
+        const yVal = document.getElementById('player-y-val');
+        const zVal = document.getElementById('player-z-val');
+        const chunkX = document.getElementById('player-chunk-x');
+        const chunkY = document.getElementById('player-chunk-y');
+        const facingIcon = document.getElementById('player-facing-icon');
+        const facingText = document.getElementById('player-facing-text');
+        const moveVal = document.getElementById('player-movement-val');
+        const locVal = document.getElementById('player-location-val');
+
+        if (xVal && p.x !== undefined && p.x !== null) xVal.innerText = p.x;
+        if (yVal && p.y !== undefined && p.y !== null) yVal.innerText = p.y;
+        if (zVal && p.elevation !== undefined) zVal.innerText = `${p.elevation}`;
+
+        if (chunkX && p.chunk) chunkX.innerText = `Chunk: ${p.chunk.x} · Local: ${p.local?.x ?? '--'}`;
+        if (chunkY && p.chunk) chunkY.innerText = `Chunk: ${p.chunk.y} · Local: ${p.local?.y ?? '--'}`;
+
+        if (facingText && p.facing) {
+          const f = p.facing.toLowerCase();
+          if (f.includes('north')) { facingIcon.innerText = '↑'; facingText.innerText = '北 (North)'; }
+          else if (f.includes('south')) { facingIcon.innerText = '↓'; facingText.innerText = '南 (South)'; }
+          else if (f.includes('west')) { facingIcon.innerText = '←'; facingText.innerText = '西 (West)'; }
+          else if (f.includes('east')) { facingIcon.innerText = '→'; facingText.innerText = '东 (East)'; }
+        }
+
+        if (moveVal && p.movement_state) {
+          moveVal.innerText = p.movement_state.split(' ')[0] || p.movement_state;
+        }
+
+        if (locVal && data.map_name) {
+          locVal.innerText = data.map_name;
+        }
+
+        // Update 3D Marker
+        updatePlayerMarker(p);
+
+      } catch (err) {
+        console.error("Refresh player error:", err);
+      }
+    }
+
+    async function refreshKnowledge() {
+      const pre = document.getElementById('knowledge-pre');
+      try {
+        const res = await fetch('/api/v1/map/knowledge/current.txt', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        if (pre) pre.textContent = text;
+      } catch (err) {
+        if (pre) pre.textContent = `当前地图知识暂不可用: ${err.message}`;
+      }
+    }
+
+    // Event Listeners
+    document.getElementById('zoom-in').onclick = () => {
+      camera3D.position.sub(controls3D.target).multiplyScalar(0.8).add(controls3D.target);
+      controls3D.update();
+    };
+    document.getElementById('zoom-out').onclick = () => {
+      camera3D.position.sub(controls3D.target).multiplyScalar(1.25).add(controls3D.target);
+      controls3D.update();
+    };
+    document.getElementById('rotate-left').onclick = () => {
+      const offset = camera3D.position.clone().sub(controls3D.target);
+      const angle = -Math.PI / 4;
+      camera3D.position.set(
+        controls3D.target.x + offset.x * Math.cos(angle) - offset.z * Math.sin(angle),
+        camera3D.position.y,
+        controls3D.target.z + offset.x * Math.sin(angle) + offset.z * Math.cos(angle)
+      );
+      controls3D.update();
+    };
+    document.getElementById('rotate-right').onclick = () => {
+      const offset = camera3D.position.clone().sub(controls3D.target);
+      const angle = Math.PI / 4;
+      camera3D.position.set(
+        controls3D.target.x + offset.x * Math.cos(angle) - offset.z * Math.sin(angle),
+        camera3D.position.y,
+        controls3D.target.z + offset.x * Math.sin(angle) + offset.z * Math.cos(angle)
+      );
+      controls3D.update();
+    };
+    document.getElementById('view-top').onclick = () => frameCamera3D(true);
+    document.getElementById('view-iso').onclick = () => frameCamera3D(false);
+    document.getElementById('btn-fit').onclick = () => frameCamera3D(false);
+    document.getElementById('reload-btn').onclick = () => {
+      loadMapVisual(true);
+      refreshKnowledge();
+    };
+    document.getElementById('refresh-knowledge-btn').onclick = refreshKnowledge;
+
+    // Keyboard Shortcuts
+    window.addEventListener('keydown', e => {
+      if (e.key === '0') frameCamera3D(false);
+      if (e.key === '1') frameCamera3D(true);
+    });
+
+    // Initialize App
+    init3D();
+    loadMapVisual();
+    refreshKnowledge();
+    setInterval(refreshPlayerLive, 250);
+
+  </script>
+</body>
+</html>

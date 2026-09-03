@@ -1,0 +1,197 @@
+{
+  "label": "page1_wait_pointer_target_probe",
+  "captured_at_unix": 1788433612.8846064,
+  "frame_from_batch": 5077748,
+  "frame_from_state": 5077750,
+  "method": "RAM-only exact-frame Main-RAM read_batch; semantic state is sampled separately and is not used as visible-text evidence.",
+  "semantic_state_untrusted_for_visible_text": {
+    "timestamp": 1788433612.881589,
+    "frame": 5077750,
+    "context": {
+      "screen_type": "DIALOGUE_ACTIVE",
+      "screen_description": "【对话中】可见文字、等待按键状态和说话 Actor 尚未由 RAM 结构验证",
+      "available_actions": [
+        "按 A 键继续对话",
+        "按 B 键加速文字"
+      ],
+      "can_move_player": false,
+      "is_dialogue_active": true,
+      "dialogue_text": "",
+      "full_dialogue_text": "",
+      "loaded_dialogue_text": "科学的力量真是惊人！现在可以用通信和１００个人同时游戏！",
+      "speaker": "说话者未解析",
+      "speaker_category": "UNRESOLVED",
+      "active_pointer": null,
+      "dialogue_start_time": "2026-09-03 19:04:47",
+      "dialogue_duration_sec": 125.27,
+      "printer": {
+        "is_active": true,
+        "is_printing": null,
+        "waiting_for_input": null,
+        "current_line": null,
+        "line_pixel_y": null,
+        "cursor_x": null,
+        "cursor_y": null,
+        "full_text": "",
+        "current_page_text": "",
+        "lines": [],
+        "total_chars": null,
+        "printed_chars": null,
+        "remaining_chars": null,
+        "progress_pct": null,
+        "visible_text_confidence": "unresolved",
+        "visible_text_source": "No verified active TextPrinter -> Window -> bitmap draw path",
+        "loaded_text": "科学的力量真是惊人！现在可以用通信和１００个人同时游戏！",
+        "renderer_kind": "candidate_tcbl_c_exp013_debug_only",
+        "control_phase": null,
+        "first_page_latch": null,
+        "current_char_pointer": null,
+        "scroll_distance_px": null,
+        "pending_control": null,
+        "line_advance_px": null,
+        "bitmap_surface_sha256": null,
+        "source_range": {},
+        "layout_scope": "unresolved",
+        "candidate_model_confidence": "candidate",
+        "candidate_model_reason": "candidate_explicit_control_model_exp013",
+        "candidate_lines": [
+          "科学的力量真是惊人！"
+        ],
+        "candidate_control_phase": 1,
+        "candidate_first_page_latch": 1,
+        "candidate_continuation_cursor": "0x022490C8",
+        "candidate_scroll_progress_px": 0,
+        "candidate_pending_control": "clear",
+        "candidate_cursor_x": 8,
+        "candidate_cursor_y": 0,
+        "candidate_line_step_px": 16,
+        "candidate_surface_sha256": "30f99941a96e2e28f071532a0dc0f690259d1d4d6e5673e92335845514db2e15",
+        "candidate_source_range": {
+          "start": "0x022490AC",
+          "end": "0x022490F8"
+        },
+        "candidate_layout_scope": "EXP_013 explicit-control diagnostic only; not a verified Window viewport; automatic wrapping unresolved"
+      },
+      "choices": [],
+      "recommended_action": "手动观察后按 A；当前 RAM 解析器不会自动判定已可翻页",
+      "dialogue_history": [
+        {
+          "id": 1,
+          "start_time": "2026-09-03 19:04:47",
+          "end_time": null,
+          "unix_timestamp": 1788433487.6082497,
+          "frame_start": 5072567,
+          "frame_end": 5077750,
+          "speaker": "说话者未解析",
+          "speaker_category": "UNRESOLVED",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "",
+          "duration_seconds": 125.27,
+          "is_active": true,
+          "has_choices": false,
+          "choices": []
+        }
+      ]
+    },
+    "location": "实时 ARM9 地图（Map Section 未验证）",
+    "map_loaded": true,
+    "player_name": "zero",
+    "rival_name": "NO",
+    "gender": "男孩子 (Male)",
+    "party_count": 0,
+    "money": 3000,
+    "badges": 0,
+    "ready_for_input": false,
+    "suggested_buttons": [
+      "A"
+    ],
+    "map_section_id": null,
+    "player_facing": "North",
+    "movement_state": "Standing (静止站立)",
+    "player_world_pos": {
+      "x": 39,
+      "y": 772,
+      "z": 12
+    },
+    "player_position_verified": true
+  },
+  "raw_dumps": {
+    "candidate_render_context": {
+      "domain": "Main RAM",
+      "offset": "0x335300",
+      "address": "0x02335300",
+      "length": 512,
+      "hex": "00000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff304c330200000000ec523302000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff304c3302484c3302484c330200000000382c33028d230202ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff445500001c0f00009c2b3302d42b330215004e19626d702e63007461736b2e6300ffffffffff6700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f21ff112122212221ff121111212f222122211f11f212ffffffffffffffff1ff2ff211ff2ff1212f2111112f221221ff2211112f22222ffffffffffffffff21ff21ff12f221ff111111212222222111111222222122f2ffffffffffffffffff1ff21fff21f21f111121112122212121ff112221ff2121fffffffffffffffff2fffffff2ffffff1121ffff22211f11ff212f22ff21ffffffffffffffffffff1ff2ffff1ff2ffff1ff21ff211111121122212221ff21ff2ffffffffffffffffff111111ff212222ff111111ff2122221111111122211222ffffffffffffffff21ffffff21ff111121ff221121ffff211121ff112122ff21ffffffffffffffff1ff2ffff111111f2111122f22212f2ff1111f2ff2212f2ff"
+    },
+    "candidate_render_allocation": {
+      "domain": "Main RAM",
+      "offset": "0x335380",
+      "address": "0x02335380",
+      "length": 4096,
+      "hex": "ffffffffffffffffffffffffffffffffffffffff445500001c0f00009c2b3302d42b330215004e19626d702e63007461736b2e6300ffffffffff6700ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f21ff112122212221ff121111212f222122211f11f212ffffffffffffffff1ff2ff211ff2ff1212f2111112f221221ff2211112f22222ffffffffffffffff21ff21ff12f221ff111111212222222111111222222122f2ffffffffffffffffff1ff21fff21f21f111121112122212121ff112221ff2121fffffffffffffffff2fffffff2ffffff1121ffff22211f11ff212f22ff21ffffffffffffffffffff1ff2ffff1ff2ffff1ff21ff211111121122212221ff21ff2ffffffffffffffffff111111ff212222ff111111ff2122221111111122211222ffffffffffffffff21ffffff21ff111121ff221121ffff211121ff112122ff21ffffffffffffffff1ff2ffff111111f2111122f22212f2ff1111f2ff2212f2ffffffffffffffffffff1f1111ff1f2222ff1f1111ff1f2222ff1f1111ff2f2222ffffffffffffffff21ffff2121ffff1121ff212121ff211121ff212122ff2221ffffffffffffffffff21ffff1111112122222222111111f2212212f221ff1ff2ffffffffffffffffffff1ff2ffff1ff2ffff1ff2ffff1ff2ffff1ff2ffff2121ffffffffffffffffffffffffffffff1fffffff1fffffff1fffffff1fffffff1ffffffffffffffffffffffffff2fffffff2fffffff2fffffff2fffffff2ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1f21212f2121121121212f222221ffffff21ffffff22ffffffffffffffffffff1221ffff1122111112f222221ff2ffff1ff2ff1f2ff2ff2fffffffffffffffff1f22ffff11111121122222221ff2ffff11f2ffff22f2ffffffffffffffffffff111121122122211f21ff212f111121ff2122211f22ff222ffffffffffffffffff221fffff221fffff221ff1fff21ff211122112222f222f2ffffffffffffffff21f21ff221ff1ff222ff1ff2f2ff1ff2ff1121f2ff2222ffffffffffffffffffff111111ff2112221f1111112f2212221111111122222222ffffffffffffffff21ffff1121ffff2111f2111122f222121121112122222222ffffffffffffffff1111f2ff2212f2ff1111112122122222f22f11f2ffff22f2ffffffffffffffff1111111122211222ff1112111f22112221f2121122ff2f22ffffffffffffffff1121ff212222ff2111f2ff2122f2ff111121ff212222ff22ffffffffffffffff111111f2121221f2211212f2221f2221f211f222ff22f2ffffffffffffffffffffff2121ff1f2212ff1ff21fff21f22f1122ffff22f2ffffffffffffffffffffffffff1ff2ffff2ff2ffffff21ffff1f1221ff1f2f22ff2ffffffffffffffffff2fffffff2fffffffffffffff2fffffff2fffffff2ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff1111111111111111121111212f1111f2ff1221ffff2ff2ff52460000ac890400882c3302000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "msg_buffer": {
+      "domain": "Main RAM",
+      "offset": "0x2490A0",
+      "address": "0x022490A0",
+      "length": 512,
+      "hex": "00a2008180042500ecd2f8b6d179665b84769b52cf911f772f66ca60ba4e01ff00f001be0000feffb0732857ef53e54e28751a90e14ffeff8c5411ff10ff10ff2a4eba4e00f000be0000feff0c54f665386e0f6201ffffff00a5002f0534005a000200a6004c000034005b0002003f00a001a3015101060000009f01a30160000200ae0c000061003c0000045c000200000000003c0000045d000200000000003f00600007003a0c0000030008006000ff00260c000061003c0000045e000700000000003f0065003500e4020100fb00230100004b02fb002900e40201000800000061006000fb00300c00000300080060000700fc0b00000300080060000200b80b00006000ff00c80b000061008c02013c0000045f00fb00000000003f003c00000460000700000000003f00600007001b020000030008006000ff007b0b00006100a200590568000700a4006000fb000302000061003c0000046100fb00000001003e004b02fb002700e2020400040000006100a20059056800fb00a4003c00000462000200000000003f0060000200570b0000030008006000ff00530b000061003c00000463000200000000003f0004005600000032003f002800a84003002800ab4001002800534101002300e50223006a00240008045e0203000100e3000100e30002009b0249009b02ae009b02b3009b02b4009b02c3009b02c7009b"
+    },
+    "script_and_window_flags": {
+      "domain": "Main RAM",
+      "offset": "0x247500",
+      "address": "0x02247500",
+      "length": 512,
+      "hex": "6e742e630018556618a63b00f47424028c752402447524024455000038000000e47424026075240204004e197363726970745f7379732e63000000000100f100000000000400010050a424020000000000000000000000000000000000000000445500006801000018752402d876240204004e197363726970745f776f726b2e630032000000ad00000000003f6403000d000000e4dc230204000000c0b42302d0742402b01e27022035260200000000000000000000000004772402a4902402dc992402000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000040000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014a32402445500002c000000607524021477240204004e19776f72647365742e630000005076240275c08200"
+    },
+    "tcbl_observation_and_pointer_targets": {
+      "domain": "Main RAM",
+      "offset": "0x332B40",
+      "address": "0x02332B40",
+      "length": 512,
+      "hex": "2e63000000000000000065000000000015000000203526022465220220000000445500002c000000684c33029c2b330215004e19626d705f77696e2e6300616d6572612e6300d50032000000b27f0101131e041e040b8803c82b33024455000028000000602b33029453330215004e19626d702e63000000de25000030d00e00008061000f000100c0533302f0002000200000004455000028000000945333020c2c330215004e19626d702e63000000010000000000000001007b0052460000205f27020800080020000100445500006c000000d42b33020000000015004e197463626c2e6300632035260294902702942b45010100000001000000010000008c2b3302c82b33025c533302c890240203010301030100000f004019000000000000000000000000000000000800000008001000e40127024004400458202702c82b3302351f0202524600001802000000000000c062330200002c00000001000040ee0200100000001000000010000000100000000000000000000000000000001000000000000000000000000000000010000052460000cc010000602b33029453330215004d196733645f73797374656d2e630046000078bf080600000000137a0000202d3302a80e290218f728025246000090010000602b33029453330200000000a08528020000000039590602202e3302ec59060200000000d95d0602"
+    }
+  },
+  "decoded_loaded_msg_fragments": [
+    {
+      "offset": 12,
+      "text": "科学的力量真是惊人!",
+      "control_words": [
+        "0xF000"
+      ]
+    },
+    {
+      "offset": 40,
+      "text": "现在可以用通信和100个人",
+      "control_words": [
+        "0xFFFE",
+        "0xFFFE",
+        "0xF000"
+      ]
+    },
+    {
+      "offset": 76,
+      "text": "同时游戏!",
+      "control_words": [
+        "0xFFFE",
+        "0xFFFF"
+      ]
+    },
+    {
+      "offset": 324,
+      "text": "夀栅",
+      "control_words": []
+    },
+    {
+      "offset": 374,
+      "text": "夀栅",
+      "control_words": []
+    }
+  ],
+  "printer_field_observations": [],
+  "assertions": [
+    "Loaded MsgBuffer fragments are not labelled as current visible lines.",
+    "All TextPrinter offsets in this snapshot are candidates unless validated by a stage transition."
+  ]
+}

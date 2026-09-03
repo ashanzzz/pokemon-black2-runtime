@@ -1,0 +1,71 @@
+{
+  "schema": "pointer_scan/v1",
+  "captured_at_unix": 1788434131.8174932,
+  "method": "bridge-owned memory.scan_pattern; read-only Main-RAM scan",
+  "target_u32": "0x0223B4C0",
+  "target_little_endian_hex": "c0b42302",
+  "request": {
+    "start": 0,
+    "size": 4194304,
+    "limit": 256
+  },
+  "response": {
+    "frame": 5099236,
+    "domain": "Main RAM",
+    "pattern_hex": "c0b42302",
+    "start": 0,
+    "size": 4194304,
+    "matches": [
+      1313492,
+      1946492,
+      2096016,
+      2096020,
+      2098704,
+      2336568,
+      2380460,
+      2387320,
+      2389216,
+      2389404,
+      2390452,
+      2401048,
+      2401412,
+      2410996,
+      2411044,
+      2503972,
+      2600848,
+      3179792,
+      3295140,
+      3298552,
+      3342312,
+      3348644
+    ],
+    "arm9_matches": [
+      "0x02140AD4",
+      "0x021DB37C",
+      "0x021FFB90",
+      "0x021FFB94",
+      "0x02200610",
+      "0x0223A738",
+      "0x022452AC",
+      "0x02246D78",
+      "0x022474E0",
+      "0x0224759C",
+      "0x022479B4",
+      "0x0224A318",
+      "0x0224A484",
+      "0x0224C9F4",
+      "0x0224CA24",
+      "0x02263524",
+      "0x0227AF90",
+      "0x02308510",
+      "0x023247A4",
+      "0x023254F8",
+      "0x0232FFE8",
+      "0x023318A4"
+    ]
+  },
+  "assertions": [
+    "A raw pointer match establishes only a memory reference, not ownership or type.",
+    "A pointer target must still pass structure-coherence and lifecycle tests."
+  ]
+}
