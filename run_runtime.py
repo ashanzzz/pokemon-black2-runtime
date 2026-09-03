@@ -12,7 +12,7 @@ from backend.black2.bizhawk.process_probe import probe_bizhawk_process
 
 def print_banner():
     print("=" * 65)
-    print("   Pokémon Black 2 - AI Semantic Runtime v1.0.0")
+    print("   Pokémon Black 2 - AI Semantic Runtime v2.0.0")
     print("   BizHawk Greenfield Architecture Engine")
     print("=" * 65)
 

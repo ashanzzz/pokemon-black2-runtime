@@ -133,9 +133,25 @@ AI Agent & Native Map Viewer
 ## 5. API 规范与端点速查
 
 * **综合控制台 Web 页面**：`http://127.0.0.1:8765/`
+* **全景运行时物理真理快照工作台**：`http://127.0.0.1:8765/ram-dumper`
+* **对话与打字机实时检查器**：`http://127.0.0.1:8765/dialogue-inspector`
 * **ROM 原生 3D 官方地图 Viewer**：`http://127.0.0.1:8765/frontend/native-map.html`
 * **实时玩家坐标与地图状态**：`GET /api/v1/map/current`
 * **实时 3D 模型网格与材质流**：`GET /api/v1/map/visual`
 * **实时文字化地图知识库**：`GET /api/v1/map/knowledge/current.txt`
 * **全量 ROM 目录索引**：`GET /api/v1/map/knowledge/catalog.txt`
 * **实时对话与时序流**：`GET /api/observer/presentation`
+* **全域硬件内存原子导出**：`POST /api/dev/dump_full_ram`
+* **快照清册与一键 ZIP**：`GET /api/dev/dumps`
+
+---
+
+## 6. 版本里程碑与发布历史 (Milestone Releases)
+
+### `v2.0.0` - Universal Ground-Truth Runtime & Multi-Domain Dumper (2026-09-04)
+* **全域硬件内存原子导出器 (Universal Dumper)**：支持一次 RPC 并行落盘 Main RAM (4MB)、ITCM (32KB)、DTCM (16KB)、Shared WRAM (32KB)、ARM7 WRAM (64KB)、SRAM (512KB)、Native 画面截图 (PNG)、ARM9 完整寄存器组 (PC/SP/LR/CPSR/R0-R12) 与结构化 `manifest.json`，自动生成一键打包 ZIP。
+* **Root Tuple 动态解析链 (DynamicDialogueResolver)**：彻底摆脱对固定堆地址（`0x02332C20` / `0x0232B400`）的依赖，通过 `MsgBGSys + 0x15C` 动态定位 `talkmsgwin` 并匹配 `[TCBL_Phase, BmpWin, Context, StrBuf]` 四指针元组，实现跨 NPC、跨堆重分配的自适应解析。
+* **流式 Token 解释器 (VisibleTextLedger)**：实现了真正的单帧零历史依赖解析（Snapshot Independence / EXP-021），精准闭环 `CLEAR` 翻页清屏、`LF` 换行、`SCROLL` 逐像素平移、`EOS` 终止，彻底消除下一屏泄露与旧行残留。
+* **物理栅格裁判 (Authoritative Raster Oracle)**：以 `PixelData`（240×32 4bpp 3840B）为物理栅格占位真理，与 `StrBuf` 字符流、`Phase/Cursor` 状态机形成三方闭环验证。
+* **全景运行时快照工作台 (ram-dumper.html)**：提供 7 大场景预设打标（NPC对话、主角坐标、路牌、进出建筑、战斗、菜单、异常排查），带有多维物理态雷达与历史快照浏览器。
+* **Lua Bridge 升级至 `v1.4.0-universal-dump`**：支持 `memory.dump_universal` 与原生文件写入。

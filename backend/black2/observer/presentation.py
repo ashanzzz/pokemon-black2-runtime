@@ -159,7 +159,7 @@ def build_observer_presentation(state_dict: Dict[str, Any]) -> ObserverPresentat
 
     return ObserverPresentationState(
         bizhawk_status="BIZHAWK CONNECTED (MelonDS NDS)",
-        bridge_version="1.1.0",
+        bridge_version="1.4.0",
         rom_name="口袋妖怪 黑2 汉化版 (IREO)",
         frame=frame,
         state_version=1000 + (frame % 500),
