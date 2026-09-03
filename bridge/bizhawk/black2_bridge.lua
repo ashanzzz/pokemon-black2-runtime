@@ -3,7 +3,7 @@
 -- 100% Background LuaSocket TCP Bridge (Zero Window Focus Needed)
 -- ============================================================================
 
-local BRIDGE_VERSION = "1.3.0-write-trace"
+local BRIDGE_VERSION = "1.4.0-universal-dump"
 local SOCKET_HOST = "127.0.0.1"
 local SOCKET_PORT = 8766
 
@@ -838,19 +838,61 @@ local function handle_command(cmd)
         resp.payload = find_exact_patterns(payload)
 
     elseif op == "memory.dump_full" or op == "memory.dump_universal" then
+        local dump_dir = payload.dump_dir
         local file_path = payload.bin_path
         local png_path = payload.png_path
         local domain = payload.domain or "Main RAM"
         local size = payload.size or 0x400000
 
-        local ok, data = pcall(function() return read_binary(domain, 0, size) end)
-        local written = 0
-        if ok and data and file_path then
-            local f = io.open(file_path, "wb")
-            if f then
-                f:write(data)
-                f:close()
-                written = #data
+        -- Multi-domain all-memory dump support
+        local domain_results = {}
+        local domains_to_dump = payload.domains or {
+            {name = "Main RAM", file = "main_ram.bin", size = 0x400000},
+            {name = "Instruction TCM", file = "itcm.bin", size = 0x8000},
+            {name = "Data TCM", file = "dtcm.bin", size = 0x4000},
+            {name = "Shared WRAM", file = "shared_wram.bin", size = 0x8000},
+            {name = "ARM7 WRAM", file = "arm7_wram.bin", size = 0x10000},
+            {name = "SRAM", file = "sram.bin", size = 0x80000},
+        }
+
+        local total_written = 0
+
+        -- 1. If dump_dir is provided, dump ALL hardware memory domains
+        if dump_dir then
+            for _, d_spec in ipairs(domains_to_dump) do
+                local d_name = d_spec.name
+                local d_file = dump_dir .. "/" .. d_spec.file
+                local d_size = d_spec.size
+                local d_ok, d_data = pcall(function() return read_binary(d_name, 0, d_size) end)
+                local d_written = 0
+                if d_ok and d_data then
+                    local f = io.open(d_file, "wb")
+                    if f then
+                        f:write(d_data)
+                        f:close()
+                        d_written = #d_data
+                        total_written = total_written + d_written
+                    end
+                end
+                domain_results[d_name] = {
+                    file = d_spec.file,
+                    size = d_written,
+                    expected = d_size,
+                    success = (d_written == d_size)
+                }
+            end
+        end
+
+        -- 2. Legacy fallback to single file_path if provided
+        if file_path and total_written == 0 then
+            local ok, data = pcall(function() return read_binary(domain, 0, size) end)
+            if ok and data then
+                local f = io.open(file_path, "wb")
+                if f then
+                    f:write(data)
+                    f:close()
+                    total_written = #data
+                end
             end
         end
 
@@ -871,8 +913,9 @@ local function handle_command(cmd)
         end
 
         resp.payload = {
-            success = (written > 0),
-            written_bytes = written,
+            success = (total_written > 0),
+            written_bytes = total_written,
+            domains = domain_results,
             screenshot_saved = shot_ok,
             frame = current_frame,
             domain = domain,
