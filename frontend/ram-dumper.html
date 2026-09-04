@@ -1,219 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pokémon Black 2 取证型 RAM 导出器</title>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Black 2 · Runtime Evidence Export</title>
   <style>
-    :root {
-      color-scheme: dark;
-      --bg:#081019; --panel:#0f1824; --panel2:#111d2b; --line:#263449;
-      --text:#e6edf7; --muted:#92a0b5; --cyan:#65d9ff; --green:#64e2a8;
-      --amber:#ffd166; --red:#ff7b86; --violet:#b59cff;
-    }
-    *{box-sizing:border-box}
-    body{margin:0;background:linear-gradient(180deg,#07101a,#0b111a 48%,#070c12);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
-    .wrap{max-width:1440px;margin:auto;padding:22px}
-    header{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding-bottom:18px;border-bottom:1px solid var(--line)}
-    h1{font-size:23px;margin:0 0 6px}.sub{color:var(--muted);font-size:13px;line-height:1.6;max-width:920px}
-    .toplinks{display:flex;gap:8px;flex-wrap:wrap}.btn,.linkbtn{border:1px solid var(--line);background:#172333;color:var(--text);border-radius:10px;padding:9px 12px;font-size:12px;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:6px}
-    .btn:hover,.linkbtn:hover{background:#1d2b3d}.btn.primary{background:linear-gradient(90deg,#7447d8,#256ea5);border-color:#6f62d9;font-weight:700}.btn.danger{background:#3a1b24;border-color:#71323f}.btn:disabled{opacity:.5;cursor:not-allowed}
-    .grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;margin-top:18px}@media(max-width:1000px){.grid{grid-template-columns:1fr}}
-    .panel{background:rgba(15,24,36,.94);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 18px 50px rgba(0,0,0,.22)}
-    .panel+.panel{margin-top:14px}.ptitle{display:flex;justify-content:space-between;align-items:center;gap:10px;font-weight:750;font-size:14px;margin-bottom:13px}
-    .badge{border:1px solid var(--line);border-radius:999px;padding:4px 8px;font-size:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.ok{color:var(--green);border-color:#286b55;background:#0e2a22}.bad{color:var(--red);border-color:#6e3540;background:#2f171c}.warn{color:var(--amber);border-color:#66532d;background:#2b2414}.idle{color:var(--muted)}
-    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(max-width:650px){.stats{grid-template-columns:repeat(2,1fr)}}.stat{background:#09111b;border:1px solid #1e2a3a;border-radius:11px;padding:10px}.stat .k{color:var(--muted);font-size:10px}.stat .v{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-weight:750;margin-top:4px;font-size:13px;word-break:break-word}
-    .preview{white-space:pre-wrap;background:#09111b;border:1px solid #1e2a3a;border-radius:11px;padding:11px;min-height:70px;font-size:12px;line-height:1.6}
-    label{display:block;color:var(--muted);font-size:11px;margin:9px 0 5px}input,textarea,select{width:100%;border:1px solid #314058;background:#09111b;color:var(--text);border-radius:10px;padding:9px 10px;font-size:12px;outline:none}input:focus,textarea:focus,select:focus{border-color:#6a78d7}textarea{resize:vertical}
-    .row{display:grid;grid-template-columns:1fr 1fr;gap:9px}.row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}@media(max-width:650px){.row,.row3{grid-template-columns:1fr}}
-    .rule{font-size:11px;color:var(--muted);line-height:1.65}.rule strong{color:var(--text)}
-    .result{margin-top:12px}.artifact{display:grid;grid-template-columns:180px 90px 110px 1fr;gap:8px;align-items:center;border-top:1px solid #1d2939;padding:8px 0;font-size:11px}@media(max-width:700px){.artifact{grid-template-columns:1fr 90px}.artifact .hash{grid-column:1/-1}}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}.hash{color:#718197;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-    .dump{background:#0b141f;border:1px solid #213044;border-radius:13px;padding:12px;margin-bottom:10px}.dumphead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.dumptitle{font-weight:700;font-size:12px;word-break:break-word}.dumpmeta{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.7}.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.actions a{font-size:10px;color:var(--cyan);text-decoration:none;border:1px solid #28465a;border-radius:8px;padding:5px 7px;background:#0a1c27}.actions a:hover{background:#102b3a}
-    .errorbox{white-space:pre-wrap;color:var(--red);font-size:11px;background:#251319;border:1px solid #63303a;border-radius:10px;padding:9px;margin-top:9px}.hidden{display:none}.tiny{font-size:10px;color:var(--muted)}
+    :root{color-scheme:dark;--bg:#091017;--card:#101b25;--line:#263746;--text:#e8f0f5;--muted:#91a4b2;--cyan:#63d8e8;--green:#61dda4;--amber:#ffd176;--red:#ff8390}*{box-sizing:border-box}body{margin:0;background:radial-gradient(900px 440px at 88% -10%,#12364a 0%,transparent 60%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif}.wrap{max-width:1120px;margin:auto;padding:28px 20px 56px}header{display:flex;justify-content:space-between;gap:22px;align-items:start;border-bottom:1px solid var(--line);padding-bottom:22px}h1{font-size:25px;letter-spacing:.01em;margin:0 0 8px}.lead{max-width:760px;color:var(--muted);font-size:14px;line-height:1.65}.link{color:var(--cyan);text-decoration:none;font-size:13px;white-space:nowrap}.status{display:flex;gap:9px;align-items:center;margin-top:17px;font-size:12px;color:var(--muted)}.dot{height:8px;width:8px;border-radius:50%;background:var(--amber);box-shadow:0 0 14px currentColor}.dot.ok{background:var(--green);color:var(--green)}.dot.bad{background:var(--red);color:var(--red)}.grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(290px,.72fr);gap:16px;margin-top:20px}.card{background:linear-gradient(150deg,rgba(18,31,42,.97),rgba(12,21,29,.97));border:1px solid var(--line);border-radius:14px;padding:18px}.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--cyan);font-weight:700}.card h2{font-size:16px;margin:5px 0 8px}.hint{color:var(--muted);font-size:12px;line-height:1.6}.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:18px 0}.fact{padding:11px;border-radius:10px;background:#0a131b;border:1px solid #20313e}.fact b{display:block;font-size:13px;margin-bottom:3px}.fact span{font-size:11px;color:var(--muted)}label{display:block;margin:14px 0 6px;color:var(--muted);font-size:12px}input,textarea{width:100%;border:1px solid #304758;border-radius:9px;background:#091218;color:var(--text);padding:10px;font:inherit;font-size:13px}textarea{resize:vertical;min-height:72px}.button{border:1px solid #56c7d6;border-radius:9px;background:linear-gradient(90deg,#0d788d,#285f9e);color:#fff;padding:11px 14px;font-weight:750;cursor:pointer;width:100%;margin-top:14px}.button:disabled{opacity:.55;cursor:wait}.button.danger{background:#40202a;border-color:#8f4050}.side-list{display:grid;gap:11px;margin-top:15px}.item{border-left:2px solid #2b5361;padding:7px 0 7px 10px;color:var(--muted);font-size:12px;line-height:1.55}.item b{color:var(--text);display:block;font-size:12px}.warn{margin-top:15px;padding:11px;border-radius:9px;border:1px solid #614e27;background:#241f14;color:#e9cc82;font-size:12px;line-height:1.55}.result{margin-top:18px}.result[hidden]{display:none}.result h3{font-size:14px;margin:0 0 8px}.state{font-size:12px;padding:4px 8px;border:1px solid var(--line);border-radius:999px}.state.ok{color:var(--green);border-color:#236c55}.state.bad{color:var(--red);border-color:#713946}.domains{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:12px}.domain{border:1px solid #233542;border-radius:8px;background:#0b141b;padding:8px;font:11px ui-monospace,Consolas,monospace}.domain .good{color:var(--green)}.domain .bad{color:var(--red)}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions a{border:1px solid #2b5361;border-radius:7px;padding:6px 8px;color:var(--cyan);text-decoration:none;font-size:12px}.saved{grid-column:1/-1}.saved-head{display:flex;justify-content:space-between;align-items:center}.refresh{width:auto;margin:0;background:#172836;border-color:#304758;font-size:12px}.dump{display:flex;justify-content:space-between;gap:14px;padding:12px 0;border-top:1px solid #223340;font-size:12px}.dump:first-child{border-top:0}.dump-name{font-weight:700;word-break:break-word}.muted{color:var(--muted);font-size:11px;margin-top:4px}.dump-links{display:flex;align-items:start;gap:7px;flex-wrap:wrap;justify-content:end}.dump-links a{color:var(--cyan);text-decoration:none;white-space:nowrap}@media(max-width:760px){header,.grid{display:block}.grid>.card{margin-top:15px}.facts{grid-template-columns:1fr}.domains{grid-template-columns:1fr}.dump{display:block}.dump-links{justify-content:start;margin-top:9px}}
   </style>
 </head>
-<body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>Pokémon Black 2 取证型 RAM 导出器 V2</h1>
-      <div class="sub">用于 RAM 逆向实验。每次导出都验证真实文件，而不是相信 manifest。目标产物包含完整 4 MiB Main RAM、原始屏幕、寄存器、语义状态、关键区域、GFL Heap 候选、完整性信息和一键 ZIP。</div>
-    </div>
-    <div class="toplinks">
-      <a class="linkbtn" href="/">返回主控制台</a>
-      <a class="linkbtn" href="/dialogue-inspector">对话检查器</a>
-    </div>
-  </header>
-
-  <div class="grid">
-    <section>
-      <div class="panel">
-        <div class="ptitle"><span>运行状态</span><span id="connBadge" class="badge idle">检测中</span></div>
-        <div class="stats">
-          <div class="stat"><div class="k">Bridge Frame</div><div id="frameVal" class="v">--</div></div>
-          <div class="stat"><div class="k">对话</div><div id="dialogueVal" class="v">--</div></div>
-          <div class="stat"><div class="k">Printer Phase</div><div id="phaseVal" class="v">--</div></div>
-          <div class="stat"><div class="k">位置</div><div id="posVal" class="v">--</div></div>
-        </div>
-        <label>当前地点</label><div id="locationVal" class="preview" style="min-height:42px">--</div>
-        <label>当前已解析文本</label><div id="textVal" class="preview">--</div>
-      </div>
-
-      <div class="panel">
-        <div class="ptitle"><span>三点对照实验</span><span class="badge warn">推荐用于 TextPrinter</span></div>
-        <div class="rule">针对你现在的场景，建议依次在<strong>无对话、第一页等待、第二页等待</strong>各保存一次。三个按钮不会控制游戏，只保存你当前停住的物理状态。</div>
-        <label>实验前缀</label>
-        <input id="expPrefix" value="NPC对话_TextPrinter" />
-        <div class="row3" style="margin-top:9px">
-          <button class="btn" onclick="capturePreset('idle_no_dialogue','无对话')">保存 无对话</button>
-          <button class="btn" onclick="capturePreset('page1_wait','第一页等待')">保存 第一页</button>
-          <button class="btn" onclick="capturePreset('page2_wait','第二页等待')">保存 第二页</button>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="ptitle"><span>单次完整导出</span><span class="badge">4 MiB + PNG + ZIP</span></div>
-        <div class="row">
-          <div><label>场景分类</label><select id="category">
-            <option value="NPC_INTERACTION">NPC_INTERACTION</option>
-            <option value="OVERWORLD_EXPLORE">OVERWORLD_EXPLORE</option>
-            <option value="SIGNPOST">SIGNPOST</option>
-            <option value="WARP_TRANSITION">WARP_TRANSITION</option>
-            <option value="BATTLE">BATTLE</option>
-            <option value="MENU">MENU</option>
-            <option value="ANOMALY">ANOMALY</option>
-          </select></div>
-          <div><label>标签</label><input id="label" value="NPC对话_完整快照" /></div>
-        </div>
-        <label>人工观察备注</label>
-        <textarea id="notes" rows="3" placeholder="例如：画面停在第二页，第一行还没找到她吗? 第二行她戴着一顶大帽子。"></textarea>
-        <button id="captureBtn" class="btn primary" style="width:100%;justify-content:center;margin-top:11px" onclick="captureNow()">保存并校验完整快照</button>
-        <div id="captureResult" class="result hidden"></div>
-      </div>
-
-      <div class="panel">
-        <div class="ptitle"><span>完整性判定</span></div>
-        <div class="rule">
-          <strong>main_ram.bin</strong> 必须正好是 4,194,304 字节。<br>
-          <strong>screen.png</strong> 必须实际存在且非空。<br>
-          <strong>semantic_state.json</strong> 单独记录语义采样帧，避免和物理 RAM 帧混淆。<br>
-          <strong>critical_ranges.json</strong> 从 main_ram.bin 离线截取，不额外读取模拟器，因此和物理 dump 同帧。<br>
-          <strong>heap_candidates.json</strong> 自动扫描 0x00005544 GFL Heap 头和 tcbl/bmp 等候选标签。<br>
-          <strong>integrity.json</strong> 记录每个文件的实际大小与 SHA-256。<br>
-          <strong>ZIP</strong> 才是建议发给其他 AI 或归档的文件。
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <div class="panel" style="min-height:720px">
-        <div class="ptitle"><span>已保存快照</span><div><span id="countBadge" class="badge">0</span> <button class="btn" onclick="refreshDumps()">刷新</button></div></div>
-        <div id="dumpList"><div class="tiny">正在读取...</div></div>
-      </div>
-    </section>
-  </div>
-</div>
-
-<script>
-const API = window.location.origin;
-const EXPECTED_RAM = 4194304;
-let busy = false;
-
-function esc(v){return String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function fmtBytes(n){n=Number(n||0); if(n<1024)return `${n} B`; if(n<1024*1024)return `${(n/1024).toFixed(1)} KiB`; return `${(n/1024/1024).toFixed(2)} MiB`;}
-function shortHash(h){return h ? h.slice(0,16)+'…' : '--';}
-async function jsonFetch(url, opts={}){
-  const r=await fetch(url,opts); const text=await r.text(); let data={};
-  try{data=text?JSON.parse(text):{};}catch{throw new Error(`HTTP ${r.status}: ${text.slice(0,300)}`)}
-  if(!r.ok)throw new Error(data.detail || JSON.stringify(data)); return data;
-}
-
-async function poll(){
-  try{
-    const [health,status,state]=await Promise.all([
-      jsonFetch(`${API}/health`), jsonFetch(`${API}/api/bizhawk/status`), jsonFetch(`${API}/api/state`)
-    ]);
-    const connected=!!health.bridge_connected && !!status.connected;
-    const badge=document.getElementById('connBadge'); badge.textContent=connected?'Bridge 已连接':'Bridge 未连接'; badge.className='badge '+(connected?'ok':'bad');
-    document.getElementById('frameVal').textContent=(state.frame ?? status.frame ?? '--').toLocaleString?.() || '--';
-    const ctx=state.context||{}, printer=ctx.printer||{};
-    document.getElementById('dialogueVal').textContent=ctx.is_dialogue_active?'ACTIVE':'IDLE';
-    document.getElementById('phaseVal').textContent=printer.candidate_control_phase ?? printer.control_phase ?? '--';
-    const p=state.player_world_pos||{}; document.getElementById('posVal').textContent=(p.x!=null&&p.y!=null)?`${p.x},${p.y},${p.z??0}`:'未验证';
-    document.getElementById('locationVal').textContent=state.location||'--';
-    document.getElementById('textVal').textContent=ctx.dialogue_text || ctx.loaded_dialogue_text || '[无已解析文本]';
-  }catch(e){const b=document.getElementById('connBadge');b.textContent='状态读取失败';b.className='badge bad';}
-}
-
-function artifactRows(artifacts){
-  const preferred=['main_ram.bin','screen.png','manifest.json','metadata.json','semantic_state.json','registers.json','critical_ranges.json','heap_candidates.json','integrity.json'];
-  const keys=[...preferred.filter(k=>artifacts?.[k]), ...Object.keys(artifacts||{}).filter(k=>!preferred.includes(k))];
-  return keys.map(name=>{const m=artifacts[name]||{}; const ram=name==='main_ram.bin'; const valid=!!m.exists && (!ram || Number(m.size)===EXPECTED_RAM);
-    return `<div class="artifact"><div class="mono">${esc(name)}</div><div class="badge ${valid?'ok':'bad'}">${valid?'OK':'缺失/异常'}</div><div class="mono">${fmtBytes(m.size)}</div><div class="hash mono" title="${esc(m.sha256||'')}">${esc(shortHash(m.sha256))}</div></div>`;
-  }).join('');
-}
-
-function renderCapture(res){
-  const box=document.getElementById('captureResult'); box.classList.remove('hidden');
-  const complete=!!res.complete;
-  const errs=(res.capture_errors||[]).map(x=>esc(x)).join('\n');
-  box.innerHTML=`
-    <div class="ptitle" style="margin:0 0 7px"><span>${complete?'完整快照已保存':'快照已保存，但不完整'}</span><span class="badge ${complete?'ok':'bad'}">${complete?'COMPLETE':'INCOMPLETE'}</span></div>
-    <div class="tiny mono">Physical frame ${esc(res.frame)} · Semantic frame ${esc(res.semantic_state_frame)} · Δ ${esc(res.frame_delta)}</div>
-    ${artifactRows(res.artifacts||{})}
-    ${errs?`<div class="errorbox">${errs}</div>`:''}
-    ${res.bundle?.url?`<div class="actions"><a href="${esc(res.bundle.url)}" download>下载完整 ZIP · ${fmtBytes(res.bundle.size)}</a></div>`:''}`;
-}
-
-async function doCapture(category,label,notes){
-  if(busy)return; busy=true; const btn=document.getElementById('captureBtn'); btn.disabled=true; btn.textContent='正在保存 4 MiB RAM 并校验...';
-  try{
-    const res=await jsonFetch(`${API}/api/dev/dump_full_ram`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category,label,notes})});
-    renderCapture(res); await refreshDumps(); return res;
-  }catch(e){const box=document.getElementById('captureResult');box.classList.remove('hidden');box.innerHTML=`<div class="errorbox">导出失败\n${esc(e.message)}</div>`; throw e;
-  }finally{busy=false;btn.disabled=false;btn.textContent='保存并校验完整快照';}
-}
-
-async function captureNow(){
-  const category=document.getElementById('category').value;
-  const label=document.getElementById('label').value.trim()||'ground_truth_sample';
-  const notes=document.getElementById('notes').value.trim();
-  try{await doCapture(category,label,notes);}catch{}
-}
-
-async function capturePreset(stage,cn){
-  const prefix=document.getElementById('expPrefix').value.trim()||'dialogue_experiment';
-  const stamp=new Date().toLocaleTimeString('zh-CN',{hour12:false}).replace(/:/g,'');
-  const label=`${prefix}_${stage}_${stamp}`;
-  const manual=document.getElementById('notes').value.trim();
-  const notes=`取证阶段: ${cn} (${stage})${manual?'\n人工备注: '+manual:''}`;
-  try{await doCapture('NPC_INTERACTION',label,notes);}catch{}
-}
-
-async function refreshDumps(){
-  const list=document.getElementById('dumpList');
-  try{
-    const res=await jsonFetch(`${API}/api/dev/dumps?limit=100`); document.getElementById('countBadge').textContent=`${res.count||0} 份`;
-    if(!res.dumps?.length){list.innerHTML='<div class="tiny">暂无快照</div>';return;}
-    list.innerHTML=res.dumps.map(d=>{
-      const good=!!d.complete; const dlg=d.dialogue||{}; const text=(dlg.visible_lines||[]).join('\n') || dlg.raw_loaded_stream || '';
-      return `<div class="dump">
-        <div class="dumphead"><div><div class="dumptitle">${esc(d.label||d.folder_name)}</div><div class="dumpmeta mono">${esc(d.folder_name)}<br>Physical frame ${esc(d.frame)}${d.semantic_state_frame!=null?` · Semantic ${esc(d.semantic_state_frame)} · Δ ${esc(d.frame_delta)}`:''}</div></div><span class="badge ${good?'ok':'bad'}">${good?'COMPLETE':'INCOMPLETE'}</span></div>
-        <div class="dumpmeta">RAM ${fmtBytes(d.ram_size)} · PNG ${fmtBytes(d.png_size)} · Registers ${esc(d.registers_count||0)}${text?`<br>Text: ${esc(text.slice(0,180))}`:''}</div>
-        ${(d.capture_errors||[]).length?`<div class="errorbox">${(d.capture_errors||[]).map(esc).join('\n')}</div>`:''}
-        <div class="actions">
-          ${d.bundle_url?`<a href="${esc(d.bundle_url)}" download>完整 ZIP</a>`:''}
-          ${d.bin_url?`<a href="${esc(d.bin_url)}" download>main_ram.bin</a>`:''}
-          ${d.png_url?`<a href="${esc(d.png_url)}" target="_blank">screen.png</a>`:''}
-          ${d.manifest_url?`<a href="${esc(d.manifest_url)}" target="_blank">manifest</a>`:''}
-          ${d.integrity_url?`<a href="${esc(d.integrity_url)}" target="_blank">integrity</a>`:''}
-        </div>
-      </div>`;
-    }).join('');
-  }catch(e){list.innerHTML=`<div class="errorbox">读取快照列表失败\n${esc(e.message)}</div>`;}
-}
-
-poll(); refreshDumps(); setInterval(poll,1000);
-</script>
-</body>
-</html>
+<body><main class="wrap">
+  <header><div><div class="eyebrow">POKÉMON BLACK 2 · READ-ONLY FORENSICS</div><h1>运行时内存证据导出</h1><div class="lead">一次导出保存全部可读 NDS 内存域、屏幕与寄存器，并生成带帧号、来源和置信度的 AI 索引。原始 <code>.bin</code> 文件是事实来源；未验证的主角坐标、Actor/NPC 位置或名字会保持 <code>unresolved</code>。</div><div class="status"><i id="dot" class="dot"></i><span id="connection">检查 BizHawk Bridge…</span></div></div><a class="link" href="/">返回控制台 →</a></header>
+  <div class="grid"><section class="card"><div class="eyebrow">ONE PHYSICAL CAPTURE</div><h2>导出当前帧</h2><p class="hint">导出不会写入游戏 RAM，也不会控制游戏。完成条件是所有可读、非 ROM 内存域和原始屏幕均由本机文件重新校验成功。</p><div class="facts"><div class="fact"><b>4 MiB</b><span>Main RAM</span></div><div class="fact"><b>动态清单</b><span>全部非 ROM 内存域</span></div><div class="fact"><b>SHA-256</b><span>每份产物校验</span></div></div><label for="label">导出标签</label><input id="label" value="runtime_evidence"><label for="notes">观察备注（可选）</label><textarea id="notes" placeholder="例如：与 NPC 对话第一页，未按 A。"></textarea><button id="capture" class="button">导出并校验当前运行时证据</button><div id="result" class="result" hidden></div></section>
+  <aside class="card"><div class="eyebrow">EXPORT CONTRACT</div><h2>给 AI 的内容</h2><div class="side-list"><div class="item"><b>全部可读非 ROM 内存域</b>从当前 BizHawk 内存域清单动态枚举；ROM 游戏文件明确排除。</div><div class="item"><b>screen.png 已在 ZIP 内</b>与内存导出同一 Bridge 操作保存，并在完整性检查中验证。</div><div class="item"><b>runtime_world.json</b>玩家、地图、Actor、NPC 名称、交互对象的当前验证状态与来源。</div><div class="item"><b>memory_domains / inventory</b>逐域的 Bridge 与磁盘字节数、哈希，以及被排除域的理由。</div></div><div class="warn">NPC Spawn 或 ROM 名称不会被当成 Runtime NPC。只有 ActorHeap 与对象链验证后，才会在 <code>runtime_world.json</code> 出现当前位置或名字。</div></aside>
+  <section class="card saved"><div class="saved-head"><div><div class="eyebrow">ARCHIVE</div><h2 style="margin-bottom:0">已保存导出</h2></div><div><button id="refresh" class="button refresh">刷新</button><button id="clear" class="button refresh danger">一键清空</button></div></div><div id="dumps" class="hint" style="margin-top:14px">正在读取…</div></section></div>
+</main><script>
+const $=id=>document.getElementById(id), API=location.origin;
+const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const bytes=n=>{n=Number(n||0);return n>=1048576?`${(n/1048576).toFixed(2)} MiB`:`${(n/1024).toFixed(1)} KiB`};
+async function request(path,opts){const r=await fetch(API+path,opts);const t=await r.text();let d={};try{d=t?JSON.parse(t):{}}catch{throw Error(`HTTP ${r.status}: ${t.slice(0,180)}`)}if(!r.ok)throw Error(d.detail||`HTTP ${r.status}`);return d}
+async function health(){try{const h=await request('/health');const ok=!!h.bridge_connected;$('dot').className='dot '+(ok?'ok':'bad');$('connection').textContent=ok?'BizHawk Bridge 已连接':'BizHawk Bridge 未连接';$('capture').disabled=!ok}catch{$('dot').className='dot bad';$('connection').textContent='无法读取 Bridge 状态';$('capture').disabled=true}}
+function domainCards(records=[]){return `<div class="domains">${records.map(d=>`<div class="domain"><span class="${d.complete?'good':'bad'}">${d.complete?'● COMPLETE':'● INCOMPLETE'}</span><br>${esc(d.name)} · ${bytes(d.actual_size)}/${bytes(d.expected_size)}</div>`).join('')}</div>`}
+function showResult(r){const complete=!!r.complete,zipOK=!!r.bundle?.verification?.ok;$('result').hidden=false;$('result').innerHTML=`<h3>本次导出 <span class="state ${complete?'ok':'bad'}">${complete?'COMPLETE':'INCOMPLETE'}</span></h3><div class="hint">物理帧 ${esc(r.frame)} · 语义帧 ${esc(r.semantic_state_frame)} · 差值 ${esc(r.frame_delta)}<br>ZIP ${zipOK?'已验证：截图、全部内存域与哈希完整':'未通过验证'}</div>${domainCards(r.memory_domains||[])}${r.capture_errors?.length?`<div class="warn">${r.capture_errors.map(esc).join('<br>')}</div>`:''}<div class="actions">${zipOK?`<a href="${esc(r.bundle.url)}" download>下载已验证完整 ZIP</a>`:''}<a href="/dumps/${esc(r.snapshot_id)}/runtime_world.json" target="_blank">runtime_world.json</a><a href="/dumps/${esc(r.snapshot_id)}/memory_domains.json" target="_blank">memory_domains.json</a></div>`}
+async function capture(){const b=$('capture');b.disabled=true;b.textContent='正在写入并逐域校验…';try{showResult(await request('/api/dev/dump_full_ram',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({category:'RUNTIME_EVIDENCE',label:$('label').value.trim()||'runtime_evidence',notes:$('notes').value.trim()})}));await list()}catch(e){$('result').hidden=false;$('result').innerHTML=`<div class="warn">导出失败：${esc(e.message)}</div>`}finally{b.textContent='导出并校验当前运行时证据';await health()}}
+async function list(){try{const r=await request('/api/dev/dumps?limit=12');if(!r.dumps?.length){$('dumps').textContent='暂无已保存导出。';return}$('dumps').innerHTML=r.dumps.map(d=>`<div class="dump"><div><div class="dump-name">${esc(d.label||d.folder_name)}</div><div class="muted">物理帧 ${esc(d.frame)} · Main RAM ${bytes(d.ram_size)} · ${d.complete?'完整':'不完整'} · ZIP ${d.bundle_verified?'已验证':'未验证'}</div></div><div class="dump-links">${d.bundle_url?`<a href="${esc(d.bundle_url)}" download>下载完整 ZIP</a>`:''}${d.manifest_url?`<a href="${esc(d.manifest_url)}" target="_blank">manifest</a>`:''}${d.world_url?`<a href="${esc(d.world_url)}" target="_blank">world</a>`:''}</div></div>`).join('')}catch(e){$('dumps').textContent=`读取失败：${e.message}`}}
+async function clearDumps(){if(!confirm('将永久删除本机 reverse_engineering/dumps 下所有 dump_* 导出与 dumps.zip，无法恢复。确定清空？'))return;const b=$('clear');b.disabled=true;b.textContent='正在清空…';try{const r=await request('/api/dev/dumps/clear',{method:'POST'});$('result').hidden=false;$('result').innerHTML=`<div class="hint">已删除 ${esc(r.deleted_count||0)} 个本地导出，共 ${bytes(r.deleted_bytes)}。</div>`;await list()}catch(e){alert(`清空失败：${e.message}`)}finally{b.disabled=false;b.textContent='一键清空'}}
+$('capture').onclick=capture;$('refresh').onclick=list;$('clear').onclick=clearDumps;health();list();
+</script></body></html>

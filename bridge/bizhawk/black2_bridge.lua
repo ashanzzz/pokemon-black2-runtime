@@ -288,6 +288,25 @@ local function read_binary(domain, offset, length)
         ok, data = pcall(function() return memory.read_bytes_as_binary_string(offset, length, domain) end)
     end
     if ok and data then return data end
+
+    -- BizHawk 2.11 exposes the array API on builds where the binary-string
+    -- helper is absent.  Convert it in chunks so a 4 MiB Main RAM dump remains
+    -- one bridge operation rather than millions of JSON memory reads.
+    local array_ok, byte_array = pcall(function()
+        return memory.read_bytes_as_array(offset, length, domain)
+    end)
+    if array_ok and type(byte_array) == "table" then
+        local chunks, chars = {}, {}
+        for index = 1, #byte_array do
+            chars[#chars + 1] = string.char(byte_array[index] or 0)
+            if #chars >= 8192 then
+                chunks[#chunks + 1] = table.concat(chars)
+                chars = {}
+            end
+        end
+        if #chars > 0 then chunks[#chunks + 1] = table.concat(chars) end
+        return table.concat(chunks)
+    end
     return ""
 end
 

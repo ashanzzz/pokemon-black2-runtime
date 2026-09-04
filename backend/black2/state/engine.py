@@ -61,12 +61,15 @@ class SemanticGameState(BaseModel):
     context: SemanticScreenContext = SemanticScreenContext()
     location: str = "桧扇市 主角家 (1F 室内)"
     map_loaded: bool = True
-    player_name: str = "zero"
-    rival_name: str = "NO"
-    gender: str = "男孩子 (Male)"
-    party_count: int = 0
-    money: int = 3000
-    badges: int = 0
+    # These trainer fields have no verified RAM decoder yet.  They must remain
+    # absent rather than leaking the old new-game demonstration defaults into
+    # a forensic export.
+    player_name: Optional[str] = None
+    rival_name: Optional[str] = None
+    gender: Optional[str] = None
+    party_count: Optional[int] = None
+    money: Optional[int] = None
+    badges: Optional[int] = None
     ready_for_input: bool = True
     suggested_buttons: List[str] = ["A"]
     map_section_id: Optional[int] = None
@@ -255,11 +258,12 @@ class SemanticStateEngine:
             context=ctx,
             location=location,
             map_loaded=(not title_login_state.is_main_menu),
-            player_name="zero",
-            gender="男孩子 (Male)",
-            party_count=0,
-            money=3000,
-            badges=0,
+            player_name=None,
+            rival_name=None,
+            gender=None,
+            party_count=None,
+            money=None,
+            badges=None,
             ready_for_input=not ctx.is_dialogue_active,
             suggested_buttons=suggested_buttons,
             map_section_id=map_section_id if not title_login_state.is_main_menu else None,

@@ -453,6 +453,21 @@ async def get_dev_dumps(limit: int = 50):
     return {"count": len(snapshots), "dumps": snapshots}
 
 
+@app.get("/api/dev/dumps/{snapshot_id}/download")
+async def download_verified_dump(snapshot_id: str):
+    """Serve only a ZIP whose screenshot, raw domains, and hashes validate."""
+    bundle_path, verification = universal_snapshot_manager.verified_bundle_path(snapshot_id)
+    if bundle_path is None:
+        raise HTTPException(status_code=409, detail={"message": "ZIP verification failed", "verification": verification})
+    return FileResponse(bundle_path, media_type="application/zip", filename=bundle_path.name)
+
+
+@app.post("/api/dev/dumps/clear")
+async def clear_dev_dumps():
+    """Delete locally generated dump_* artifacts after the UI confirmation."""
+    return universal_snapshot_manager.clear_snapshots()
+
+
 @app.post("/api/dev/capture")
 async def post_dev_capture(req: CaptureRequest):
     """Expose a real BizHawk PNG for visual map calibration only."""
