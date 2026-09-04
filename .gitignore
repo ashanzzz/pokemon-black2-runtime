@@ -21,8 +21,12 @@ test_logs_tmp/
 # Backup files
 *.bak
 *.v4bak
+*.v6bak
 *.maptruth_v2.bak
 *.playerstate_v3.bak
+
+# Evidence output (large generated artifacts)
+reverse_engineering/v6_evidence/
 
 # Large local tooling / generated binaries
 pi.exe

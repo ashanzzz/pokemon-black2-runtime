@@ -3,95 +3,85 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Pokémon Black 2 · Original Map v5</title>
+<title>Pokémon Black 2 · 3D Runtime World v6</title>
 <style>
-  :root{color-scheme:dark;--bg:#0b0d10;--panel:#12161c;--muted:#8d98a6;--line:#27303a;--text:#e8edf2;--accent:#e5b84b;--ok:#80c995;--bad:#ef7f7f}
-  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial}
-  header{display:flex;gap:14px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#0b0d10ee;backdrop-filter:blur(8px);z-index:5}
-  header strong{font-size:16px}.badge{padding:3px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted)}
-  main{display:grid;grid-template-columns:340px minmax(0,1fr);gap:12px;padding:12px;min-height:calc(100vh - 58px)}
-  .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
-  .left{display:flex;flex-direction:column;gap:12px}.toolbar{display:grid;grid-template-columns:1fr auto;gap:8px}.toolbar input,.toolbar button{background:#0d1117;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:8px}.toolbar button{cursor:pointer}
-  .toolbar button:hover{border-color:#4c5968}.kv{display:grid;grid-template-columns:130px 1fr;gap:5px 8px}.kv b{font-weight:500;color:var(--muted)}
-  .main{display:grid;grid-template-rows:minmax(420px,58vh) auto;gap:12px}.tabs{display:flex;gap:6px;margin-bottom:8px}.tabs button{background:#0d1117;color:var(--muted);border:1px solid var(--line);border-radius:7px;padding:7px 10px}.tabs button.active{color:var(--text);border-color:var(--accent)}
-  #mapCanvas,#view3d{width:100%;height:100%;min-height:380px;background:#090b0e;border:1px solid var(--line);border-radius:8px}#view3d{display:none;overflow:hidden}
-  table{border-collapse:collapse;width:100%;font-size:12px}th,td{text-align:left;border-bottom:1px solid #202832;padding:6px 5px;vertical-align:top}th{color:var(--muted);font-weight:500;position:sticky;top:0;background:var(--panel)}
-  .scroll{max-height:320px;overflow:auto}.status-ok{color:var(--ok)}.status-bad{color:var(--bad)}.muted{color:var(--muted)}pre{white-space:pre-wrap;word-break:break-word;font-size:11px;margin:0}
-  .legend{display:flex;flex-wrap:wrap;gap:10px;color:var(--muted);font-size:12px;margin-top:7px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px}.building{background:#c8a85b}.door{background:#e86f6f}.npc{background:#71b8e8}.warp{background:#b47de8}.player{background:#7fe19c}
-  @media(max-width:900px){main{grid-template-columns:1fr}.main{grid-template-rows:500px auto}}
+:root{color-scheme:dark;--bg:#070a0f;--panel:#0d121aee;--line:#273242;--text:#edf3fa;--muted:#8d9baa;--accent:#e7bb59;--ok:#68d59a;--warn:#f0bd67;--bad:#f07b7b}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:13px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial}
+#world{position:fixed;inset:0}canvas{display:block}.glass{background:var(--panel);border:1px solid var(--line);box-shadow:0 16px 50px #0008;backdrop-filter:blur(12px);border-radius:12px}
+.top{position:fixed;left:14px;right:14px;top:12px;height:50px;z-index:5;display:flex;align-items:center;gap:14px;padding:0 14px}.brand{font-weight:750;letter-spacing:.2px}.tag{color:var(--muted);font-size:11px;border-left:1px solid var(--line);padding-left:12px}.grow{flex:1}.status{display:flex;gap:8px}.pill{padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
+.left{position:fixed;left:14px;top:74px;width:282px;z-index:5;padding:12px}.section+.section{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}.title{font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:var(--muted);margin-bottom:8px}.kv{display:grid;grid-template-columns:94px minmax(0,1fr);gap:5px 8px}.kv b{font-weight:500;color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}.good{color:var(--ok)}.muted{color:var(--muted)}
+.right{position:fixed;right:14px;top:74px;width:260px;z-index:5;padding:12px}.control{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:7px 0}.control button{background:#111925;color:var(--text);border:1px solid var(--line);padding:6px 9px;border-radius:7px;cursor:pointer}.control button.active{border-color:var(--accent);color:var(--accent)}input[type=checkbox]{accent-color:#dcb35b}
+.bottom{position:fixed;left:310px;right:288px;bottom:12px;min-height:44px;z-index:5;padding:8px 12px;display:flex;align-items:center;gap:14px}.progress{flex:1;height:5px;background:#151e2a;border-radius:99px;overflow:hidden}.progress>i{display:block;height:100%;width:0;background:#7e91aa;transition:width .2s}.hint{color:var(--muted);font-size:11px;white-space:nowrap}.actorBadge{color:var(--accent)}
+.crosshair{pointer-events:none;position:fixed;left:50%;top:50%;width:8px;height:8px;border:1px solid #fff3;border-radius:50%;transform:translate(-50%,-50%);z-index:2}
+@media(max-width:980px){.right{display:none}.bottom{right:14px}.tag{display:none}}@media(max-width:720px){.left{width:230px}.bottom{left:14px}.status .pill:nth-child(n+3){display:none}}
 </style>
 </head>
 <body>
-<header>
-  <strong>Original Map v5</strong>
-  <span class="badge">ROM static world + RAM runtime join</span>
-  <span id="topStatus" class="muted">checking…</span>
-</header>
-<main>
-  <section class="left">
-    <div class="panel">
-      <div class="toolbar"><input id="zoneInput" type="number" min="0" placeholder="Zone ID"/><button id="loadZone">加载原版 Zone</button></div>
-      <div style="height:8px"></div>
-      <div class="toolbar"><button id="loadCurrent" style="grid-column:1/-1">读取当前 Runtime → ROM Join</button></div>
+<div id="world"></div><div class="crosshair"></div>
+<div class="top glass"><div class="brand">Pokémon Black 2 · 3D Runtime World</div><div class="tag">ROM StaticWorld + RAM RuntimeOverlay · no 2D map</div><div class="grow"></div><div class="status"><span id="backend" class="pill">HTTP</span><span id="sceneStatus" class="pill">Scene</span><span id="playerStatus" class="pill">Player</span></div></div>
+<div class="left glass">
+  <div class="section"><div class="title">Current Scene</div><div class="kv" id="sceneKV"><b>Zone</b><span>—</span></div></div>
+  <div class="section"><div class="title">Live Player</div><div class="kv" id="playerKV"><b>Runtime</b><span>waiting…</span></div></div>
+  <div class="section"><div class="title">Coordinate Proof</div><div id="proof" class="mono muted">WPos / GPos / Chunk waiting…</div></div>
+</div>
+<div class="right glass">
+  <div class="title">View</div>
+  <div class="control"><span>Follow player</span><button id="follow" class="active">ON</button></div>
+  <div class="control"><span>Runtime NPCs</span><label><input id="actors" type="checkbox" checked></label></div>
+  <div class="control"><span>3D evidence grid</span><label><input id="debug" type="checkbox"></label></div>
+  <div class="section"><div class="title">Player Renderer</div><div id="actorMode" class="actorBadge">probing ROM actor…</div><div id="actorMeta" class="muted" style="margin-top:5px;font-size:11px">—</div></div>
+  <div class="section">
+    <div class="title">v6 Evidence Capture (一键取证)</div>
+    <div style="display:flex;gap:6px;margin-bottom:6px">
+      <input id="evidenceLabel" type="text" value="outdoor" placeholder="标签如 outdoor / indoor" style="flex:1;background:#09121c;color:#fff;border:1px solid var(--line);border-radius:6px;padding:4px 7px;font-size:11px">
+      <button id="evidenceBtn" style="background:#13334c;color:#63d8e8;border:1px solid #2d618a;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap">📸 一键打包</button>
     </div>
-    <div class="panel"><div class="kv" id="summary"></div></div>
-    <div class="panel">
-      <b>资源策略</b>
-      <div style="height:7px"></div>
-      <div class="kv">
-        <b>不实时</b><span>Zone / Area / Matrix / Terrain / Building model / Texture / NPC-Warp-Trigger 定义</span>
-        <b>实时</b><span>Player / Actor / Zone identity / current Chunk / Prop instances / transition</span>
-        <b>原则</b><span>ROM 只描述世界；RAM 决定“现在在哪、现在发生什么”。</span>
-      </div>
-    </div>
-    <div class="panel"><b>验证信息</b><div style="height:8px"></div><pre id="verification" class="muted">—</pre></div>
-  </section>
-
-  <section class="main">
-    <div class="panel" style="display:flex;flex-direction:column;min-height:0">
-      <div class="tabs"><button id="tab2d" class="active">2D Evidence</button><button id="tab3d">Original 3D</button></div>
-      <canvas id="mapCanvas"></canvas><div id="view3d"></div>
-      <div class="legend"><span><i class="dot building"></i>Building</span><span><i class="dot door"></i>Door metadata</span><span><i class="dot npc"></i>NPC definition</span><span><i class="dot warp"></i>Warp definition</span><span><i class="dot player"></i>Live player</span></div>
-    </div>
-    <div class="panel scroll"><table><thead><tr><th>Type</th><th>ID</th><th>Position / Cell</th><th>Evidence</th></tr></thead><tbody id="rows"></tbody></table></div>
-  </section>
-</main>
+    <div id="evidenceStatus" class="muted" style="font-size:10px;line-height:1.4">点击自动截屏 + 运行验证 + 生成带 JSON 的 ZIP 包</div>
+  </div>
+  <div class="section"><div class="title">Architecture</div><div class="muted" style="font-size:11px">Terrain / Buildings: ROM cached<br>Player: RuntimeHub cache ~90ms<br>Scene identity / actors: low frequency<br>Zone change: replace StaticWorld only</div></div>
+</div>
+<div class="bottom glass"><span id="progressText" class="hint">initializing 3D scene…</span><div class="progress"><i id="bar"></i></div><span class="hint">Mouse orbit available when Follow=OFF</span></div>
 <script type="module">
-const $=s=>document.querySelector(s); let world=null, truth=null, mode='2d', rendererState=null;
-async function json(url){const r=await fetch(url); if(!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json()}
-function esc(v){return String(v??'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
-function setSummary(w,t){
-  const z=w?.zone||{}, a=w?.area||{}, m=w?.matrix||{}, mm=t?.matrix_match||{};
-  const items=[['Zone',w?.zone_id??'—'],['Area',z.area_id??'—'],['Matrix',mm.selected_matrix_id??z.matrix_id??'—'],['Matrix size',m.width?`${m.width} × ${m.height}`:'—'],['Entities',z.entities_id??'—'],['Terrain BTX',a.textures_id??'—'],['Building bundle',a.buildings_id??'—'],['Environment',a.is_exterior===true?'exterior':a.is_exterior===false?'interior':'—'],['Buildings',w?.buildings?.length??0],['Runtime confidence',t?.confidence??'static only']];
-  $('#summary').innerHTML=items.map(([k,v])=>`<b>${esc(k)}</b><span>${esc(v)}</span>`).join('');
-}
-function rows(w){
-  const out=[];
-  for(const b of w?.buildings||[]){const p=b.world_position||b.world_position_candidate||{};const r=b.resource||{};out.push(`<tr><td>${r.has_door_metadata?'Door/Building':'Building'}</td><td>UID ${esc(b.model_uid)}${r.door_uid!=null?` / Door ${esc(r.door_uid)}`:''}</td><td>chunk ${b.chunk_cell.x},${b.chunk_cell.y}<br>${Number(p.x||0).toFixed(1)}, ${Number(p.y||0).toFixed(1)}, ${Number(p.z||0).toFixed(1)}</td><td>ROM ChunkBuildings + AreaBuildingResource</td></tr>`)}
-  const e=w?.entities||{}; for(const n of e.npcs||[]) out.push(`<tr><td>NPC definition</td><td>${esc(n.id)}</td><td>${esc(n.x)}, ${esc(n.y)}, ${esc(n.z)}</td><td>ROM entities ${esc(e.entities_id)}</td></tr>`); for(const x of e.warps||[]) out.push(`<tr><td>Warp definition</td><td>${esc(x.id)} → raw ${esc(x.target_zone_or_map_raw)}:${esc(x.target_warp_id)}</td><td>${esc(x.x_world)}, ${esc(x.y_world)}, ${esc(x.z)}</td><td>destination semantics candidate until live transition</td></tr>`);
-  $('#rows').innerHTML=out.join('')||'<tr><td colspan="4" class="muted">No decoded records.</td></tr>';
-}
-function draw2d(w,t){
-  const c=$('#mapCanvas'), box=c.getBoundingClientRect(), dpr=devicePixelRatio||1;c.width=Math.max(1,box.width*dpr);c.height=Math.max(1,box.height*dpr);const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);g.clearRect(0,0,box.width,box.height);g.fillStyle='#090b0e';g.fillRect(0,0,box.width,box.height);
-  const m=w?.matrix||{};if(!m.width){g.fillStyle='#8993a0';g.fillText('No map loaded',20,30);return}const pad=28, cw=(box.width-pad*2)/m.width,ch=(box.height-pad*2)/m.height,cell=Math.max(2,Math.min(cw,ch)),ox=(box.width-cell*m.width)/2,oy=(box.height-cell*m.height)/2;
-  for(const x of w.cells||[]){const px=ox+x.x*cell,py=oy+x.y*cell;g.fillStyle=x.present?(x.belongs_to_zone===false?'#151a20':'#202832'):'#0d1014';g.fillRect(px,py,cell-.5,cell-.5);if(x.present&&cell>12){g.fillStyle='#66717f';g.font='9px sans-serif';g.fillText(String(x.chunk_id),px+2,py+10)}}
-  function point(wx,wz,color,r=3){const span=w.render_coordinate_system?.chunk_span_world||512;const px=ox+(wx/span)*cell,py=oy+(wz/span)*cell;g.fillStyle=color;g.beginPath();g.arc(px,py,r,0,Math.PI*2);g.fill()}
-  for(const b of w.buildings||[]){const p=b.world_position||b.world_position_candidate||{};point(p.x||0,p.z||0,b.resource?.has_door_metadata?'#e86f6f':'#c8a85b',b.resource?.has_door_metadata?4:3)}
-  const player=t?.runtime?.player?.actor?.grid_position, size=t?.runtime?.mapper?.chunk_tile_size; if(player&&size){const span=w.render_coordinate_system?.chunk_span_world||512;point((player.x||0)*16,(player.z||0)*16,'#7fe19c',5)}
-}
-async function loadZone(id){truth=null;world=await json(`/api/v1/map/v5/zone/${id}`);$('#zoneInput').value=id;setSummary(world,null);rows(world);$('#verification').textContent='Static ROM world. Current identity is intentionally not asserted.';draw2d(world,null);if(mode==='3d') await draw3d()}
-async function loadCurrent(){truth=await json('/api/v1/map/v5/current?include_world=true');world=truth.original_world||null;if(world){$('#zoneInput').value=world.zone_id;setSummary(world,truth);rows(world);draw2d(world,truth)}$('#verification').textContent=JSON.stringify({status:truth.status,confidence:truth.confidence,verification:truth.verification,matrix_match:truth.matrix_match,zone_identity:truth.zone_identity,consistency:truth.consistency},null,2);if(mode==='3d'&&world) await draw3d()}
-async function draw3d(){
-  const host=$('#view3d');host.innerHTML=''; if(!world){host.textContent='Load a zone first.';return}
+import {Black2World3D,esc} from '/frontend/world3d-runtime.js';
+const $=s=>document.querySelector(s);
+function pill(el,state,text){el.textContent=text||state;el.className='pill '+(state==='resolved'||state==='ready'||state==='ok'?'ok':state==='candidate'||state==='degraded'||state==='unresolved'?'warn':'bad')}
+function kv(el,items){el.innerHTML=items.map(([k,v])=>`<b>${esc(k)}</b><span>${esc(v??'—')}</span>`).join('')}
+let runtimeGender='male';
+try{const st=await fetch('/api/state').then(r=>r.json()); if(String(st.gender||'').toLowerCase().includes('female')||String(st.gender)==='1') runtimeGender='female';}catch{}
+const viewer=new Black2World3D($('#world'),{gender:runtimeGender,
+ onStatus(kind,state,detail){if(kind==='scene')pill($('#sceneStatus'),state,`Scene · ${detail}`);if(kind==='player')pill($('#playerStatus'),state,`Player · ${detail}`)},
+ onProgress(done,total,label){$('#progressText').textContent=`${label} ${done}/${total}`;$('#bar').style.width=total?`${Math.min(100,done/total*100)}%`:'0%'},
+ onActorMode(mode,meta){$('#actorMode').textContent=mode==='original_billboard'?'Original NDS billboard':mode==='original_glb'?'Original NDS 3D actor':'Pixel marker fallback';$('#actorMeta').textContent=meta?`OBJ ${meta.obj_code} · resource ${meta.resource_id} · ${meta.resource_kind}`:'ROM actor resource unresolved'},
+ onScene(d){const s=d.static||{},m=s.matrix||{},a=s.area||{};kv($('#sceneKV'),[['Zone',d.zone_id],['Environment',d.environment],['Area',a.area_id],['Matrix',m.matrix_id],['Matrix size',m.width?`${m.width} × ${m.height}`:'—'],['Terrain chunks',s.terrains?.length],['Buildings',s.buildings?.length],['Identity',d.identity?.confidence]]);},
+ onPlayer(p){const w=p.world||{},g=p.grid||{},o=p.orientation||{},l=p.locomotion||{},v=p.validation||{};kv($('#playerKV'),[['Frame',p.frame],['GPos',`${g.x??'—'}, ${g.y??'—'}, ${g.z??'—'}`],['WPos',`${w.x?.toFixed?.(2)??'—'}, ${w.y?.toFixed?.(2)??'—'}, ${w.z?.toFixed?.(2)??'—'}`],['Facing',`${o.facing??'—'} / ${o.facing_zh??'—'}`],['Motion',l.semantic_state],['Transport',l.transport_mode]]);$('#proof').innerHTML=`grid→world residual<br>X: ${v.residual_world?.x?.toFixed?.(3)??'—'} · Z: ${v.residual_world?.z?.toFixed?.(3)??'—'}<br>Chunk: ${v.chunk_matches_gpos===true?'<span class="good">MATCH</span>':String(v.chunk_matches_gpos??'—')}<br>Facing crosscheck: ${v.facing_crosscheck?'<span class="good">PASS</span>':'—'}`;}
+});
+$('#follow').onclick=()=>{viewer.setFollow(!viewer.followPlayer);$('#follow').textContent=viewer.followPlayer?'ON':'OFF';$('#follow').classList.toggle('active',viewer.followPlayer)};
+$('#actors').onchange=e=>viewer.setRuntimeActors(e.target.checked);$('#debug').onchange=e=>viewer.setDebug(e.target.checked);
+fetch('/api/v1/map/v6/status').then(r=>r.json()).then(s=>pill($('#backend'),s.status,s.status==='ready'?'HTTP · v6 ready':'ROM unavailable')).catch(e=>pill($('#backend'),'bad','HTTP error'));
+viewer.start().catch(e=>{pill($('#sceneStatus'),'bad',e.message);$('#progressText').textContent=e.message});
+
+// v6 One-Click Evidence Capture & Zip
+$('#evidenceBtn').onclick=async()=>{
+  const btn=$('#evidenceBtn');
+  const status=$('#evidenceStatus');
+  const label=($('#evidenceLabel').value.trim()||'evidence');
+  btn.disabled=true;
+  btn.textContent='📸 采集中…';
+  status.innerHTML='正在截屏并执行 verify_v6_runtime...';
   try{
-    const THREE=await import('https://unpkg.com/three@0.170.0/build/three.module.js');const {GLTFLoader}=await import('https://unpkg.com/three@0.170.0/examples/jsm/loaders/GLTFLoader.js');
-    const scene=new THREE.Scene();scene.background=new THREE.Color(0x090b0e);const cam=new THREE.PerspectiveCamera(50,host.clientWidth/Math.max(1,host.clientHeight),1,100000);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(host.clientWidth,host.clientHeight);renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));host.appendChild(renderer.domElement);scene.add(new THREE.HemisphereLight(0xffffff,0x444444,2.2));const sun=new THREE.DirectionalLight(0xffffff,2.0);sun.position.set(1000,1800,800);scene.add(sun);const loader=new GLTFLoader();const load=url=>new Promise((res,rej)=>loader.load(url,g=>res(g.scene),undefined,rej));
-    const span=world.render_coordinate_system?.chunk_span_world||512;const cells=(world.cells||[]).filter(c=>c.present&&c.belongs_to_zone!==false).slice(0,96);for(const cell of cells){try{const o=await load(`/api/v1/map/v5/terrain/${world.zone_id}/${cell.x}/${cell.y}.glb`);o.position.set((cell.x+.5)*span,0,(cell.y+.5)*span);scene.add(o)}catch(e){console.debug('terrain source-only',cell,e)}}
-    const modelCache=new Map();for(const b of (world.buildings||[]).filter(b=>b.belongs_to_zone!==false).slice(0,256)){try{let base=modelCache.get(b.model_uid);if(!base){base=await load(`/api/v1/map/v5/building/${world.zone_id}/${b.model_uid}.glb`);modelCache.set(b.model_uid,base)}const o=base.clone(true),p=b.world_position||b.world_position_candidate||{};o.position.set(p.x||0,p.y||0,p.z||0);o.rotation.y=(b.rotation_degrees||0)*Math.PI/180;scene.add(o)}catch(e){console.debug('building source-only',b.model_uid,e)}}
-    const cx=(world.matrix.width*span)/2,cz=(world.matrix.height*span)/2,extent=Math.max(world.matrix.width,world.matrix.height)*span;cam.position.set(cx,Math.max(700,extent*.85),cz+Math.max(900,extent*.85));cam.lookAt(cx,0,cz);function tick(){if(mode!=='3d')return;renderer.render(scene,cam);requestAnimationFrame(tick)}tick();rendererState={renderer,scene,cam};
-  }catch(e){host.innerHTML=`<div style="padding:20px" class="muted">3D source is available, but browser Three.js/Apicula could not render it.<br><br>${esc(e.message||e)}<br><br>2D Evidence remains authoritative and does not invent geometry.</div>`}
-}
-$('#loadZone').onclick=()=>loadZone(Number($('#zoneInput').value)).catch(e=>alert(e.message));$('#loadCurrent').onclick=()=>loadCurrent().catch(e=>alert(e.message));$('#tab2d').onclick=()=>{mode='2d';$('#tab2d').classList.add('active');$('#tab3d').classList.remove('active');$('#mapCanvas').style.display='block';$('#view3d').style.display='none';if(world)draw2d(world,truth)};$('#tab3d').onclick=()=>{mode='3d';$('#tab3d').classList.add('active');$('#tab2d').classList.remove('active');$('#mapCanvas').style.display='none';$('#view3d').style.display='block';draw3d()};
-window.addEventListener('resize',()=>{if(mode==='2d'&&world)draw2d(world,truth)});json('/api/v1/map/v5/status').then(s=>{$('#topStatus').textContent=s.status==='ready'?'v5 ready':'ROM unavailable';$('#topStatus').className=s.status==='ready'?'status-ok':'status-bad'}).catch(e=>{$('#topStatus').textContent=e.message;$('#topStatus').className='status-bad'});loadCurrent().catch(()=>{});
+    const res=await fetch(`/api/v1/map/v6/evidence/capture?label=${encodeURIComponent(label)}`,{method:'POST'}).then(r=>r.json());
+    if(res.ok){
+      status.innerHTML=`<span style="color:var(--ok)">✓ 成功生成!</span> <a href="${res.download_url}" download style="color:var(--accent);text-decoration:underline;font-weight:bold;margin-left:4px">下载 ZIP (${res.zip_name})</a>`;
+    }else{
+      status.innerHTML=`<span style="color:var(--bad)">采集失败: ${res.detail||'未知错误'}</span>`;
+    }
+  }catch(err){
+    status.innerHTML=`<span style="color:var(--bad)">请求异常: ${err.message}</span>`;
+  }finally{
+    btn.disabled=false;
+    btn.textContent='📸 一键打包';
+  }
+};
 </script>
-</body></html>
+</body>
+</html>
