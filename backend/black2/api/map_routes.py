@@ -15,15 +15,18 @@ from ..decoders.field import get_map_name
 from ..world.map_knowledge import MapKnowledgeService, format_catalog_text, format_current_text
 from ..world.map_schematic import MapSchematicService, format_schematic_text
 from ..world.map_truth import MapTruthService
+from ..world.map_scene import MapSceneService
 from ..world.runtime_field_resolver import resolve_runtime_field
+from ..world.runtime_player_state import player_runtime_service
 from ..world.native_map import NativeMapError, NativeMapService, read_live_map_state, _bytes_from_result
 
 
 router = APIRouter(prefix="/api/v1/map", tags=["map"])
-native_maps = NativeMapService()
+native_maps: NativeMapService | None = None
 schematics = MapSchematicService()
 knowledge = MapKnowledgeService()
 truth = MapTruthService()
+scene = MapSceneService(truth=truth)
 _cache_task: asyncio.Task[None] | None = None
 _reader: MemoryReader | None = None
 _client: BridgeClient | None = None
@@ -35,11 +38,26 @@ class MapProbeRequest(BaseModel):
     wait_frames: int = 15
 
 
+def _native_maps() -> NativeMapService:
+    global native_maps
+    if native_maps is None:
+        native_maps = NativeMapService()
+    return native_maps
+
+
 def start_cache_observer(reader: MemoryReader) -> None:
-    """Start one local map cache observer for the application lifecycle."""
+    """Start the optional ROM-native map cache only when a ROM is configured."""
     global _cache_task
-    if _cache_task is None or _cache_task.done():
-        _cache_task = asyncio.create_task(native_maps.start_auto_cache(reader))
+    if _cache_task is not None and not _cache_task.done():
+        return
+    try:
+        service = _native_maps()
+    except (FileNotFoundError, OSError):
+        # Map rendering is an optional subsystem. Missing ROM must not prevent
+        # HTTP, Bridge, Dialogue or Player Runtime from starting.
+        _cache_task = None
+        return
+    _cache_task = asyncio.create_task(service.start_auto_cache(reader))
 
 
 def configure_map_routes(reader: MemoryReader, client: BridgeClient) -> None:
@@ -193,34 +211,51 @@ async def scan_facing(reader: MemoryReader = Depends(_map_reader)) -> dict[str, 
 
 @router.get("/current")
 async def current_position(reader: MemoryReader = Depends(_map_reader)) -> dict[str, Any]:
-    try:
-        live = await read_live_map_state(reader)
-    except NativeMapError as error:
-        raise HTTPException(status_code=503, detail=str(error)) from error
+    """Compatibility map HUD backed by the shared verified Player Runtime cache.
 
-    chunk_x = (live.x // 32) if live.x is not None else None
-    chunk_y = (live.y // 32) if live.y is not None else None
-    local_x = (live.x % 32) if live.x is not None else None
-    local_y = (live.y % 32) if live.y is not None else None
+    The RuntimeHub continuously refreshes ``player_runtime_service.latest``.
+    This endpoint does not issue another competing RAM request unless no sample
+    exists yet (for example when called before the hub's first completed tick).
+    """
+    sample = player_runtime_service.latest
+    if not sample:
+        try:
+            sample = await player_runtime_service.sample(reader)
+        except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError) as error:
+            raise HTTPException(status_code=503, detail=str(error)) from error
+    status = sample.get("status")
+    resolved = status in {"resolved", "candidate"}
+    pos = (sample.get("position") or {}).get("grid") or {}
+    mapper = sample.get("mapper") or {}
+    chunk = mapper.get("player_chunk") or {}
+    size = int(mapper.get("chunk_tile_size") or 32)
+    x = pos.get("x") if resolved else None
+    z = pos.get("z") if resolved else None
+    orientation = sample.get("orientation") or {}
+    locomotion = sample.get("locomotion") or {}
     return {
-        "source": "runtime FieldPlayerCore -> FieldActor; no manual map database",
-        "map_section_id": live.map_id,
-        "map_name": get_map_name(live.map_id) if live.map_id is not None else None,
+        "source": "RuntimeHub cache -> Field -> FieldPlayer -> Core -> FieldActor",
         "player": {
-            "x": live.x,
-            "y": live.y,
-            "elevation": live.elevation,
-            "facing": live.facing,
-            "movement_state": live.movement_state,
-            "chunk": {"x": chunk_x, "y": chunk_y},
-            "local": {"x": local_x, "y": local_y},
-            "verified": live.verified,
+            "x": x,
+            "y": z,
+            "elevation": pos.get("y") if resolved else None,
+            "facing": orientation.get("facing") if orientation.get("verified") else "Unresolved",
+            "movement_state": locomotion.get("semantic_state", "Unresolved"),
+            "chunk": {"x": chunk.get("x"), "y": chunk.get("y")},
+            "local": {
+                "x": (int(x) % size) if isinstance(x, int) else None,
+                "y": (int(z) % size) if isinstance(z, int) else None,
+            },
+            "verified": bool(resolved and orientation.get("verified")),
+            "confidence": sample.get("confidence"),
         },
+        "map_section_id": None,
+        "map_name": None,
         "field_system": {
             "matrix_id": None,
             "active_actors_count": None,
             "camera_target": None,
-            "status": "use /api/v1/map/truth/current for runtime+ROM resolved values",
+            "status": "Use /api/v1/map/scene/current for runtime+ROM scene facts",
         },
         "trainer": None,
     }
@@ -228,22 +263,22 @@ async def current_position(reader: MemoryReader = Depends(_map_reader)) -> dict[
 
 @router.get("/runtime/field")
 async def runtime_field(reader: MemoryReader = Depends(_map_reader)) -> dict[str, Any]:
-    """Explicit full-RAM structural resolver for Field/Player/Actors/Mapper/Props."""
     return await _map_response(resolve_runtime_field(reader))
 
 
 @router.get("/truth/current")
-async def truth_current(
-    include_raw: bool = False,
-    reader: MemoryReader = Depends(_map_reader),
-) -> dict[str, Any]:
-    """Authoritative current map: live RAM structures joined to exact ROM resources."""
+async def truth_current(include_raw: bool = False, reader: MemoryReader = Depends(_map_reader)) -> dict[str, Any]:
     return await _map_response(truth.current(reader, include_raw=include_raw))
+
+
+@router.get("/scene/current")
+async def scene_current(force: bool = False, reader: MemoryReader = Depends(_map_reader)) -> dict[str, Any]:
+    return await _map_response(scene.current(reader, force=force))
 
 
 @router.get("/visual")
 async def visual_map(reader: MemoryReader = Depends(_map_reader)) -> dict[str, Any]:
-    visual = await _retry_live_build(lambda: native_maps.build_live(reader))
+    visual = await _retry_live_build(lambda: _native_maps().build_live(reader))
     # The BMD/BTX visual alignment identifies the loaded scene.  ZoneData adds
     # the verified Map Header/event context used by the rest of the map API.
     visual.update(schematics.visual_context(visual))
@@ -252,14 +287,14 @@ async def visual_map(reader: MemoryReader = Depends(_map_reader)) -> dict[str, A
 
 @router.get("/geometry")
 async def geometry_map(reader: MemoryReader = Depends(_map_reader)) -> dict[str, Any]:
-    geometry = await _retry_live_build(lambda: native_maps.build_geometry_live(reader))
+    geometry = await _retry_live_build(lambda: _native_maps().build_geometry_live(reader))
     geometry.update(schematics.visual_context(geometry))
     return geometry
 
 
 @router.get("/visual/cache/{cache_key}/{asset_key}/{asset_name}")
 async def visual_asset(cache_key: str, asset_key: str, asset_name: str):
-    path = native_maps.asset_path(cache_key, asset_key, asset_name)
+    path = _native_maps().asset_path(cache_key, asset_key, asset_name)
     if path is None:
         raise HTTPException(status_code=404, detail="Native map asset not found")
     return FileResponse(path)
@@ -267,7 +302,7 @@ async def visual_asset(cache_key: str, asset_key: str, asset_name: str):
 
 @router.get("/geometry/cache/{cache_key}/{asset_key}/{asset_name}")
 async def geometry_asset(cache_key: str, asset_key: str, asset_name: str):
-    path = native_maps.geometry_asset_path(cache_key, asset_key, asset_name)
+    path = _native_maps().geometry_asset_path(cache_key, asset_key, asset_name)
     if path is None:
         raise HTTPException(status_code=404, detail="Geometry map asset not found")
     return FileResponse(path)
@@ -275,7 +310,10 @@ async def geometry_asset(cache_key: str, asset_key: str, asset_name: str):
 
 @router.get("/cache/status")
 async def cache_status() -> dict[str, Any]:
-    return native_maps.cache_status()
+    try:
+        return _native_maps().cache_status()
+    except (FileNotFoundError, OSError) as error:
+        return {"state": "rom_unavailable", "error": str(error)}
 
 
 @router.get("/schematic")

@@ -133,46 +133,9 @@ AI Agent & Native Map Viewer
 ## 5. API 规范与端点速查
 
 * **综合控制台 Web 页面**：`http://127.0.0.1:8765/`
-* **全景运行时物理真理快照工作台**：`http://127.0.0.1:8765/ram-dumper`
-* **对话与打字机实时检查器**：`http://127.0.0.1:8765/dialogue-inspector`
 * **ROM 原生 3D 官方地图 Viewer**：`http://127.0.0.1:8765/frontend/native-map.html`
 * **实时玩家坐标与地图状态**：`GET /api/v1/map/current`
 * **实时 3D 模型网格与材质流**：`GET /api/v1/map/visual`
 * **实时文字化地图知识库**：`GET /api/v1/map/knowledge/current.txt`
 * **全量 ROM 目录索引**：`GET /api/v1/map/knowledge/catalog.txt`
 * **实时对话与时序流**：`GET /api/observer/presentation`
-* **全域硬件内存原子导出**：`POST /api/dev/dump_full_ram`
-* **快照清册与一键 ZIP**：`GET /api/dev/dumps`
-* **主角运行时状态工作台页面**：`http://127.0.0.1:8765/frontend/player-state.html`
-* **主角高频运行时状态 API**：`GET /api/v1/player/runtime`
-* **运行时 Field 对象解析**：`GET /api/v1/map/runtime/field`
-* **物理真理与 ROM 对齐地图**：`GET /api/v1/map/truth/current`
-
----
-
-## 6. 版本里程碑与发布历史 (Milestone Releases)
-
-### `v2.2.0` - Player Runtime v3 & Cardinal Facing Coherence (2026-09-04)
-* **主角真实朝向与时序运动判定 (Player Runtime v3)**：
-  - 新增 `GET /api/v1/player/runtime` 与前端控制台 `player-state.html`。
-  - **朝向双源强闭环**：以 `FieldActor.FaceDir` 为主要物理事实，并与 `PlayerState.RotationAngle` (0=North, 0x4000=West, 0x8000=South, 0xC000=East) 进行 1:1 精确交叉校验（四方向实测 4/4 全部一致）。
-  - **明确区分 FaceDir 与 MotionDir**：`MotionDir` 仅作为动画/移动过渡方向，不篡改当前物理朝向。
-  - **逐帧速度与步态计算**：基于 `FieldActor.WPos` 真实连续位移与模拟器帧差，实时测算水平运动速度，摆脱对离散动画状态枚举的猜测。
-  - **升级 `runtime_field_resolver.py`**：进一步完善 Field -> Player -> Core -> GridPos/WPos/TileType 闭环链路。
-
-### `v2.1.0` - Map Truth v2 & Full Non-ROM Hardware Memory Exporter (2026-09-04)
-* **Map Truth v2 闭环落地**：
-  - 新增 `GET /api/v1/map/runtime/field`：从当前 Main RAM 动态解析 Field -> Player -> PlayerActor -> ActorSystem -> Mapper -> Loaded Chunks -> Props -> DoorUID -> TileType。
-  - 新增 `GET /api/v1/map/truth/current`：将运行时 RAM 与 ROM Matrix (`a/0/0/9`)、Map Header、BMD0 (`a/0/0/8`)、BTX0 (`a/0/1/4`)、NPC Spawn、Warp、Trigger、Permission 进行物理匹配闭环。
-* **通用全域硬件导出优化**：
-  - Lua Bridge `memory.read` 支持高速 binary-string / chunked-array 批量流式传输，解决大范围 Main RAM 遍历超时。
-  - `memory.read_bytes` 支持定制超时间隔（`timeout=10.0s`），支撑 4MB 全量 RAM 零丢失读取。
-  - 增强 `ram-dumper.html`：包含全部内存域物理文件验证、CRC 校验、ZIP 一键安全下载。
-
-### `v2.0.0` - Universal Ground-Truth Runtime & Multi-Domain Dumper (2026-09-04)
-* **全域硬件内存原子导出器 (Universal Dumper)**：支持一次 RPC 并行落盘 Main RAM (4MB)、ITCM (32KB)、DTCM (16KB)、Shared WRAM (32KB)、ARM7 WRAM (64KB)、SRAM (512KB)、Native 画面截图 (PNG)、ARM9 完整寄存器组 (PC/SP/LR/CPSR/R0-R12) 与结构化 `manifest.json`，自动生成一键打包 ZIP。
-* **Root Tuple 动态解析链 (DynamicDialogueResolver)**：彻底摆脱对固定堆地址（`0x02332C20` / `0x0232B400`）的依赖，通过 `MsgBGSys + 0x15C` 动态定位 `talkmsgwin` 并匹配 `[TCBL_Phase, BmpWin, Context, StrBuf]` 四指针元组，实现跨 NPC、跨堆重分配的自适应解析。
-* **流式 Token 解释器 (VisibleTextLedger)**：实现了真正的单帧零历史依赖解析（Snapshot Independence / EXP-021），精准闭环 `CLEAR` 翻页清屏、`LF` 换行、`SCROLL` 逐像素平移、`EOS` 终止，彻底消除下一屏泄露与旧行残留。
-* **物理栅格裁判 (Authoritative Raster Oracle)**：以 `PixelData`（240×32 4bpp 3840B）为物理栅格占位真理，与 `StrBuf` 字符流、`Phase/Cursor` 状态机形成三方闭环验证。
-* **全景运行时快照工作台 (ram-dumper.html)**：提供 7 大场景预设打标（NPC对话、主角坐标、路牌、进出建筑、战斗、菜单、异常排查），带有多维物理态雷达与历史快照浏览器。
-* **Lua Bridge 升级至 `v1.4.0-universal-dump`**：支持 `memory.dump_universal` 与原生文件写入。

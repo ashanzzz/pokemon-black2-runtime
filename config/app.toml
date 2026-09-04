@@ -1,12 +1,18 @@
-[server]
+[web]
 host = "127.0.0.1"
 port = 8765
+role = "FastAPI + browser UI only"
 
-[bizhawk]
-socket_port = 8766
-default_domain = "Main RAM"
-melon_ds_main_ram_size = 4194304
+[bridge]
+host = "127.0.0.1"
+port = 8766
+role = "BizHawk Lua TCP bridge only"
 
-[sampling]
-state_hz = 10
-heartbeat_interval_frames = 30
+[runtime]
+semantic_sample_interval_seconds = 0.20
+map_scene_cache_seconds = 3.0
+
+[frontend]
+api_mode = "same-origin-relative"
+# Browser pages must never hard-code 127.0.0.1:8765.
+# Transport health and semantic decode health are displayed separately.

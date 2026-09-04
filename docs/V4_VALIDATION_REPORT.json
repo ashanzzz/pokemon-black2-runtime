@@ -1,0 +1,22 @@
+{
+  "format": "black2-runtime-v4-validation/v1",
+  "validated_at": "2026-09-03",
+  "offline_validation": {
+    "python_compileall_backend": "pass",
+    "frontend_inline_javascript": "11/11 pass",
+    "runtime_unit_tests": "20 passed",
+    "fastapi_import_without_rom": "pass",
+    "fastapi_runtime_health_without_bridge": "pass"
+  },
+  "controlled_facing_samples": {
+    "result": "4/4 pass",
+    "up": {"face_dir": 0, "rotation_angle": "0x0000"},
+    "down": {"face_dir": 1, "rotation_angle": "0x8000"},
+    "left": {"face_dir": 2, "rotation_angle": "0x4000"},
+    "right": {"face_dir": 3, "rotation_angle": "0xC000"}
+  },
+  "not_executed_here": {
+    "snapshot_independence_live_test": "requires user's running FastAPI + BizHawk + savestate slot 2; container has no emulator",
+    "rom_join_map_scene": "requires BLACK2_ROM_PATH; backend now starts without ROM and map subsystem degrades independently"
+  }
+}

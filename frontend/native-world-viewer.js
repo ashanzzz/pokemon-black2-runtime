@@ -1364,7 +1364,7 @@
         `【当前地图】${mapName}`,
         `【游戏全局】X=${game.x}  Y=${game.y}  E=${game.elevation ?? 0}（E 为高程层级）`,
         `【分块索引】Chunk=(${chunkX}, ${chunkY}) · 局部 Local=(${localX}, ${localY})`,
-        `【主角朝向】${facingCn} · 状态: ${player?.movement_state || 'Idle'}`
+        `【主角朝向】${facingCn} · 状态: ${player?.movement_state || 'Unresolved'}`
       ].join('\n');
 
       const anchor = this.playerRenderAnchor;

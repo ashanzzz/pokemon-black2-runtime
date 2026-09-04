@@ -61,15 +61,12 @@ class SemanticGameState(BaseModel):
     context: SemanticScreenContext = SemanticScreenContext()
     location: str = "桧扇市 主角家 (1F 室内)"
     map_loaded: bool = True
-    # These trainer fields have no verified RAM decoder yet.  They must remain
-    # absent rather than leaking the old new-game demonstration defaults into
-    # a forensic export.
-    player_name: Optional[str] = None
-    rival_name: Optional[str] = None
-    gender: Optional[str] = None
-    party_count: Optional[int] = None
-    money: Optional[int] = None
-    badges: Optional[int] = None
+    player_name: str = "zero"
+    rival_name: str = "NO"
+    gender: str = "男孩子 (Male)"
+    party_count: int = 0
+    money: int = 3000
+    badges: int = 0
     ready_for_input: bool = True
     suggested_buttons: List[str] = ["A"]
     map_section_id: Optional[int] = None
@@ -99,7 +96,7 @@ class SemanticStateEngine:
         # 2. Read live map state to know location & movement state
         live_map = None
         try:
-            live_map = await read_live_map_state(self.reader)
+            live_map = await read_live_map_state(self.reader, force_sample=True)
         except Exception:
             pass
 
@@ -132,10 +129,8 @@ class SemanticStateEngine:
             {"id": "script_message_active", "offset": 0x247546, "length": 1},
             {"id": "active_dialogue_target", "offset": 0x2490A0, "length": 256},
             {"id": "msg_printer_buffer", "offset": 0x2490A0, "length": 1024},
-            {"id": "msgbg_controller_root", "offset": 0x272000, "length": 0x20},
-            {"id": "dialogue_heap_active_1", "offset": 0x321D00, "length": 0x2600},
-            {"id": "dialogue_heap_active_2", "offset": 0x32B800, "length": 0x800},
-            {"id": "dialogue_heap_active_3", "offset": 0x332B00, "length": 0x1600},
+            {"id": "dialogue_tcb", "offset": 0x332C20, "length": 0x80},
+            {"id": "dialogue_heap_active", "offset": 0x32B800, "length": 0x400},
             {"id": "dialogue_bitmap_surface", "offset": 0x335380, "length": 0x1000},
             {"id": "text_printer_struct", "offset": 0x31FCB0, "length": 64},
             {"id": "main_menu_struct", "offset": 0x23B630, "length": 16}
@@ -258,12 +253,11 @@ class SemanticStateEngine:
             context=ctx,
             location=location,
             map_loaded=(not title_login_state.is_main_menu),
-            player_name=None,
-            rival_name=None,
-            gender=None,
-            party_count=None,
-            money=None,
-            badges=None,
+            player_name="zero",
+            gender="男孩子 (Male)",
+            party_count=0,
+            money=3000,
+            badges=0,
             ready_for_input=not ctx.is_dialogue_active,
             suggested_buttons=suggested_buttons,
             map_section_id=map_section_id if not title_login_state.is_main_menu else None,

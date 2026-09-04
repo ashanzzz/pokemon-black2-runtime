@@ -3,7 +3,7 @@
 -- 100% Background LuaSocket TCP Bridge (Zero Window Focus Needed)
 -- ============================================================================
 
-local BRIDGE_VERSION = "1.4.0-universal-dump"
+local BRIDGE_VERSION = "1.3.0-write-trace"
 local SOCKET_HOST = "127.0.0.1"
 local SOCKET_PORT = 8766
 
@@ -288,25 +288,6 @@ local function read_binary(domain, offset, length)
         ok, data = pcall(function() return memory.read_bytes_as_binary_string(offset, length, domain) end)
     end
     if ok and data then return data end
-
-    -- BizHawk 2.11 exposes the array API on builds where the binary-string
-    -- helper is absent.  Convert it in chunks so a 4 MiB Main RAM dump remains
-    -- one bridge operation rather than millions of JSON memory reads.
-    local array_ok, byte_array = pcall(function()
-        return memory.read_bytes_as_array(offset, length, domain)
-    end)
-    if array_ok and type(byte_array) == "table" then
-        local chunks, chars = {}, {}
-        for index = 1, #byte_array do
-            chars[#chars + 1] = string.char(byte_array[index] or 0)
-            if #chars >= 8192 then
-                chunks[#chunks + 1] = table.concat(chars)
-                chars = {}
-            end
-        end
-        if #chars > 0 then chunks[#chunks + 1] = table.concat(chars) end
-        return table.concat(chunks)
-    end
     return ""
 end
 
@@ -856,125 +837,25 @@ local function handle_command(cmd)
     elseif op == "memory.find_patterns" then
         resp.payload = find_exact_patterns(payload)
 
-    elseif op == "memory.dump_full" or op == "memory.dump_universal" then
-        local dump_dir = payload.dump_dir
-        local file_path = payload.bin_path
-        local png_path = payload.png_path
-        local domain = payload.domain or "Main RAM"
-        local size = payload.size or 0x400000
-
-        -- Multi-domain all-memory dump support
-        local domain_results = {}
-        local domains_to_dump = payload.domains or {
-            {name = "Main RAM", file = "main_ram.bin", size = 0x400000},
-            {name = "Instruction TCM", file = "itcm.bin", size = 0x8000},
-            {name = "Data TCM", file = "dtcm.bin", size = 0x4000},
-            {name = "Shared WRAM", file = "shared_wram.bin", size = 0x8000},
-            {name = "ARM7 WRAM", file = "arm7_wram.bin", size = 0x10000},
-            {name = "SRAM", file = "sram.bin", size = 0x80000},
-        }
-
-        local total_written = 0
-
-        -- 1. If dump_dir is provided, dump ALL hardware memory domains
-        if dump_dir then
-            for _, d_spec in ipairs(domains_to_dump) do
-                local d_name = d_spec.name
-                local d_file = dump_dir .. "/" .. d_spec.file
-                local d_size = d_spec.size
-                local d_ok, d_data = pcall(function() return read_binary(d_name, 0, d_size) end)
-                local d_written = 0
-                if d_ok and d_data then
-                    local f = io.open(d_file, "wb")
-                    if f then
-                        f:write(d_data)
-                        f:close()
-                        d_written = #d_data
-                        total_written = total_written + d_written
-                    end
-                end
-                domain_results[d_name] = {
-                    file = d_spec.file,
-                    size = d_written,
-                    expected = d_size,
-                    success = (d_written == d_size)
-                }
-            end
-        end
-
-        -- 2. Legacy fallback to single file_path if provided
-        if file_path and total_written == 0 then
-            local ok, data = pcall(function() return read_binary(domain, 0, size) end)
-            if ok and data then
-                local f = io.open(file_path, "wb")
-                if f then
-                    f:write(data)
-                    f:close()
-                    total_written = #data
-                end
-            end
-        end
-
-        local shot_ok = false
-        if png_path and client and client.screenshot then
-            shot_ok = pcall(function() client.screenshot(png_path) end)
-        end
-
-        -- Capture active registers snapshot
-        local reg_snap = {}
-        if emu and emu.getregisters then
-            local r_ok, raw_regs = pcall(function() return emu.getregisters() end)
-            if r_ok and type(raw_regs) == "table" then
-                for k, v in pairs(raw_regs) do
-                    reg_snap[tostring(k)] = v
-                end
-            end
-        end
-
-        resp.payload = {
-            success = (total_written > 0),
-            written_bytes = total_written,
-            domains = domain_results,
-            screenshot_saved = shot_ok,
-            frame = current_frame,
-            domain = domain,
-            bin_path = file_path,
-            png_path = png_path,
-            registers = reg_snap
-        }
-
     elseif op == "memory.read" then
         local domain = payload.domain or "Main RAM"
         local addr = payload.addr or payload.offset or 0
         local size = payload.size or payload.length or 1
         local format = payload.format or "u8"
 
-        local val_scalar = nil
-        local hex_str = ""
         local bytes = {}
+        for i = 0, size - 1 do
+            local val = safe_read_u8(addr + i, domain)
+            table.insert(bytes, val)
+        end
 
-        if format == "bytes" or format == "hex" or size > 16 then
-            local data = read_binary(domain, addr, size)
-            hex_str = binary_to_hex(data)
-            -- For small reads keep the bytes array for backward compatibility
-            if size <= 1024 then
-                for i = 1, #data do
-                    bytes[i] = string.byte(data, i)
-                end
-            end
-        else
-            for i = 0, size - 1 do
-                local val = safe_read_u8(addr + i, domain)
-                table.insert(bytes, val)
-            end
-            hex_str = bytes_to_hex(bytes)
-            if format == "u8" or size == 1 then
-                val_scalar = bytes[1]
-            elseif format == "u16" or size == 2 then
-                val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256)
-            elseif format == "u32" or size == 4 then
-                val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256) + ((bytes[3] or 0) * 65536) + ((bytes[4] or 0) * 16777216)
-            end
+        local val_scalar = nil
+        if format == "u8" or size == 1 then
+            val_scalar = bytes[1]
+        elseif format == "u16" or size == 2 then
+            val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256)
+        elseif format == "u32" or size == 4 then
+            val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256) + ((bytes[3] or 0) * 65536) + ((bytes[4] or 0) * 16777216)
         end
 
         resp.payload = {
@@ -982,7 +863,7 @@ local function handle_command(cmd)
             addr = addr,
             size = size,
             value = val_scalar,
-            hex = hex_str,
+            hex = bytes_to_hex(bytes),
             bytes = bytes
         }
 

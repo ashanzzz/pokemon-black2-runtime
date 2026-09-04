@@ -18,7 +18,6 @@ from ..decoders.field import get_map_name
 from .rom_maps import NativeMapEngine
 from .rom_reader import NarcArchive
 from .runtime_player_state import player_runtime_service
-from .runtime_field_resolver import RuntimeFieldLocator
 
 
 MAP_MODEL_PATH = "a/0/0/8"
@@ -27,7 +26,6 @@ MAP_ID_OFFSETS = (0x1434A6, 0x143668, 0x146CE8, 0x146EB2)
 _MATRIX_NONE = 0xFFFFFFFF
 _NAME_RE = re.compile(rb"[A-Za-z][A-Za-z0-9_]{2,}")
 _VISUAL_SCAN_LOCK = asyncio.Lock()
-_RUNTIME_FIELD_LOCATOR = RuntimeFieldLocator()
 
 # This model has three exact material/palette candidates.  Archive 282 was
 # selected by a direct BizHawk screen comparison; 307 showed a blue variant.
@@ -60,14 +58,24 @@ def _u16(data: bytes) -> int:
     return struct.unpack_from("<H", data)[0] if len(data) >= 2 else 0
 
 
-async def read_live_map_state(reader: MemoryReader) -> LiveMapState:
-    """Resolve the live player from the runtime Field object graph.
+async def read_live_map_state(reader: MemoryReader, *, force_sample: bool = False) -> LiveMapState:
+    """Read the live player from the verified runtime Field object graph.
 
-    FaceDir is authoritative for current cardinal orientation and is checked
-    against PlayerState.RotationAngle.  No fixed pseudo-player address is used.
+    Current facing is FieldActor.FaceDir, cross-checked by
+    PlayerState.RotationAngle inside PlayerRuntimeService.  A failed player
+    decode remains unresolved; it is never replaced by a default direction.
     """
-    sample = await player_runtime_service.sample(reader)
-    if sample.get("status") not in {"resolved", "candidate"}:
+    # The SemanticStateEngine is the canonical high-frequency sampler and calls
+    # this function with force_sample=True. Other consumers (map HUD, schematic,
+    # cache observer) reuse that sample so temporal gait measurements are not
+    # distorted by unrelated map polling. Bootstrap once if no sample exists.
+    sample = player_runtime_service.latest
+    if force_sample or not sample:
+        try:
+            sample = await player_runtime_service.sample(reader)
+        except Exception:
+            sample = None
+    if not sample or sample.get("status") not in {"resolved", "candidate"}:
         fallback_error: Exception | None = None
         for attempt in range(3):
             try:
@@ -83,25 +91,22 @@ async def read_live_map_state(reader: MemoryReader) -> LiveMapState:
             map_id=None, x=None, y=None, elevation=None, verified=False,
             facing="Unresolved", movement_state="Unresolved",
         )
-    position = sample.get("position", {}).get("grid", {})
-    orientation = sample.get("orientation", {})
-    locomotion = sample.get("locomotion", {})
-    x = position.get("x")
-    z = position.get("z")
-    elevation = position.get("y")
+    pos = (sample.get("position") or {}).get("grid") or {}
+    orient = sample.get("orientation") or {}
+    locomotion = sample.get("locomotion") or {}
     verified = bool(
         sample.get("status") == "resolved"
-        and orientation.get("verified")
-        and isinstance(x, int) and isinstance(z, int)
+        and orient.get("verified")
+        and isinstance(pos.get("x"), int)
+        and isinstance(pos.get("z"), int)
     )
     return LiveMapState(
-        # ZoneID / Map Header is not silently relabelled as Map Section ID.
         map_id=None,
-        x=x if verified else None,
-        y=z if verified else None,
-        elevation=elevation if verified else None,
+        x=pos.get("x") if verified else None,
+        y=pos.get("z") if verified else None,
+        elevation=pos.get("y") if verified else None,
         verified=verified,
-        facing=orientation.get("facing", "Unresolved") if verified else "Unresolved",
+        facing=orient.get("facing", "Unresolved") if verified else "Unresolved",
         movement_state=locomotion.get("semantic_state", "Unresolved") if verified else "Unresolved",
     )
 
@@ -121,6 +126,10 @@ def _decode_live_map_state(results: dict[str, Any]) -> LiveMapState:
     map_vote = Counter(plausible_maps).most_common(1)
     map_id = map_vote[0][0] if map_vote and map_vote[0][1] >= 2 else None
 
+    # The former 0x0223DE00 candidate and three 0x02143620 mirrors were
+    # rejected by the controlled EXP_015 input sequence.  They remain absent
+    # here until a GameSystem -> Field -> FieldPlayer -> Core -> PlayerActor
+    # chain is resolved and lifecycle-validated for this ROM/session.
     return LiveMapState(
         map_id=map_id,
         x=None,

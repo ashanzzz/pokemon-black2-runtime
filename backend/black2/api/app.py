@@ -21,6 +21,9 @@ from ..bizhawk.bridge_client import BridgeClient
 from ..bizhawk.doctor import BizHawkDoctor
 from ..memory.reader import MemoryReader
 from ..state.engine import SemanticStateEngine
+from ..state.universal_snapshot_manager import universal_snapshot_manager
+from ..runtime.config import runtime_config
+from ..runtime.hub import RuntimeHub
 from ..actions.input_engine import ActionEngine
 from ..actions.onboarding import OnboardingFlow
 from ..observer.presentation import build_observer_presentation
@@ -29,19 +32,21 @@ from ..observer.logger import observer_logger
 from ..decoders.dialogue import dialogue_timeline
 from ..dev.tester import init_dev_workbench, DeveloperTestWorkbench
 from ..world.navigation import navigation_service, ReachabilityResult
-from ..world.map_catalog import get_all_landmarks, find_landmark_by_id
-from ..state.universal_snapshot_manager import universal_snapshot_manager
+from .runtime_routes import configure_runtime_routes, router as runtime_router
+from .player_routes import configure_player_routes, router as player_router
 from .map_routes import (
     configure_map_routes,
     router as map_router,
     start_cache_observer,
     stop_cache_observer,
 )
-from .player_routes import configure_player_routes, router as player_router
 
 
-# Global singletons
-transport: SocketTransport = SocketTransport(host="127.0.0.1", port=8766)
+# Global singletons. Port roles are canonical and environment-overridable.
+# HTTP (default 8765) is FastAPI/browser only; TCP (default 8766) is BizHawk Lua only.
+transport: SocketTransport = SocketTransport(
+    host=runtime_config.bridge_host, port=runtime_config.bridge_port
+)
 client: BridgeClient = BridgeClient(transport)
 memory_reader: MemoryReader = MemoryReader(client)
 state_engine: SemanticStateEngine = SemanticStateEngine(memory_reader)
@@ -49,23 +54,40 @@ action_engine: ActionEngine = ActionEngine(client, state_engine)
 onboarding_flow: OnboardingFlow = OnboardingFlow(client, state_engine)
 doctor: BizHawkDoctor = BizHawkDoctor(client)
 dev_wb: DeveloperTestWorkbench = init_dev_workbench(client, state_engine)
+runtime_hub = RuntimeHub(
+    client=client,
+    reader=memory_reader,
+    state_engine=state_engine,
+    transport=transport,
+    sample_interval=runtime_config.semantic_sample_interval,
+    process_probe=probe_bizhawk_process,
+)
 configure_map_routes(memory_reader, client)
 configure_player_routes(memory_reader)
+configure_runtime_routes(runtime_hub)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(transport.connect())
+    await transport.connect()
+    await runtime_hub.start()
     start_cache_observer(memory_reader)
-    observer_logger.log_event("backend_startup", "Semantic Runtime API Server online on port 8765")
-    yield
-    await stop_cache_observer()
-    transport.running = False
+    observer_logger.log_event(
+        "backend_startup",
+        f"Semantic Runtime HTTP={runtime_config.http_host}:{runtime_config.http_port} "
+        f"BizHawkBridge={runtime_config.bridge_host}:{runtime_config.bridge_port}",
+    )
+    try:
+        yield
+    finally:
+        await runtime_hub.stop()
+        await stop_cache_observer()
+        await transport.disconnect()
 
 
 app = FastAPI(
     title="Pokémon Black 2 - AI Semantic Runtime API",
-    version="2.0.0",
+    version="4.0.0",
     description="Greenfield BizHawk Semantic Engine and AI Control API",
     lifespan=lifespan
 )
@@ -77,8 +99,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.include_router(map_router)
+app.include_router(runtime_router)
 app.include_router(player_router)
+app.include_router(map_router)
 
 
 class PressButtonRequest(BaseModel):
@@ -155,7 +178,7 @@ class SnapshotRequest(BaseModel):
 
 
 class FullRamDumpRequest(BaseModel):
-    category: str = "OVERWORLD_EXPLORE"  # "OVERWORLD_EXPLORE" | "NPC_INTERACTION" | "SIGNPOST" | "WARP_TRANSITION" | "BATTLE" | "MENU" | "ANOMALY"
+    category: str = "OVERWORLD_EXPLORE"
     label: str = "ground_truth_sample"
     notes: str = ""
 
@@ -251,28 +274,39 @@ def _checkpoint_path(label: str, frame: Any) -> Path:
 
 @app.get("/health")
 async def health():
+    """Compatibility health endpoint with transport/semantic states separated."""
+    h = runtime_hub.health()
     return {
         "status": "ok",
         "service": "Pokémon Black 2 Semantic Runtime",
-        "bridge_connected": client.is_connected
+        "backend_http": "online",
+        "bridge_connected": h["bridge_connected"],
+        "bridge_state": h["bridge_state"],
+        "runtime_status": h["runtime_status"],
+        "semantic_status": h["semantic_status"],
+        "player_status": h.get("player_status"),
+        "ports": runtime_config.public_schema(),
     }
 
 
 @app.get("/api/bizhawk/status")
 async def get_bizhawk_status():
+    """Compatibility endpoint: reports only emulator/bridge connectivity facts."""
     probe = probe_bizhawk_process()
     transport_status = transport.diagnostics()
     return {
         "running": probe.running,
         "pid": probe.pid,
         "exe_path": probe.exe_path,
-        "connected": transport_status["connected"],
+        "connected": bool(client.is_connected),
+        "bridge_state": "connected" if client.is_connected else "waiting",
         "bridge_version": transport.bridge_version,
         "frame": transport.last_frame,
         "last_heartbeat": transport.last_heartbeat,
         "session_id": transport.session_id,
         "transport": transport_status,
-        "hello": transport.hello_data
+        "hello": transport.hello_data,
+        "roles": runtime_config.public_schema(),
     }
 
 
@@ -300,14 +334,60 @@ async def get_bizhawk_doctor():
 
 @app.get("/api/state")
 async def get_semantic_state():
-    state = await state_engine.sample_once()
-    return state.model_dump()
+    """Legacy semantic contract backed by the single-flight Runtime Hub cache.
+
+    A decoder gap must not become an HTTP/Bridge offline signal. If no semantic
+    sample exists yet, return an explicit unresolved state rather than inventing
+    facing/location/profile facts.
+    """
+    state = runtime_hub.semantic_state()
+    if state is not None:
+        return state
+    snap = runtime_hub.snapshot()
+    return {
+        "timestamp": snap.get("sampled_at") or 0,
+        "frame": (snap.get("transport") or {}).get("frame") or 0,
+        "context": {
+            "screen_type": "RUNTIME_UNRESOLVED",
+            "screen_description": "运行时语义尚未解析；HTTP/Bridge 状态请读取 /api/v1/runtime/health",
+            "available_actions": [],
+            "can_move_player": False,
+            "is_dialogue_active": False,
+            "dialogue_text": "",
+            "speaker": "UNRESOLVED",
+            "speaker_category": "UNRESOLVED",
+            "printer": {},
+            "choices": [],
+        },
+        "location": "实时状态未解析",
+        "map_loaded": False,
+        "player_name": None,
+        "rival_name": None,
+        "gender": None,
+        "party_count": None,
+        "money": None,
+        "badges": None,
+        "ready_for_input": False,
+        "suggested_buttons": [],
+        "map_section_id": None,
+        "player_facing": "Unresolved",
+        "movement_state": "Unresolved",
+        "player_world_pos": {"x": None, "y": None, "z": None},
+        "player_position_verified": False,
+        "runtime_meta": snap.get("runtime"),
+    }
 
 
 @app.get("/api/observer/presentation")
 async def get_observer_presentation():
-    state = await state_engine.sample_once()
-    pres = build_observer_presentation(state.model_dump())
+    state = runtime_hub.semantic_state()
+    if state is None:
+        return {
+            "status": "unresolved",
+            "runtime": runtime_hub.health(),
+            "reason": "No semantic snapshot has been published yet",
+        }
+    pres = build_observer_presentation(state)
     return pres.model_dump()
 
 
@@ -414,6 +494,22 @@ async def post_dev_snapshot(req: SnapshotRequest):
     return await dev_wb.create_test_snapshot(req.label)
 
 
+@app.post("/api/dev/dump_full_ram")
+async def post_dump_full_ram(req: FullRamDumpRequest):
+    """Create a portable read-only evidence bundle (4 MiB Main RAM + context)."""
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await universal_snapshot_manager.create_snapshot(
+        transport, state_engine, category=req.category, label=req.label, notes=req.notes
+    )
+
+
+@app.get("/api/dev/dumps")
+async def get_full_ram_dumps(limit: int = 50):
+    entries = universal_snapshot_manager.list_snapshots(limit=max(1, min(limit, 200)))
+    return {"ok": True, "count": len(entries), "dumps": entries}
+
+
 @app.post("/api/dev/savestate/save")
 async def post_savestate_save(slot: int = 1):
     if not client.is_connected:
@@ -428,47 +524,6 @@ async def post_savestate_load(slot: int = 1):
         raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
     res = await client.load_state(slot)
     return {"ok": True, "slot": slot, "result": res}
-
-
-@app.post("/api/dev/dump_full_ram")
-async def post_dump_full_ram(req: FullRamDumpRequest):
-    """Universal atomic dump of 4MB Main RAM, native screenshot, registers, and context."""
-    if not client.is_connected:
-        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
-
-    try:
-        res = await universal_snapshot_manager.create_snapshot(
-            transport=transport,
-            state_engine=state_engine,
-            category=req.category,
-            label=req.label,
-            notes=req.notes,
-        )
-        return res
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Universal snapshot creation failed: {exc}") from exc
-
-
-@app.get("/api/dev/dumps")
-async def get_dev_dumps(limit: int = 50):
-    """List all saved full 4MB RAM ground-truth snapshots."""
-    snapshots = universal_snapshot_manager.list_snapshots(limit=limit)
-    return {"count": len(snapshots), "dumps": snapshots}
-
-
-@app.get("/api/dev/dumps/{snapshot_id}/download")
-async def download_verified_dump(snapshot_id: str):
-    """Serve only a ZIP whose screenshot, raw domains, and hashes validate."""
-    bundle_path, verification = universal_snapshot_manager.verified_bundle_path(snapshot_id)
-    if bundle_path is None:
-        raise HTTPException(status_code=409, detail={"message": "ZIP verification failed", "verification": verification})
-    return FileResponse(bundle_path, media_type="application/zip", filename=bundle_path.name)
-
-
-@app.post("/api/dev/dumps/clear")
-async def clear_dev_dumps():
-    """Delete locally generated dump_* artifacts after the UI confirmation."""
-    return universal_snapshot_manager.clear_snapshots()
 
 
 @app.post("/api/dev/capture")
@@ -820,14 +875,8 @@ async def post_action_onboarding(req: OnboardingRequest):
     return await onboarding_flow.run_full_new_game_sequence(req.player_name, req.gender)
 
 
-@app.get("/api/v1/nav/catalog")
-async def get_nav_catalog():
-    """Return all known POIs, landmarks, towns, routes, and coordinates in Pokémon Black 2."""
-    landmarks = get_all_landmarks()
-    return {
-        "count": len(landmarks),
-        "landmarks": [lm.model_dump() for lm in landmarks],
-    }
+# Legacy hand-authored POI catalog was removed from the Runtime API.
+# World identity and entrances must come from /api/v1/map/scene/current.
 
 
 @app.post("/api/v1/nav/reachability")
@@ -966,14 +1015,15 @@ async def post_nav_navigate_to(req: NavigateToRequest):
 # Serve Frontend Web UI
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../frontend"))
 CAPTURE_DIR = DeveloperTestWorkbench._capture_dir()
-DUMP_DIR = Path("reverse_engineering/dumps").resolve()
-DUMP_DIR.mkdir(parents=True, exist_ok=True)
 if os.path.exists(FRONTEND_DIR):
     app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="assets")
 CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
 app.mount("/api/dev/captures", StaticFiles(directory=CAPTURE_DIR), name="dev-captures")
-app.mount("/dumps", StaticFiles(directory=str(DUMP_DIR)), name="dumps")
+
+DUMPS_DIR = universal_snapshot_manager.base_dir
+DUMPS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/dumps", StaticFiles(directory=DUMPS_DIR), name="runtime-evidence-dumps")
 
 
 @app.get("/dialogue-checkpoints")
@@ -985,18 +1035,9 @@ async def dialogue_checkpoints_page():
     raise HTTPException(status_code=404, detail="dialogue-checkpoints.html not found")
 
 
-@app.get("/dialogue-inspector")
-async def dialogue_inspector_page():
-    """Friendly short URL for the live dialogue inspector page."""
-    page = os.path.join(FRONTEND_DIR, "dialogue-inspector.html")
-    if os.path.exists(page):
-        return FileResponse(page)
-    raise HTTPException(status_code=404, detail="dialogue-inspector.html not found")
-
-
 @app.get("/ram-dumper")
 async def ram_dumper_page():
-    """Friendly short URL for the full 4MB RAM + screenshot dumper page."""
+    """Friendly short URL for the universal evidence dumper."""
     page = os.path.join(FRONTEND_DIR, "ram-dumper.html")
     if os.path.exists(page):
         return FileResponse(page)
@@ -1010,7 +1051,7 @@ async def root():
         return FileResponse(index_file)
     return {
         "title": "Pokémon Black 2 Semantic Runtime API",
-        "version": "1.0.0",
+        "version": "4.0.0",
         "docs_url": "/docs",
         "bizhawk_status_url": "/api/bizhawk/status",
         "observer_url": "/api/observer/presentation"

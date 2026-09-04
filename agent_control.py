@@ -7,10 +7,11 @@ and executing actions against the running BizHawk instance via API.
 
 import sys
 import time
+import os
 import requests
 import json
 
-BASE_URL = "http://127.0.0.1:8765"
+BASE_URL = os.getenv("BLACK2_RUNTIME_URL", "http://127.0.0.1:8765")
 
 
 def get_status():

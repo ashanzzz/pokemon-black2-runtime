@@ -60,14 +60,13 @@ class SocketTransport(BizHawkTransport):
 
     async def connect(self) -> bool:
         self.running = True
-        for p in [self.port, 8768]:
-            try:
-                srv = await asyncio.start_server(self._handle_client, self.host, p)
-                self.servers.append(srv)
-                print(f"[SocketTransport] TCP Server listening on {self.host}:{p}")
-                _bridge_log.info("listen host=%s port=%s", self.host, p)
-            except Exception as e:
-                _bridge_log.warning("listen_failed host=%s port=%s error=%r", self.host, p, e)
+        try:
+            srv = await asyncio.start_server(self._handle_client, self.host, self.port)
+            self.servers.append(srv)
+            print(f"[SocketTransport] BizHawk TCP bridge listening on {self.host}:{self.port}")
+            _bridge_log.info("listen host=%s port=%s role=bizhawk_bridge", self.host, self.port)
+        except Exception as e:
+            _bridge_log.warning("listen_failed host=%s port=%s error=%r", self.host, self.port, e)
         return len(self.servers) > 0
 
     async def _handle_client(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):

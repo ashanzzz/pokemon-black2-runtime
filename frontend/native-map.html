@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pokémon Black 2 · ROM 原生 3D 官方材质地图</title>
+  <title>Pokémon Black 2 · ROM 原生 3D 地图查看器</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Lucide Icons -->
@@ -36,12 +36,12 @@
       </div>
       <div>
         <div class="flex items-center gap-2">
-          <h1 class="font-bold text-sm text-cyan-300 tracking-wide">ROM 原生 3D 官方材质地图</h1>
+          <h1 class="font-bold text-sm text-cyan-300 tracking-wide">ROM 原生 3D 地图查看器</h1>
           <span id="active-mode-badge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">
             BMD0 网格 + BTX0 官方贴图
           </span>
         </div>
-        <p class="text-[11px] text-slate-400">100% 官方 3D 建筑材质 · 室内家具/楼梯/围墙与室外大地图精准对齐</p>
+        <p class="text-[11px] text-slate-400">BMD0/BTX0 原生资源渲染 · 建筑/门/Warp 语义请以 World Evidence 为准</p>
       </div>
     </div>
 
@@ -79,6 +79,9 @@
       <a href="/" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-800/60 transition">
         <i data-lucide="layout-dashboard" class="w-3.5 h-3.5"></i> 总控制台
       </a>
+      <a href="/frontend/map-runtime.html" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-800/60 transition">
+        <i data-lucide="layers" class="w-3.5 h-3.5"></i> World Evidence
+      </a>
       <button id="reload-btn" title="重新从 RAM 扫描加载" class="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition">
         <i data-lucide="refresh-cw" class="w-4 h-4"></i>
       </button>
@@ -96,9 +99,9 @@
       <div class="absolute top-3 left-3 flex items-center gap-2 pointer-events-none">
         <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900/90 border border-slate-800 text-xs font-mono backdrop-blur-md shadow-lg">
           <span id="live-indicator" class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span id="scene-type-badge" class="font-bold text-purple-300">INTERIOR (室内场景 #426)</span>
+          <span id="scene-type-badge" class="font-bold text-purple-300">场景解析中…</span>
           <span class="text-slate-600">|</span>
-          <span id="map-size-badge" class="text-slate-400">BMD0 官方 3D 模型已对齐</span>
+          <span id="map-size-badge" class="text-slate-400">BMD0/BTX0 待解析</span>
         </div>
       </div>
 
@@ -122,7 +125,7 @@
             <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">玩家实时运行状态</h2>
           </div>
           <span id="player-verified-badge" class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800 font-mono font-semibold flex items-center gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Verified ✓
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> Unresolved
           </span>
         </div>
 

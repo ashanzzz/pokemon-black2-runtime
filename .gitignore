@@ -1,40 +1,30 @@
-# Python & Virtual Environments
-.venv/
-venv/
-env/
+# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.pyd
+.venv/
+venv/
+.pytest_cache/
 
-# Node.js
-node_modules/
-
-# OS & IDE
-.DS_Store
-Thumbs.db
-desktop.ini
-.vscode/
-.idea/
-.claude/
-
-# Logs & Temporary Files
+# Runtime output
 logs/
-runtime.log
+/runtime/
+reverse_engineering/dumps/
 test_logs_tmp/
 *.log
 
-# Large Binaries & Executables (>50MB or compiled)
+# Emulator / proprietary game data
+*.nds
+*.sav
+*.dsv
+*.State
+*.state
+
+# Large local tooling / generated binaries
 pi.exe
+*.wasm
 
-# Ephemeral screenshots & local test dumps
-current_screen.png
-verify_screen_now.png
-lua_console.png
-reverse_engineering/dumps/*.bin
-reverse_engineering/dumps/*/*.bin
-
-# Runtime cache (large local map cache)
-runtime/native_map_cache/
-runtime/dev_test_captures/
-runtime/service_logs/
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

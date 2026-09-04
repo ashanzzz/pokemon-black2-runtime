@@ -20,7 +20,6 @@ from pydantic import BaseModel
 from ..memory.reader import MemoryReader
 from ..world.native_map import read_live_map_state, LiveMapState
 from ..world.rom_maps import NativeMapEngine, PermissionModel
-from ..world.map_catalog import UNOVA_LANDMARKS, get_all_landmarks, find_landmark_by_id
 
 
 # Tile Collision Classification
@@ -126,7 +125,15 @@ class MapNavigationService:
     """Provides pathfinding, reachability assessment and movement execution for Pokémon Black 2."""
 
     def __init__(self):
-        self.engine = NativeMapEngine.get_instance()
+        self._engine: NativeMapEngine | None = None
+
+    @property
+    def engine(self) -> NativeMapEngine:
+        # Navigation is optional. The HTTP/Dialogue/Player runtime must start
+        # even when BLACK2_ROM_PATH is not configured yet.
+        if self._engine is None:
+            self._engine = NativeMapEngine.get_instance()
+        return self._engine
 
     def build_navigation_grid_for_points(
         self,

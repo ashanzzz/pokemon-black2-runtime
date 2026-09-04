@@ -1,3 +1,4 @@
+import os
 """Pokémon Black 2 Semantic Runtime - High-Level AI Agent Skills & Tool Definitions.
 
 Provides intuitive, human/AI-readable perception and decision interfaces.
@@ -7,7 +8,7 @@ from typing import Dict, Any, List, Optional
 import requests
 import json
 
-BASE_URL = "http://127.0.0.1:8765"
+BASE_URL = os.getenv("BLACK2_RUNTIME_URL", "http://127.0.0.1:8765")
 
 
 class PokemonAgentSkills:

@@ -32,7 +32,7 @@ class ObserverLogger:
 
     def _init_default_logs(self):
         now_str = time.strftime("%H:%M:%S")
-        self.log_event("system_boot", "Backend Semantic Runtime initialized and listening on 127.0.0.1:8765")
+        self.log_event("system_boot", "Backend Semantic Runtime initialized; HTTP/Bridge roles are exposed by /api/v1/runtime/schema")
         self.log_event("bizhawk_attached", "BizHawk LuaSocket TCP Bridge attached (PID: 27068, NDS MelonDS Core)")
         self.log_event("new_game_started", "Title screen passed, new game initialized with player 'zero' (Male)")
         self.log_event("map_entered", "Player entered Aspertia City - Player's Room (2F)")

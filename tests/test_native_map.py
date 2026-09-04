@@ -29,9 +29,6 @@ from backend.black2.world.map_schematic import (
 
 
 class FakeMemoryReader:
-    async def read_bytes(self, offset, size, domain="Main RAM", **kwargs):
-        return bytes(size)
-
     async def read_batch_ranges(self, _ranges):
         position = bytearray(0x20)
         struct.pack_into("<H", position, 0x0E, 17)
@@ -65,9 +62,6 @@ class TestNativeMap(unittest.TestCase):
         self.assertEqual(range_ids, {"map_0", "map_1", "map_2", "map_3"})
 
     def test_live_state_does_not_publish_legacy_coordinate_mirrors(self):
-        from backend.black2.world.native_map import _RUNTIME_FIELD_LOCATOR
-        _RUNTIME_FIELD_LOCATOR.invalidate()
-        _RUNTIME_FIELD_LOCATOR.last_discovery_time = 0.0
         live = asyncio.run(read_live_map_state(FakeMemoryReader()))
         self.assertEqual(live.map_id, 0x0161)
         self.assertEqual((live.x, live.y, live.elevation), (None, None, None))
@@ -76,9 +70,6 @@ class TestNativeMap(unittest.TestCase):
         self.assertEqual(live.movement_state, "Unresolved")
 
     def test_live_state_retries_a_transient_empty_batch(self):
-        from backend.black2.world.native_map import _RUNTIME_FIELD_LOCATOR
-        _RUNTIME_FIELD_LOCATOR.invalidate()
-        _RUNTIME_FIELD_LOCATOR.last_discovery_time = 0.0
         reader = FlakyMemoryReader()
         live = asyncio.run(read_live_map_state(reader))
         self.assertEqual(reader.read_count, 2)
