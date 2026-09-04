@@ -617,6 +617,8 @@ class UniversalSnapshotManager:
         domains_path = target_folder / "memory_domains.json"
         inventory_path = target_folder / "memory_domain_inventory.json"
         runtime_world_path = target_folder / "runtime_world.json"
+        runtime_field_v2_path = target_folder / "runtime_field_v2.json"
+        map_truth_v3_path = target_folder / "map_truth_v3.json"
         metadata_path = target_folder / "metadata.json"
         manifest_path = target_folder / "manifest.json"
         integrity_path = target_folder / "integrity.json"
@@ -639,6 +641,22 @@ class UniversalSnapshotManager:
             _write_json(critical_path, _extract_forensic_ranges(ram, physical_frame))
             _write_json(heap_path, _scan_gfl_heap_candidates(ram, physical_frame))
             _write_json(runtime_world_path, _runtime_world_index(ram, physical_frame, curr_state, semantic_frame))
+            # V5: derive from the exact same physical 4 MiB RAM image; no new emulator read.
+            from ..world.runtime_field_resolver import resolve_runtime_field_from_ram
+            runtime_field_v2 = resolve_runtime_field_from_ram(ram, frame=physical_frame)
+            _write_json(runtime_field_v2_path, runtime_field_v2)
+            try:
+                from ..world.map_truth_v3 import MapTruthV3
+                map_truth_v3 = MapTruthV3().from_runtime(runtime_field_v2, include_world=False)
+            except Exception as exc:
+                map_truth_v3 = {
+                    "format": "black2-map-truth/v3",
+                    "status": "rom_unavailable",
+                    "confidence": "unresolved",
+                    "reason": f"{type(exc).__name__}: {exc}",
+                    "runtime_field_status": runtime_field_v2.get("status"),
+                }
+            _write_json(map_truth_v3_path, map_truth_v3)
         else:
             _write_json(
                 critical_path,
@@ -670,6 +688,19 @@ class UniversalSnapshotManager:
                     "error": "main_ram.bin is missing or incomplete; runtime index was not derived",
                 },
             )
+            _write_json(runtime_field_v2_path, {
+                "format": "black2-runtime-field/v2",
+                "status": "unavailable",
+                "confidence": "unresolved",
+                "frame": physical_frame,
+                "reason": "main_ram.bin is missing or incomplete",
+            })
+            _write_json(map_truth_v3_path, {
+                "format": "black2-map-truth/v3",
+                "status": "unavailable",
+                "confidence": "unresolved",
+                "reason": "main_ram.bin is missing or incomplete",
+            })
 
         _write_json(domains_path, memory_domains)
         _write_json(inventory_path, domain_inventory)
@@ -698,6 +729,8 @@ class UniversalSnapshotManager:
             ("memory_domains_json", domains_path),
             ("memory_domain_inventory_json", inventory_path),
             ("runtime_world_json", runtime_world_path),
+            ("runtime_field_v2_json", runtime_field_v2_path),
+            ("map_truth_v3_json", map_truth_v3_path),
             ("metadata_json", metadata_path),
         ):
             if path.exists():
@@ -717,6 +750,8 @@ class UniversalSnapshotManager:
             domains_path,
             inventory_path,
             runtime_world_path,
+            runtime_field_v2_path,
+            map_truth_v3_path,
             metadata_path,
         ]
         artifact_summary = {path.name: _artifact_meta(path) for path in artifact_paths}
@@ -755,6 +790,8 @@ class UniversalSnapshotManager:
             "memory_domains.json",
             "memory_domain_inventory.json",
             "runtime_world.json",
+            "runtime_field_v2.json",
+            "map_truth_v3.json",
         ]
         integrity_payload = {
             "schema": "snapshot_integrity/v1",

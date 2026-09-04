@@ -38,9 +38,10 @@ def _decode_matrix(raw: bytes, matrix_id: int) -> dict[str, Any]:
     if not width or not height or len(raw) < 8 + count * 4:
         raise ValueError(f"Matrix {matrix_id} has invalid dimensions")
     model_ids = struct.unpack_from(f"<{count}I", raw, 8)
-    definitions = (
+    has_zones = struct.unpack_from("<I", raw, 0)[0] == 1
+    definitions = (  # deprecated v4 name; contains ZoneID values
         struct.unpack_from(f"<{count}I", raw, 8 + count * 4)
-        if len(raw) >= 8 + count * 8 else None
+        if has_zones and len(raw) >= 8 + count * 8 else None
     )
     model_counts = Counter(model_ids)
     definition_counts = Counter(definitions) if definitions is not None else Counter()
@@ -214,9 +215,13 @@ def _zone_headers(engine: NativeMapEngine) -> list[dict[str, Any]]:
         raw = engine.zone_data[offset:offset + ZONE_RECORD_SIZE]
         headers.append({
             "map_header_id": header_id,
-            "primary_matrix_id": struct.unpack_from("<H", raw, 0)[0],
-            "shared_matrix_id": struct.unpack_from("<H", raw, 2)[0],
-            "event_archive_id": struct.unpack_from("<H", raw, 0x10)[0],
+            "area_id": struct.unpack_from("<H", raw, 0x02)[0],
+            "matrix_id": struct.unpack_from("<H", raw, 0x04)[0],
+            "entities_id": struct.unpack_from("<H", raw, 0x16)[0],
+            # Deprecated v4 aliases. There are not two matrix IDs here.
+            "primary_matrix_id": struct.unpack_from("<H", raw, 0x04)[0],
+            "shared_matrix_id": struct.unpack_from("<H", raw, 0x04)[0],
+            "event_archive_id": struct.unpack_from("<H", raw, 0x16)[0],
             "raw_hex": raw.hex(),
             "source": f"rom:/a/0/1/2[{header_id}]",
         })

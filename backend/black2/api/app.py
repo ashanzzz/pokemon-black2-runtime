@@ -33,6 +33,7 @@ from ..decoders.dialogue import dialogue_timeline
 from ..dev.tester import init_dev_workbench, DeveloperTestWorkbench
 from ..world.navigation import navigation_service, ReachabilityResult
 from .runtime_routes import configure_runtime_routes, router as runtime_router
+from .map_v5_routes import configure_map_v5_routes, router as map_v5_router
 from .player_routes import configure_player_routes, router as player_router
 from .map_routes import (
     configure_map_routes,
@@ -63,6 +64,7 @@ runtime_hub = RuntimeHub(
     process_probe=probe_bizhawk_process,
 )
 configure_map_routes(memory_reader, client)
+configure_map_v5_routes(memory_reader)
 configure_player_routes(memory_reader)
 configure_runtime_routes(runtime_hub)
 
@@ -87,7 +89,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Pokémon Black 2 - AI Semantic Runtime API",
-    version="4.0.0",
+    version="5.0.0",
     description="Greenfield BizHawk Semantic Engine and AI Control API",
     lifespan=lifespan
 )
@@ -102,6 +104,7 @@ app.add_middleware(
 app.include_router(runtime_router)
 app.include_router(player_router)
 app.include_router(map_router)
+app.include_router(map_v5_router)
 
 
 class PressButtonRequest(BaseModel):

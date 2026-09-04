@@ -1,4 +1,8 @@
-"""Read-only Nintendo DS NitroFS and NARC containers."""
+"""Read-only Nintendo DS NitroFS and NARC containers.
+
+Compatibility copy included in the v5 overlay so the static ROM layer is
+self-contained.  It preserves the v4 public interface used by map modules.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -37,7 +41,6 @@ class NitroRom:
         directory_count = struct.unpack_from("<H", self._data, self._fnt_offset + 6)[0] & 0x0FFF
         if not directory_count or self._fnt_size < directory_count * 8:
             raise RomFormatError("Nintendo DS FNT directory table is invalid")
-
         paths: dict[str, int] = {}
         seen: set[int] = set()
         fnt_end = self._fnt_offset + self._fnt_size
@@ -98,7 +101,7 @@ class NitroRom:
 
 
 class NarcArchive:
-    """Read the BTAF/FIMG entries used by the B2/W2 ROM."""
+    """Read the BTAF/FIMG entries used by B2/W2."""
 
     def __init__(self, data: bytes) -> None:
         if len(data) < 0x10 or data[:4] != b"NARC":
@@ -127,15 +130,10 @@ class NarcArchive:
         entries_offset = fat_offset + 4
         if entries_offset + count * 8 > fat_offset + fat_size:
             raise RomFormatError("NARC BTAF entries are truncated")
-        self.files = tuple(
-            data[image_offset + start:image_offset + end]
-            for start, end in (
-                struct.unpack_from("<II", data, entries_offset + index * 8)
-                for index in range(count)
-            )
-        )
-        if any(start > end or end > image_size for start, end in (
+        entries = [
             struct.unpack_from("<II", data, entries_offset + index * 8)
             for index in range(count)
-        )):
+        ]
+        if any(start > end or end > image_size for start, end in entries):
             raise RomFormatError("NARC file points outside FIMG")
+        self.files = tuple(data[image_offset + start:image_offset + end] for start, end in entries)

@@ -62,7 +62,10 @@ class TestNativeMap(unittest.TestCase):
         self.assertEqual(range_ids, {"map_0", "map_1", "map_2", "map_3"})
 
     def test_live_state_does_not_publish_legacy_coordinate_mirrors(self):
-        live = asyncio.run(read_live_map_state(FakeMemoryReader()))
+        from backend.black2.world.runtime_player_state import player_runtime_service
+        player_runtime_service.invalidate()
+        player_runtime_service.locator.last_discovery_attempt = 0.0
+        live = asyncio.run(read_live_map_state(FakeMemoryReader(), allow_fallback=True))
         self.assertEqual(live.map_id, 0x0161)
         self.assertEqual((live.x, live.y, live.elevation), (None, None, None))
         self.assertFalse(live.verified)
@@ -70,8 +73,11 @@ class TestNativeMap(unittest.TestCase):
         self.assertEqual(live.movement_state, "Unresolved")
 
     def test_live_state_retries_a_transient_empty_batch(self):
+        from backend.black2.world.runtime_player_state import player_runtime_service
+        player_runtime_service.invalidate()
+        player_runtime_service.locator.last_discovery_attempt = 0.0
         reader = FlakyMemoryReader()
-        live = asyncio.run(read_live_map_state(reader))
+        live = asyncio.run(read_live_map_state(reader, allow_fallback=True))
         self.assertEqual(reader.read_count, 2)
         self.assertEqual((live.x, live.y, live.elevation), (None, None, None))
         self.assertFalse(live.verified)
@@ -106,7 +112,7 @@ class TestNativeMap(unittest.TestCase):
         self.assertEqual(gallery["active_cells"][0]["candidate_matrix_ids"], [4, 5])
 
     def test_map_knowledge_preserves_matrix_and_event_coordinates(self):
-        matrix = b"MAP0" + struct.pack("<HH", 2, 1) + struct.pack("<2I", 7, 8)
+        matrix = struct.pack("<IHH", 1, 2, 1) + struct.pack("<2I", 7, 8)
         matrix += struct.pack("<2I", 426, 426)
         decoded_matrix = _decode_matrix(matrix, 45)
         self.assertEqual(decoded_matrix["model_ids"], [7, 8])
@@ -131,7 +137,7 @@ class TestNativeMap(unittest.TestCase):
         self.assertIn("目标落点要以实际切图后的 Map Header 验证", text)
 
     def test_live_visual_only_uses_resident_definition_cells(self):
-        matrix = b"MAP0" + struct.pack("<HH", 3, 1)
+        matrix = struct.pack("<IHH", 1, 3, 1)
         matrix += struct.pack("<3I", 7, 8, 9)
         matrix += struct.pack("<3I", 100, 200, 300)
         engine = SimpleNamespace(matrix_narc=SimpleNamespace(files=(matrix,)))

@@ -141,6 +141,10 @@ class PlayerRuntimeService:
                 locomotion["gait_confidence"] = "needs_walk_and_run_calibration"
         return sample
 
+    def invalidate(self) -> None:
+        self.latest = None
+        self.locator.invalidate()
+
     async def sample(self, reader: MemoryReader, *, allow_discovery: bool = False) -> dict[str, Any]:
         """Sample cached player structures without scheduling RAM-wide discovery by default."""
         sample = await self.locator.sample_player(reader, allow_discovery=allow_discovery)

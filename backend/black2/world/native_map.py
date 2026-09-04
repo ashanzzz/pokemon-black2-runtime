@@ -210,10 +210,8 @@ def _select_texture_for_model(
     calibrated_id = _SCREEN_VALIDATED_TEXTURE_IDS.get(_model_name(bmd0))
     if calibrated_id in candidates:
         return calibrated_id, len(expected), len(expected)
-    if candidates:
-        return candidates[0], len(expected), len(expected)
     raise NativeMapError(
-        f"model {model_id} has multiple exact BTX0 candidates {list(candidates)} without screen calibration"
+        f"model {model_id} has multiple exact BTX0 candidates {list(candidates)} without runtime/area identity"
     )
 
 

@@ -18,6 +18,12 @@ test_logs_tmp/
 *.State
 *.state
 
+# Backup files
+*.bak
+*.v4bak
+*.maptruth_v2.bak
+*.playerstate_v3.bak
+
 # Large local tooling / generated binaries
 pi.exe
 *.wasm

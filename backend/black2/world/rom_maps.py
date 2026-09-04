@@ -94,16 +94,17 @@ class NativeMapEngine:
         zone_offset = map_id * 48
         if zone_offset < 0 or zone_offset + 48 > len(self.zone_data):
             raise ValueError(f"ZoneData entry {map_id} is outside the ROM table")
-        matrix_id = struct.unpack_from("<H", self.zone_data, zone_offset + 2)[0]
+        matrix_id = struct.unpack_from("<H", self.zone_data, zone_offset + 4)[0]  # v5: ZoneHeader.matrixID
         raw = self.matrix_narc.files[matrix_id]
         width, height = struct.unpack_from("<HH", raw, 4)
         count = width * height
         if not width or not height or len(raw) < 8 + count * 4:
             raise ValueError(f"Matrix {matrix_id} has invalid dimensions")
         model_ids = struct.unpack_from(f"<{count}I", raw, 8)
-        definitions = (
+        has_zones = struct.unpack_from("<I", raw, 0)[0] == 1
+        definitions = (  # deprecated name: this is the matrix ZoneID table
             struct.unpack_from(f"<{count}I", raw, 8 + count * 4)
-            if len(raw) >= 8 + count * 8
+            if has_zones and len(raw) >= 8 + count * 8
             else None
         )
         return matrix_id, width, height, model_ids, definitions
