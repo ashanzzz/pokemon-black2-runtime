@@ -143,10 +143,21 @@ AI Agent & Native Map Viewer
 * **实时对话与时序流**：`GET /api/observer/presentation`
 * **全域硬件内存原子导出**：`POST /api/dev/dump_full_ram`
 * **快照清册与一键 ZIP**：`GET /api/dev/dumps`
+* **运行时 Field 对象解析**：`GET /api/v1/map/runtime/field`
+* **物理真理与 ROM 对齐地图**：`GET /api/v1/map/truth/current`
 
 ---
 
 ## 6. 版本里程碑与发布历史 (Milestone Releases)
+
+### `v2.1.0` - Map Truth v2 & Full Non-ROM Hardware Memory Exporter (2026-09-04)
+* **Map Truth v2 闭环落地**：
+  - 新增 `GET /api/v1/map/runtime/field`：从当前 Main RAM 动态解析 Field -> Player -> PlayerActor -> ActorSystem -> Mapper -> Loaded Chunks -> Props -> DoorUID -> TileType。
+  - 新增 `GET /api/v1/map/truth/current`：将运行时 RAM 与 ROM Matrix (`a/0/0/9`)、Map Header、BMD0 (`a/0/0/8`)、BTX0 (`a/0/1/4`)、NPC Spawn、Warp、Trigger、Permission 进行物理匹配闭环。
+* **通用全域硬件导出优化**：
+  - Lua Bridge `memory.read` 支持高速 binary-string / chunked-array 批量流式传输，解决大范围 Main RAM 遍历超时。
+  - `memory.read_bytes` 支持定制超时间隔（`timeout=10.0s`），支撑 4MB 全量 RAM 零丢失读取。
+  - 增强 `ram-dumper.html`：包含全部内存域物理文件验证、CRC 校验、ZIP 一键安全下载。
 
 ### `v2.0.0` - Universal Ground-Truth Runtime & Multi-Domain Dumper (2026-09-04)
 * **全域硬件内存原子导出器 (Universal Dumper)**：支持一次 RPC 并行落盘 Main RAM (4MB)、ITCM (32KB)、DTCM (16KB)、Shared WRAM (32KB)、ARM7 WRAM (64KB)、SRAM (512KB)、Native 画面截图 (PNG)、ARM9 完整寄存器组 (PC/SP/LR/CPSR/R0-R12) 与结构化 `manifest.json`，自动生成一键打包 ZIP。

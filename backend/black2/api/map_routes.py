@@ -14,6 +14,8 @@ from ..memory.reader import MemoryReader
 from ..decoders.field import get_map_name
 from ..world.map_knowledge import MapKnowledgeService, format_catalog_text, format_current_text
 from ..world.map_schematic import MapSchematicService, format_schematic_text
+from ..world.map_truth import MapTruthService
+from ..world.runtime_field_resolver import resolve_runtime_field
 from ..world.native_map import NativeMapError, NativeMapService, read_live_map_state, _bytes_from_result
 
 
@@ -21,6 +23,7 @@ router = APIRouter(prefix="/api/v1/map", tags=["map"])
 native_maps = NativeMapService()
 schematics = MapSchematicService()
 knowledge = MapKnowledgeService()
+truth = MapTruthService()
 _cache_task: asyncio.Task[None] | None = None
 _reader: MemoryReader | None = None
 _client: BridgeClient | None = None
@@ -199,10 +202,10 @@ async def current_position(reader: MemoryReader = Depends(_map_reader)) -> dict[
     chunk_y = (live.y // 32) if live.y is not None else None
     local_x = (live.x % 32) if live.x is not None else None
     local_y = (live.y % 32) if live.y is not None else None
-
     return {
+        "source": "runtime FieldPlayerCore -> FieldActor; no manual map database",
         "map_section_id": live.map_id,
-        "map_name": get_map_name(live.map_id) if live.map_id is not None else "未知区域",
+        "map_name": get_map_name(live.map_id) if live.map_id is not None else None,
         "player": {
             "x": live.x,
             "y": live.y,
@@ -214,18 +217,28 @@ async def current_position(reader: MemoryReader = Depends(_map_reader)) -> dict[
             "verified": live.verified,
         },
         "field_system": {
-            "matrix_id": 0 if live.map_id in (42, 0x0170, 0x0178, 0x0188) else None,
-            "scene_type": "OVERWORLD" if live.map_id in (42, 0x0170, 0x0178, 0x0188) else "INTERIOR",
-            "active_actors_count": 1,
-            "camera_target": "Player",
+            "matrix_id": None,
+            "active_actors_count": None,
+            "camera_target": None,
+            "status": "use /api/v1/map/truth/current for runtime+ROM resolved values",
         },
-        "trainer": {
-            "name": "zero",
-            "gender": "男孩子 (Male)",
-            "money": 3000,
-            "badges": 0,
-        },
+        "trainer": None,
     }
+
+
+@router.get("/runtime/field")
+async def runtime_field(reader: MemoryReader = Depends(_map_reader)) -> dict[str, Any]:
+    """Explicit full-RAM structural resolver for Field/Player/Actors/Mapper/Props."""
+    return await _map_response(resolve_runtime_field(reader))
+
+
+@router.get("/truth/current")
+async def truth_current(
+    include_raw: bool = False,
+    reader: MemoryReader = Depends(_map_reader),
+) -> dict[str, Any]:
+    """Authoritative current map: live RAM structures joined to exact ROM resources."""
+    return await _map_response(truth.current(reader, include_raw=include_raw))
 
 
 @router.get("/visual")

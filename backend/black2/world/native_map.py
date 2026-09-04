@@ -17,6 +17,7 @@ from ..memory.reader import MemoryReader
 from ..decoders.field import get_map_name
 from .rom_maps import NativeMapEngine
 from .rom_reader import NarcArchive
+from .runtime_field_resolver import RuntimeFieldLocator
 
 
 MAP_MODEL_PATH = "a/0/0/8"
@@ -25,6 +26,7 @@ MAP_ID_OFFSETS = (0x1434A6, 0x143668, 0x146CE8, 0x146EB2)
 _MATRIX_NONE = 0xFFFFFFFF
 _NAME_RE = re.compile(rb"[A-Za-z][A-Za-z0-9_]{2,}")
 _VISUAL_SCAN_LOCK = asyncio.Lock()
+_RUNTIME_FIELD_LOCATOR = RuntimeFieldLocator()
 
 # This model has three exact material/palette candidates.  Archive 282 was
 # selected by a direct BizHawk screen comparison; 307 showed a blue variant.
@@ -58,32 +60,54 @@ def _u16(data: bytes) -> int:
 
 
 async def read_live_map_state(reader: MemoryReader) -> LiveMapState:
-    """Read map metadata while leaving unverified player state unresolved.
+    """Resolve the live player through Field -> FieldPlayerCore -> FieldActor.
 
-    EXP_015 rejected the former fixed ``0x0223DE00`` pseudo-player and its
-    position mirrors.  A FieldPlayerCore-rooted resolver is not installed in
-    this public path yet, so this function must not turn those values into a
-    live player sample.
+    The first successful call performs one structural discovery pass across
+    Main RAM. Later calls use bounded reads and validate every cached back
+    pointer. No absolute runtime object address is hard-coded.
     """
-    ranges = _live_state_ranges()
     last_error: Exception | None = None
-
     for attempt in range(3):
         try:
-            results = await reader.read_batch_ranges(ranges)
-        except (ConnectionError, TimeoutError, OSError) as error:
+            sample = await _RUNTIME_FIELD_LOCATOR.sample_player(reader)
+            gpos = sample.get("grid_position") or {}
+            if (
+                sample.get("status") in {"resolved", "candidate"}
+                and gpos.get("x") is not None
+                and gpos.get("z") is not None
+            ):
+                # ``map_id`` historically meant a legacy Map-Section mirror.
+                # Runtime PlayerState.ZoneID is deliberately *not* stuffed into
+                # that field; MapTruthService resolves the Map Header separately.
+                return LiveMapState(
+                    map_id=None,
+                    x=int(gpos["x"]),
+                    y=int(gpos["z"]),
+                    elevation=int(gpos.get("y") or 0),
+                    verified=sample.get("confidence") == "probable",
+                    facing=str(sample.get("facing") or "Unresolved"),
+                    movement_state=str(sample.get("move_status") or "Unresolved"),
+                )
+            last_error = NativeMapError(sample.get("reason", "runtime Field player is unresolved"))
+        except (ConnectionError, TimeoutError, OSError, RuntimeError) as error:
             last_error = error
-        else:
-            # An empty batch is a bridge gap and is worth retrying.  A real
-            # batch with no verified player route is an honest unresolved
-            # observation, not a reason to manufacture a coordinate.
-            if results:
-                return _decode_live_map_state(results)
-            last_error = NativeMapError("BizHawk bridge returned an empty map-state batch")
         if attempt < 2:
             await asyncio.sleep(0.05)
 
-    raise NativeMapError("BizHawk bridge is not connected") from last_error
+    # Keep the old map-ID mirrors only as a candidate fallback.  They never
+    # fabricate a player position and therefore cannot anchor a rendered map.
+    fallback_error: Exception | None = None
+    for attempt in range(3):
+        try:
+            results = await reader.read_batch_ranges(_live_state_ranges())
+            if results:
+                return _decode_live_map_state(results)
+            fallback_error = NativeMapError("BizHawk bridge returned an empty map-state batch")
+        except (ConnectionError, TimeoutError, OSError, RuntimeError) as error:
+            fallback_error = error
+        if attempt < 2:
+            await asyncio.sleep(0.05)
+    raise NativeMapError("BizHawk bridge is connected but Field runtime is unresolved") from (last_error or fallback_error)
 
 
 def _live_state_ranges() -> list[dict[str, int | str]]:
@@ -102,10 +126,6 @@ def _decode_live_map_state(results: dict[str, Any]) -> LiveMapState:
     map_vote = Counter(plausible_maps).most_common(1)
     map_id = map_vote[0][0] if map_vote and map_vote[0][1] >= 2 else None
 
-    # The former 0x0223DE00 candidate and three 0x02143620 mirrors were
-    # rejected by the controlled EXP_015 input sequence.  They remain absent
-    # here until a GameSystem -> Field -> FieldPlayer -> Core -> PlayerActor
-    # chain is resolved and lifecycle-validated for this ROM/session.
     return LiveMapState(
         map_id=map_id,
         x=None,
@@ -407,22 +427,6 @@ async def _inspect_loaded_visual_map(reader: MemoryReader, player_x: int, player
             active.append({"x": cell_x, "y": cell_y, "model_id": model_id})
             pending.extend(((cell_x - 1, cell_y), (cell_x + 1, cell_y), (cell_x, cell_y - 1), (cell_x, cell_y + 1)))
 
-        # In Overworld (Matrix 0), load all connected regional models around player's active region
-        # (Aspertia City, Route 19, Floccesy Town, Floccesy Ranch, Route 20)
-        # Chunks: X=1..7, Y=19..23
-        for cell_y in range(height):
-            for cell_x in range(width):
-                idx = cell_y * width + cell_x
-                m = model_ids[idx]
-                if m != _MATRIX_NONE and m in engine.models:
-                    # If matrix 0, load all regional chunks (x <= 8 and y >= 18)
-                    if matrix_id == 0:
-                        if cell_x <= 8 and 18 <= cell_y <= 24:
-                            if not any(c["x"] == cell_x and c["y"] == cell_y for c in active):
-                                active.append({"x": cell_x, "y": cell_y, "model_id": m})
-                    elif m in loaded_models:
-                        if not any(c["x"] == cell_x and c["y"] == cell_y for c in active):
-                            active.append({"x": cell_x, "y": cell_y, "model_id": m})
     active.sort(key=lambda cell: (cell["y"], cell["x"]))
     min_x, max_x = min(cell["x"] for cell in active), max(cell["x"] for cell in active)
     min_y, max_y = min(cell["y"] for cell in active), max(cell["y"] for cell in active)

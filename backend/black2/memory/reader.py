@@ -23,9 +23,9 @@ class MemoryReader:
         offset = arm9_to_main_ram_offset(addr) if domain == MAIN_RAM else addr
         return await self.client.read_u32(offset, domain)
 
-    async def read_bytes(self, addr: int, length: int, domain: str = MAIN_RAM) -> List[int]:
+    async def read_bytes(self, addr: int, length: int, domain: str = MAIN_RAM, timeout: float = 3.0) -> List[int]:
         offset = arm9_to_main_ram_offset(addr) if domain == MAIN_RAM else addr
-        return await self.client.read_bytes(offset, length, domain)
+        return await self.client.read_bytes(offset, length, domain, timeout=timeout)
 
     async def read_batch_ranges(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Perform batch atomic read across multiple memory addresses."""

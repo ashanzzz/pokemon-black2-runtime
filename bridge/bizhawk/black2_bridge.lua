@@ -949,19 +949,32 @@ local function handle_command(cmd)
         local size = payload.size or payload.length or 1
         local format = payload.format or "u8"
 
-        local bytes = {}
-        for i = 0, size - 1 do
-            local val = safe_read_u8(addr + i, domain)
-            table.insert(bytes, val)
-        end
-
         local val_scalar = nil
-        if format == "u8" or size == 1 then
-            val_scalar = bytes[1]
-        elseif format == "u16" or size == 2 then
-            val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256)
-        elseif format == "u32" or size == 4 then
-            val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256) + ((bytes[3] or 0) * 65536) + ((bytes[4] or 0) * 16777216)
+        local hex_str = ""
+        local bytes = {}
+
+        if format == "bytes" or format == "hex" or size > 16 then
+            local data = read_binary(domain, addr, size)
+            hex_str = binary_to_hex(data)
+            -- For small reads keep the bytes array for backward compatibility
+            if size <= 1024 then
+                for i = 1, #data do
+                    bytes[i] = string.byte(data, i)
+                end
+            end
+        else
+            for i = 0, size - 1 do
+                local val = safe_read_u8(addr + i, domain)
+                table.insert(bytes, val)
+            end
+            hex_str = bytes_to_hex(bytes)
+            if format == "u8" or size == 1 then
+                val_scalar = bytes[1]
+            elseif format == "u16" or size == 2 then
+                val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256)
+            elseif format == "u32" or size == 4 then
+                val_scalar = (bytes[1] or 0) + ((bytes[2] or 0) * 256) + ((bytes[3] or 0) * 65536) + ((bytes[4] or 0) * 16777216)
+            end
         end
 
         resp.payload = {
@@ -969,7 +982,7 @@ local function handle_command(cmd)
             addr = addr,
             size = size,
             value = val_scalar,
-            hex = bytes_to_hex(bytes),
+            hex = hex_str,
             bytes = bytes
         }
 

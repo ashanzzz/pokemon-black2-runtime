@@ -23,6 +23,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from ..world.runtime_field_resolver import resolve_runtime_field_from_ram
+
 
 SNAPSHOT_BASE_DIR = Path("reverse_engineering/dumps").resolve()
 MAIN_RAM_SIZE = 0x400000
@@ -638,7 +640,9 @@ class UniversalSnapshotManager:
             ram = bin_path.read_bytes()
             _write_json(critical_path, _extract_forensic_ranges(ram, physical_frame))
             _write_json(heap_path, _scan_gfl_heap_candidates(ram, physical_frame))
-            _write_json(runtime_world_path, _runtime_world_index(ram, physical_frame, curr_state, semantic_frame))
+            runtime_index = _runtime_world_index(ram, physical_frame, curr_state, semantic_frame)
+            runtime_index["field_runtime"] = resolve_runtime_field_from_ram(ram, frame=physical_frame)
+            _write_json(runtime_world_path, runtime_index)
         else:
             _write_json(
                 critical_path,

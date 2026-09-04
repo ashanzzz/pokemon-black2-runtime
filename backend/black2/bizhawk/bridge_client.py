@@ -71,13 +71,18 @@ class BridgeClient:
         })
         return res.get("value", 0)
 
-    async def read_bytes(self, addr: int, length: int, domain: str = "Main RAM") -> List[int]:
+    async def read_bytes(self, addr: int, length: int, domain: str = "Main RAM", timeout: float = 3.0) -> List[int]:
         res = await self.transport.request("memory.read", {
             "domain": domain,
             "addr": addr,
             "size": length,
             "format": "bytes"
-        })
+        }, timeout=timeout)
+        if "hex" in res and res["hex"] and (not res.get("bytes") or len(res.get("bytes", [])) != length):
+            try:
+                return list(bytes.fromhex(res["hex"]))
+            except ValueError:
+                pass
         return res.get("bytes", [])
 
     async def write_bytes(self, addr: int, bytes_data: List[int], domain: str = "Main RAM") -> Dict[str, Any]:
