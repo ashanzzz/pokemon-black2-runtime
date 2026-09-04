@@ -1,102 +1,131 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Pokémon Black 2 · 3D Runtime World v6</title>
-<script>
-window.onerror = function(msg, url, line, col, error) {
-  const el = document.getElementById('progressText');
-  if (el) el.textContent = 'JS Error: ' + msg + ' (L' + line + ')';
-  console.error('Global Error:', msg, url, line, error);
-};
-</script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
-  }
-}
-</script>
-<style>
-:root{color-scheme:dark;--bg:#070a0f;--panel:#0d121aee;--line:#273242;--text:#edf3fa;--muted:#8d9baa;--accent:#e7bb59;--ok:#68d59a;--warn:#f0bd67;--bad:#f07b7b}
-*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:13px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial}
-#world{position:fixed;inset:0}canvas{display:block}.glass{background:var(--panel);border:1px solid var(--line);box-shadow:0 16px 50px #0008;backdrop-filter:blur(12px);border-radius:12px}
-.top{position:fixed;left:14px;right:14px;top:12px;height:50px;z-index:5;display:flex;align-items:center;gap:14px;padding:0 14px}.brand{font-weight:750;letter-spacing:.2px}.tag{color:var(--muted);font-size:11px;border-left:1px solid var(--line);padding-left:12px}.grow{flex:1}.status{display:flex;gap:8px}.pill{padding:4px 8px;border:1px solid var(--line);border-radius:999px;color:var(--muted);white-space:nowrap}.pill.ok{color:var(--ok)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
-.left{position:fixed;left:14px;top:74px;width:282px;z-index:5;padding:12px}.section+.section{margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}.title{font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:var(--muted);margin-bottom:8px}.kv{display:grid;grid-template-columns:94px minmax(0,1fr);gap:5px 8px}.kv b{font-weight:500;color:var(--muted)}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px}.good{color:var(--ok)}.muted{color:var(--muted)}
-.right{position:fixed;right:14px;top:74px;width:260px;z-index:5;padding:12px}.control{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:7px 0}.control button{background:#111925;color:var(--text);border:1px solid var(--line);padding:6px 9px;border-radius:7px;cursor:pointer}.control button.active{border-color:var(--accent);color:var(--accent)}input[type=checkbox]{accent-color:#dcb35b}
-.bottom{position:fixed;left:310px;right:288px;bottom:12px;min-height:44px;z-index:5;padding:8px 12px;display:flex;align-items:center;gap:14px}.progress{flex:1;height:5px;background:#151e2a;border-radius:99px;overflow:hidden}.progress>i{display:block;height:100%;width:0;background:#7e91aa;transition:width .2s}.hint{color:var(--muted);font-size:11px;white-space:nowrap}.actorBadge{color:var(--accent)}
-.crosshair{pointer-events:none;position:fixed;left:50%;top:50%;width:8px;height:8px;border:1px solid #fff3;border-radius:50%;transform:translate(-50%,-50%);z-index:2}
-@media(max-width:980px){.right{display:none}.bottom{right:14px}.tag{display:none}}@media(max-width:720px){.left{width:230px}.bottom{left:14px}.status .pill:nth-child(n+3){display:none}}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pokémon Black 2 · World Viewport</title>
+  <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
+  <link rel="stylesheet" href="/frontend/original-map-v6.css">
 </head>
 <body>
-<div id="world"></div><div class="crosshair"></div>
-<div class="top glass"><div class="brand">Pokémon Black 2 · 3D Runtime World</div><div class="tag">ROM StaticWorld + RAM RuntimeOverlay · no 2D map</div><div class="grow"></div><div class="status"><span id="backend" class="pill">HTTP</span><span id="sceneStatus" class="pill">Scene</span><span id="playerStatus" class="pill">Player</span></div></div>
-<div class="left glass">
-  <div class="section"><div class="title">Current Scene</div><div class="kv" id="sceneKV"><b>Zone</b><span>—</span></div></div>
-  <div class="section"><div class="title">Live Player</div><div class="kv" id="playerKV"><b>Runtime</b><span>waiting…</span></div></div>
-  <div class="section"><div class="title">Coordinate Proof</div><div id="proof" class="mono muted">WPos / GPos / Chunk waiting…</div></div>
-</div>
-<div class="right glass">
-  <div class="title">View</div>
-  <div class="control"><span>Follow player</span><button id="follow" class="active">ON</button></div>
-  <div class="control"><span>Runtime NPCs</span><label><input id="actors" type="checkbox" checked></label></div>
-  <div class="control"><span>3D evidence grid</span><label><input id="debug" type="checkbox"></label></div>
-  <div class="section"><div class="title">Player Renderer</div><div id="actorMode" class="actorBadge">probing ROM actor…</div><div id="actorMeta" class="muted" style="margin-top:5px;font-size:11px">—</div></div>
-  <div class="section">
-    <div class="title">v6 Evidence Capture (一键取证)</div>
-    <div style="display:flex;gap:6px;margin-bottom:6px">
-      <input id="evidenceLabel" type="text" value="outdoor" placeholder="标签如 outdoor / indoor" style="flex:1;background:#09121c;color:#fff;border:1px solid var(--line);border-radius:6px;padding:4px 7px;font-size:11px">
-      <button id="evidenceBtn" style="background:#13334c;color:#63d8e8;border:1px solid #2d618a;border-radius:6px;padding:5px 8px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap">📸 一键打包</button>
+<div class="app">
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">B2</span><span class="brand-copy"><strong>Pokémon Black 2 Runtime</strong><span>RAM-grounded world observer</span></span></a>
+    <nav class="workspace-tabs" aria-label="Workspace">
+      <a class="workspace-tab active" href="/original-map" data-i18n="viewportTab">World Viewport</a>
+      <a class="workspace-tab" href="/runtime-monitor" data-i18n="monitorTab">Service Monitor</a>
+      <a class="workspace-tab" href="/docs">API</a>
+    </nav>
+    <div class="grow"></div>
+    <div class="top-status">
+      <span class="status-chip" id="httpChip" data-state="active"><i class="status-dot"></i><span>HTTP</span></span>
+      <span class="status-chip" id="bridgeChip" data-state="active"><i class="status-dot"></i><span>Bridge</span></span>
+      <span class="status-chip" id="romChip" data-state="active"><i class="status-dot"></i><span>ROM</span></span>
+      <span class="status-chip" id="playerChip" data-state="active"><i class="status-dot"></i><span>Player</span></span>
     </div>
-    <div id="evidenceStatus" class="muted" style="font-size:10px;line-height:1.4">点击自动截屏 + 运行验证 + 生成带 JSON 的 ZIP 包</div>
-  </div>
-  <div class="section"><div class="title">Architecture</div><div class="muted" style="font-size:11px">Terrain / Buildings: ROM cached<br>Player: RuntimeHub cache ~90ms<br>Scene identity / actors: low frequency<br>Zone change: replace StaticWorld only</div></div>
-</div>
-<div class="bottom glass"><span id="progressText" class="hint">initializing 3D scene…</span><div class="progress"><i id="bar"></i></div><span class="hint">Mouse orbit available when Follow=OFF</span></div>
-<script type="module">
-import {Black2World3D,esc} from '/frontend/world3d-runtime.js';
-const $=s=>document.querySelector(s);
-function pill(el,state,text){el.textContent=text||state;el.className='pill '+(state==='resolved'||state==='ready'||state==='ok'?'ok':state==='candidate'||state==='degraded'||state==='unresolved'?'warn':'bad')}
-function kv(el,items){el.innerHTML=items.map(([k,v])=>`<b>${esc(k)}</b><span>${esc(v??'—')}</span>`).join('')}
-let runtimeGender='male';
-try{const st=await fetch('/api/state').then(r=>r.json()); if(String(st.gender||'').toLowerCase().includes('female')||String(st.gender)==='1') runtimeGender='female';}catch{}
-const viewer=new Black2World3D($('#world'),{gender:runtimeGender,
- onStatus(kind,state,detail){if(kind==='scene')pill($('#sceneStatus'),state,`Scene · ${detail}`);if(kind==='player')pill($('#playerStatus'),state,`Player · ${detail}`)},
- onProgress(done,total,label){$('#progressText').textContent=`${label} ${done}/${total}`;$('#bar').style.width=total?`${Math.min(100,done/total*100)}%`:'0%'},
- onActorMode(mode,meta){$('#actorMode').textContent=mode==='original_billboard'?'Original NDS billboard':mode==='original_glb'?'Original NDS 3D actor':'Pixel marker fallback';$('#actorMeta').textContent=meta?`OBJ ${meta.obj_code} · resource ${meta.resource_id} · ${meta.resource_kind}`:'ROM actor resource unresolved'},
- onScene(d){const s=d.static||{},m=s.matrix||{},a=s.area||{};kv($('#sceneKV'),[['Zone',d.zone_id],['Environment',d.environment],['Area',a.area_id],['Matrix',m.matrix_id],['Matrix size',m.width?`${m.width} × ${m.height}`:'—'],['Terrain chunks',s.terrains?.length],['Buildings',s.buildings?.length],['Identity',d.identity?.confidence]]);},
- onPlayer(p){const w=p.world||{},g=p.grid||{},o=p.orientation||{},l=p.locomotion||{},v=p.validation||{};kv($('#playerKV'),[['Frame',p.frame],['GPos',`${g.x??'—'}, ${g.y??'—'}, ${g.z??'—'}`],['WPos',`${w.x?.toFixed?.(2)??'—'}, ${w.y?.toFixed?.(2)??'—'}, ${w.z?.toFixed?.(2)??'—'}`],['Facing',`${o.facing??'—'} / ${o.facing_zh??'—'}`],['Motion',l.semantic_state],['Transport',l.transport_mode]]);$('#proof').innerHTML=`grid→world residual<br>X: ${v.residual_world?.x?.toFixed?.(3)??'—'} · Z: ${v.residual_world?.z?.toFixed?.(3)??'—'}<br>Chunk: ${v.chunk_matches_gpos===true?'<span class="good">MATCH</span>':String(v.chunk_matches_gpos??'—')}<br>Facing crosscheck: ${v.facing_crosscheck?'<span class="good">PASS</span>':'—'}`;}
-});
-$('#follow').onclick=()=>{viewer.setFollow(!viewer.followPlayer);$('#follow').textContent=viewer.followPlayer?'ON':'OFF';$('#follow').classList.toggle('active',viewer.followPlayer)};
-$('#actors').onchange=e=>viewer.setRuntimeActors(e.target.checked);$('#debug').onchange=e=>viewer.setDebug(e.target.checked);
-fetch('/api/v1/map/v6/status').then(r=>r.json()).then(s=>pill($('#backend'),s.status,s.status==='ready'?'HTTP · v6 ready':'ROM unavailable')).catch(e=>pill($('#backend'),'bad','HTTP error'));
-viewer.start().catch(e=>{pill($('#sceneStatus'),'bad',e.message);$('#progressText').textContent=e.message});
+  </header>
 
-// v6 One-Click Evidence Capture & Zip
-$('#evidenceBtn').onclick=async()=>{
-  const btn=$('#evidenceBtn');
-  const status=$('#evidenceStatus');
-  const label=($('#evidenceLabel').value.trim()||'evidence');
-  btn.disabled=true;
-  btn.textContent='📸 采集中…';
-  status.innerHTML='正在截屏并执行 verify_v6_runtime...';
-  try{
-    const res=await fetch(`/api/v1/map/v6/evidence/capture?label=${encodeURIComponent(label)}`,{method:'POST'}).then(r=>r.json());
-    if(res.ok){
-      status.innerHTML=`<span style="color:var(--ok)">✓ 成功生成!</span> <a href="${res.download_url}" download style="color:var(--accent);text-decoration:underline;font-weight:bold;margin-left:4px">下载 ZIP (${res.zip_name})</a>`;
-    }else{
-      status.innerHTML=`<span style="color:var(--bad)">采集失败: ${res.detail||'未知错误'}</span>`;
-    }
-  }catch(err){
-    status.innerHTML=`<span style="color:var(--bad)">请求异常: ${err.message}</span>`;
-  }finally{
-    btn.disabled=false;
-    btn.textContent='📸 一键打包';
-  }
-};
-</script>
+  <section class="workspace">
+    <aside class="editor left">
+      <div class="editor-head"><span data-i18n="outliner">Runtime Outliner</span><span class="sub" id="uiVersion">UI 6.2.1</span></div>
+      <div class="editor-scroll">
+        <section class="section">
+          <div class="section-title"><span data-i18n="pipeline">World pipeline</span><span class="count" id="pipelineCount">0 / 5</span></div>
+          <div class="pipeline" id="pipeline">
+            <div class="pipeline-step" data-step="backend" data-state="active"><i class="step-icon"></i><div><div class="step-name" data-i18n="backendStep">Backend API</div><div class="step-detail">checking…</div></div></div>
+            <div class="pipeline-step" data-step="bridge" data-state="active"><i class="step-icon"></i><div><div class="step-name" data-i18n="bridgeStep">BizHawk Bridge</div><div class="step-detail">checking…</div></div></div>
+            <div class="pipeline-step" data-step="rom" data-state="active"><i class="step-icon"></i><div><div class="step-name" data-i18n="romStep">ROM Static World</div><div class="step-detail">checking…</div></div></div>
+            <div class="pipeline-step" data-step="player" data-state="active"><i class="step-icon"></i><div><div class="step-name" data-i18n="playerStep">Player Runtime</div><div class="step-detail">checking…</div></div></div>
+            <div class="pipeline-step" data-step="scene" data-state="waiting"><i class="step-icon"></i><div><div class="step-name" data-i18n="sceneStep">3D Scene</div><div class="step-detail">waiting…</div></div></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title"><span data-i18n="sceneFacts">Scene facts</span><span class="count" id="sceneConfidence">unresolved</span></div>
+          <dl class="fact-grid" id="sceneFacts"><dt data-i18n="status">Status</dt><dd class="unresolved" data-i18n="notResolved">Not resolved</dd></dl>
+        </section>
+        <section class="section">
+          <div class="section-title"><span data-i18n="playerFacts">Player facts</span><span class="count" id="playerFrame">frame —</span></div>
+          <dl class="fact-grid" id="playerFacts"><dt data-i18n="status">Status</dt><dd class="unresolved" data-i18n="notResolved">Not resolved</dd></dl>
+        </section>
+      </div>
+    </aside>
+
+    <main class="viewport" id="viewport">
+      <div id="world"></div>
+      <div class="viewport-head">
+        <button class="mode active" id="followButton" type="button" data-i18n="follow">Follow Player</button>
+        <button class="mode" id="frameButton" type="button" data-i18n="framePlayer">Frame Player</button>
+        <span class="scene-label" id="viewportScene">scene: unresolved</span>
+      </div>
+      <div class="axis-gizmo" aria-hidden="true"></div>
+      <div class="blocker" id="blocker">
+        <section class="blocker-card" id="blockerCard" data-state="active">
+          <div class="blocker-line"></div>
+          <div class="blocker-body">
+            <div class="blocker-kicker" id="blockerKicker">RUNTIME PIPELINE</div>
+            <h1 id="blockerTitle">Checking runtime…</h1>
+            <p id="blockerMessage">Reading the current service state.</p>
+            <div class="blocker-detail" id="blockerDetail">HTTP → Bridge → ROM → PlayerRuntime → 3D Scene</div>
+            <div class="blocker-actions"><button class="btn primary" id="primaryAction" type="button" data-i18n="checkAgain">Check again</button><a class="btn" href="/runtime-monitor" data-i18n="openMonitor">Open monitor</a></div>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <aside class="editor right">
+      <div class="editor-head"><span data-i18n="properties">Viewport Properties</span><span class="sub" id="releaseVersion">runtime —</span></div>
+      <div class="editor-scroll">
+        <section class="section">
+          <div class="section-title" data-i18n="display">Display</div>
+          <div class="control-list">
+            <label class="control-row"><span data-i18n="followToggle">Follow player</span><input class="switch" id="followToggle" type="checkbox" checked></label>
+            <label class="control-row"><span data-i18n="actorsToggle">Runtime NPCs</span><input class="switch" id="actorsToggle" type="checkbox" checked></label>
+            <label class="control-row"><span data-i18n="gridToggle">Evidence grid</span><input class="switch" id="gridToggle" type="checkbox"></label>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-title" data-i18n="runtimeActions">Runtime actions</div>
+          <div class="btn-row">
+            <button class="btn primary" id="discoverButton" type="button" data-i18n="discover">Discover player</button>
+            <button class="btn" id="refreshButton" type="button" data-i18n="refreshScene">Refresh scene</button>
+            <button class="btn danger" id="restartButton" type="button" data-i18n="restart">Restart backend</button>
+            <a class="btn" href="/runtime-monitor" data-i18n="logs">Logs & versions</a>
+          </div>
+          <div class="small-note" id="actionNote" data-i18n="discoveryNote">Player discovery is an explicit read-only RAM probe. It never writes game memory.</div>
+        </section>
+        <section class="section">
+          <div class="section-title" data-i18n="renderer">Player renderer</div>
+          <dl class="fact-grid" id="rendererFacts"><dt data-i18n="mode">Mode</dt><dd data-i18n="waiting">Waiting</dd></dl>
+        </section>
+        <section class="section">
+          <div class="section-title"><span data-i18n="pathPreview">Path preview</span><span class="count" id="pathCount">0 nodes</span></div>
+          <div class="btn-row">
+            <input class="field" id="goalX" type="number" inputmode="numeric" placeholder="Goal X" aria-label="Goal X">
+            <input class="field" id="goalZ" type="number" inputmode="numeric" placeholder="Goal Z" aria-label="Goal Z">
+            <button class="btn primary" id="previewPathButton" type="button" data-i18n="previewPath">Preview path</button>
+            <button class="btn" id="clearPathButton" type="button" data-i18n="clearPath">Clear</button>
+          </div>
+          <div class="small-note" id="pathStatus" data-i18n="pathNote">Displays only the candidate path returned by the navigation API.</div>
+        </section>
+        <section class="section">
+          <div class="section-title" data-i18n="shortcuts">Viewport navigation</div>
+          <div class="shortcut-list"><kbd>LMB / RMB</kbd><span data-i18n="orbit">Orbit</span><kbd>MMB</kbd><span data-i18n="pan">Pan</span><kbd>Wheel</kbd><span data-i18n="zoom">Zoom</span><kbd>R</kbd><span data-i18n="discoverShortcut">Discover player runtime</span></div>
+        </section>
+        <section class="section">
+          <div class="section-title" data-i18n="evidence">Evidence package</div>
+          <div class="evidence"><input class="field" id="evidenceLabel" value="outdoor" aria-label="Evidence label"><button class="btn full" id="evidenceButton" type="button" data-i18n="capture">Capture & verify ZIP</button></div>
+          <div class="small-note" id="evidenceStatus" data-i18n="evidenceNote">Screenshot, validation output and JSON manifest.</div>
+        </section>
+      </div>
+    </aside>
+  </section>
+
+  <footer class="statusbar">
+    <div class="mouse-help"><b>L/R</b> <span data-i18n="orbit">Orbit</span> · <b>MMB</b> <span data-i18n="pan">Pan</span> · <b>Wheel</b> <span data-i18n="zoom">Zoom</span></div>
+    <div class="load-progress"><span id="progressLabel">Checking runtime</span><span class="progress-track"><i class="progress-fill" id="progressFill"></i></span><span id="progressPercent">0%</span></div>
+    <div class="frame-info" id="frameInfo">frame — · GPos unresolved</div>
+  </footer>
+</div>
+<script type="module" src="/frontend/original-map-ui.js"></script>
 </body>
 </html>

@@ -1,5 +1,7 @@
+import asyncio
 import unittest
-from backend.black2.world.world3d_scene import canonical_player, scene_origin
+from backend.black2.world.runtime_player_state import player_runtime_service
+from backend.black2.world.world3d_scene import World3DSceneService, canonical_player, scene_origin
 
 
 def _sample(phase="Idle"):
@@ -51,3 +53,64 @@ class TestWorld3DSceneV6(unittest.TestCase):
         self.assertEqual(o["x"], 600.0)
         self.assertEqual(o["z"], 11432.0)
         self.assertEqual(o["source"], "live_player_wpos")
+
+    def test_unresolved_player_returns_without_ram_discovery(self):
+        class ReaderThatMustNotBeCalled:
+            async def read_bytes(self, *_args, **_kwargs):
+                raise AssertionError("normal scene polling must not start RAM-wide discovery")
+
+        original_latest = player_runtime_service.latest
+        try:
+            player_runtime_service.latest = {"status": "unresolved", "reason": "no cached player"}
+            service = World3DSceneService(original=None, truth=None, exported=object())
+            result = asyncio.run(service.current_scene(ReaderThatMustNotBeCalled()))
+        finally:
+            player_runtime_service.latest = original_latest
+
+        self.assertEqual(result["status"], "unresolved")
+        self.assertEqual(result["reason"], "no runtime ZoneID is available")
+
+    def test_loaded_visual_replaces_only_verified_matching_terrain_cells(self):
+        service = World3DSceneService(original=None, truth=None, exported=object())
+        static = {
+            "zone_id": 427,
+            "matrix": {"matrix_id": 0},
+            "terrains": [
+                {"cell": {"x": 1, "z": 23}, "asset_url": "/fallback.glb"},
+                {"cell": {"x": 1, "z": 22}, "asset_url": "/other-fallback.glb"},
+            ],
+        }
+        visual = {
+            "verified": True,
+            "map_definition_id": 427,
+            "matrix_id": 0,
+            "cache_key": "live-bmd-btx",
+            "texture_id": 210,
+            "player_alignment": {"verified": True},
+            "models": [{
+                "model_id": 279,
+                "texture_id": 210,
+                "texture_match": "78/78",
+                "texture_candidate": False,
+                "cell": {"x": 1, "y": 23},
+                "asset_url": "/verified-279.glb",
+            }],
+        }
+
+        result = service._bind_loaded_visual(static, visual)
+
+        self.assertEqual(result["terrains"][0]["asset_url"], "/verified-279.glb")
+        self.assertEqual(result["terrains"][1]["asset_url"], "/other-fallback.glb")
+        self.assertEqual(result["terrains"][0]["texture_binding"]["status"], "verified")
+        self.assertEqual(result["visual_binding"]["status"], "verified")
+
+    def test_mismatched_loaded_visual_is_not_applied(self):
+        service = World3DSceneService(original=None, truth=None, exported=object())
+        static = {"zone_id": 427, "matrix": {"matrix_id": 0}, "terrains": []}
+        result = service._bind_loaded_visual(static, {
+            "verified": True,
+            "map_definition_id": 426,
+            "matrix_id": 0,
+            "player_alignment": {"verified": True},
+        })
+        self.assertEqual(result["visual_binding"]["status"], "rejected")

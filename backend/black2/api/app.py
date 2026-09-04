@@ -23,7 +23,9 @@ from ..memory.reader import MemoryReader
 from ..state.engine import SemanticStateEngine
 from ..state.universal_snapshot_manager import universal_snapshot_manager
 from ..runtime.config import runtime_config
+from ..runtime.control_log import runtime_control_log
 from ..runtime.hub import RuntimeHub
+from ..runtime.versions import RUNTIME_RELEASE_VERSION
 from ..actions.input_engine import ActionEngine
 from ..actions.onboarding import OnboardingFlow
 from ..observer.presentation import build_observer_presentation
@@ -71,17 +73,37 @@ configure_runtime_routes(runtime_hub)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await transport.connect()
-    await runtime_hub.start()
-    start_cache_observer(memory_reader)
+    try:
+        await transport.connect()
+        await runtime_hub.start()
+        start_cache_observer(memory_reader)
+    except Exception as exc:
+        runtime_control_log.record(
+            "backend_startup",
+            "failed",
+            http_host=runtime_config.http_host,
+            http_port=runtime_config.http_port,
+            error_type=type(exc).__name__,
+        )
+        raise
     observer_logger.log_event(
         "backend_startup",
         f"Semantic Runtime HTTP={runtime_config.http_host}:{runtime_config.http_port} "
         f"BizHawkBridge={runtime_config.bridge_host}:{runtime_config.bridge_port}",
     )
+    runtime_control_log.record(
+        "backend_startup",
+        "ready",
+        http_host=runtime_config.http_host,
+        http_port=runtime_config.http_port,
+        bridge_host=runtime_config.bridge_host,
+        bridge_port=runtime_config.bridge_port,
+        restart_parent_pid=os.getenv("BLACK2_RESTART_PARENT_PID"),
+    )
     try:
         yield
     finally:
+        runtime_control_log.record("backend_shutdown", "stopping")
         await runtime_hub.stop()
         await stop_cache_observer()
         await transport.disconnect()
@@ -89,7 +111,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Pokémon Black 2 - AI Semantic Runtime API",
-    version="5.0.0",
+    version=RUNTIME_RELEASE_VERSION,
     description="Greenfield BizHawk Semantic Engine and AI Control API",
     lifespan=lifespan
 )
@@ -1097,6 +1119,15 @@ async def ram_dumper_page():
     if os.path.exists(page):
         return FileResponse(page)
     raise HTTPException(status_code=404, detail="ram-dumper.html not found")
+
+
+@app.get("/runtime-monitor")
+async def runtime_monitor_page():
+    """Friendly short URL for local service lifecycle monitoring."""
+    page = os.path.join(FRONTEND_DIR, "runtime-monitor.html")
+    if os.path.exists(page):
+        return FileResponse(page)
+    raise HTTPException(status_code=404, detail="runtime-monitor.html not found")
 
 
 @app.get("/")

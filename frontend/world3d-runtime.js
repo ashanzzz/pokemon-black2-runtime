@@ -7,8 +7,15 @@ const TILE = 16;
 const DIR_STEP = [0,3,2,3,0,1,3,0,0,0,4,0,4,2,2,2,3,3,3,3,3,3,0,0,0,0,0,3,3,3,3,3,2,2,0];
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-async function getJSON(url) {
-  const r = await fetch(url, {cache:'no-store'});
+async function getJSON(url, timeoutMs=5000) {
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  let r;
+  try { r = await fetch(url, {cache:'no-store',signal:controller.signal}); }
+  catch(error){
+    if(error.name==='AbortError') throw new Error(`request timed out after ${timeoutMs}ms`);
+    throw error;
+  } finally { clearTimeout(timer); }
   if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
   return r.json();
 }
@@ -33,14 +40,34 @@ export class Black2World3D {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
+    this.controls.enablePan = true;
+    this.controls.screenSpacePanning = true;
+    this.controls.zoomSpeed = 1.15;
+    this.controls.rotateSpeed = 0.8;
+    this.controls.panSpeed = 0.9;
+    this.controls.minDistance = 12;
+    this.controls.maxDistance = 8000;
+    // DCC-style mapping: drag L/R to orbit, drag the wheel button to pan,
+    // and roll the wheel to zoom.  Prevent the browser context menu from
+    // stealing the right-button orbit gesture.
+    this.controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.ROTATE,
+    };
     this.controls.enabled = false;
+    this._onCameraInteraction = () => this.setFollow(false, 'camera_interaction');
+    this.renderer.domElement.addEventListener('pointerdown', this._onCameraInteraction, true);
+    this.renderer.domElement.addEventListener('wheel', this._onCameraInteraction, {capture:true,passive:true});
+    this.renderer.domElement.addEventListener('contextmenu', event => event.preventDefault());
 
     this.loader = new GLTFLoader();
     this.worldRoot = new THREE.Group();
     this.staticRoot = new THREE.Group();
     this.actorRoot = new THREE.Group();
+    this.pathRoot = new THREE.Group();
     this.debugRoot = new THREE.Group();
-    this.worldRoot.add(this.staticRoot, this.actorRoot, this.debugRoot);
+    this.worldRoot.add(this.staticRoot, this.pathRoot, this.actorRoot, this.debugRoot);
     this.scene.add(this.worldRoot);
 
     const hemi = new THREE.HemisphereLight(0xe9f2ff, 0x4a4438, 2.1);
@@ -72,6 +99,8 @@ export class Black2World3D {
     this.lastPlayerFrame = null;
     this.lastSceneError = null;
     this.loadingGeneration = 0;
+    this.sceneRequestInFlight = null;
+    this.navigationPath = [];
 
     this._makeGrid();
     this.resize();
@@ -97,23 +126,71 @@ export class Black2World3D {
 
   setDebug(v){ this.showDebug=!!v; for(const o of this.debugRoot.children)o.visible=this.showDebug; }
   setRuntimeActors(v){ this.showRuntimeActors=!!v; for(const [_,o] of this.actorMarkers)o.visible=this.showRuntimeActors; }
-  setFollow(v){
+  framePlayer(){ if(!this.player)return false; this._frameCamera(this.sceneData?.environment); return true; }
+  clearNavigationPath(){ this.navigationPath=[]; this._disposeGroup(this.pathRoot); this.pathRoot.clear(); }
+  frameNavigationPath(){
+    if(this.navigationPath.length<2)return false;
+    const worldY=(finite(this.player?.world?.y)??0)+12;
+    const points=this.navigationPath.map(p=>this._canonicalToDisplay({x:Number(p.x)*TILE+TILE/2,y:worldY,z:Number(p.y)*TILE+TILE/2}));
+    const bounds=new THREE.Box3().setFromPoints(points),center=bounds.getCenter(new THREE.Vector3()),size=bounds.getSize(new THREE.Vector3());
+    const span=Math.max(size.x,size.z,64),distance=Math.min(this.controls.maxDistance,Math.max(360,span*2.6));
+    this.setFollow(false,'path_preview');
+    this.controls.target.copy(center);
+    this.camera.position.set(center.x+distance*.55,center.y+distance*.72,center.z+distance*.82);
+    this.controls.update();
+    return true;
+  }
+  setNavigationPath(points){
+    this.navigationPath=Array.isArray(points)?points.filter(p=>Number.isFinite(Number(p?.x))&&Number.isFinite(Number(p?.y))):[];
+    this._disposeGroup(this.pathRoot);this.pathRoot.clear();
+    if(this.navigationPath.length<2)return 0;
+    // Lift the route above terrain/props and draw real geometry. WebGL line
+    // width is effectively one pixel on most browsers, which made a valid
+    // route almost invisible in the overview camera.
+    const worldY=(finite(this.player?.world?.y)??0)+12;
+    const vertices=this.navigationPath.map(p=>this._canonicalToDisplay({x:Number(p.x)*TILE+TILE/2,y:worldY,z:Number(p.y)*TILE+TILE/2}));
+    const routeMaterial=new THREE.MeshBasicMaterial({color:0x38d7ff,transparent:true,opacity:.94,depthTest:false});
+    const up=new THREE.Vector3(0,1,0);
+    for(let i=1;i<vertices.length;i++){
+      const start=vertices[i-1],end=vertices[i],delta=end.clone().sub(start),length=delta.length();
+      if(length<=0)continue;
+      const segment=new THREE.Mesh(new THREE.CylinderGeometry(2.4,2.4,length,8),routeMaterial.clone());
+      segment.position.copy(start).add(end).multiplyScalar(.5);
+      segment.quaternion.setFromUnitVectors(up,delta.normalize());
+      segment.renderOrder=20;segment.name='candidate-navigation-path';
+      this.pathRoot.add(segment);
+    }
+    const nodeGeometry=new THREE.SphereGeometry(3.2,10,8);
+    const nodeMaterial=new THREE.MeshBasicMaterial({color:0x9beaff,depthTest:false});
+    for(const point of vertices){const node=new THREE.Mesh(nodeGeometry.clone(),nodeMaterial.clone());node.position.copy(point);node.renderOrder=21;this.pathRoot.add(node);}
+    const goal=new THREE.Mesh(new THREE.SphereGeometry(5,12,8),new THREE.MeshBasicMaterial({color:0xffd35e,depthTest:false}));
+    goal.position.copy(vertices[vertices.length-1]);goal.renderOrder=22;goal.name='candidate-navigation-goal';this.pathRoot.add(goal);
+    return this.navigationPath.length;
+  }
+  setFollow(v, source='toggle'){
     this.followPlayer=!!v;
     this.controls.enabled=!this.followPlayer;
     if(!this.followPlayer){ this.controls.target.copy(this.playerDisplay); }
+    if(this.ui.onFollowChange)this.ui.onFollowChange(this.followPlayer,source);
   }
 
   async start(){
-    await this.refreshScene(true);
     this._playerLoop();
     this._sceneLoop();
     this._actorsLoop();
+    // Do not ask the scene endpoint to discover RAM-wide field structures
+    // until the shared PlayerRuntime cache has a real player transform.
+    this._status('scene','unresolved','waiting for PlayerRuntime cache');
+    this._progress(0,0,'sceneUnavailable');
   }
 
   async _sceneLoop(){
     while(!this.disposed){
       await sleep(1000);
-      try{ await this.refreshScene(false); }catch(e){ this._status('scene', 'degraded', e.message); }
+      // The first resolved scene refresh is user-visible work: it asks the
+      // backend once for the BMD0/BTX0 pair actually resident in ARM9. Later
+      // polling reuses that verified binding and never performs a RAM scan.
+      try{ await this.refreshScene(!this.sceneData && !!this.player); }catch(e){ this._status('scene', 'degraded', e.message); }
     }
   }
   async _playerLoop(){
@@ -141,14 +218,30 @@ export class Black2World3D {
   }
 
   async refreshScene(force=false){
-    const q=force?'?force_identity=true':'';
-    const data=await getJSON(`${API}/scene/current${q}`);
+    if(this.sceneRequestInFlight)return this.sceneRequestInFlight;
+    const request=this._refreshScene(force);
+    this.sceneRequestInFlight=request;
+    try{return await request;}
+    finally{if(this.sceneRequestInFlight===request)this.sceneRequestInFlight=null;}
+  }
+
+  async _refreshScene(force=false){
+    // ``force`` means refresh the browser's static-world view.  It must not
+    // turn ordinary rendering into a RAM-wide reverse-engineering probe.
+    if(!this.player || this.player.status==='unresolved'){
+      this._status('scene','unresolved','waiting for PlayerRuntime cache');
+      this._progress(0,0,'sceneUnavailable');
+      return;
+    }
+    const query=force?'?refresh_visual=true':'';
+    const data=await getJSON(`${API}/scene/current${query}`,force?15000:5000);
     if(data.status==='unresolved'){
       this._status('scene','unresolved',data.reason||'runtime unresolved');
+      this._progress(0,0,'sceneUnavailable');
       return;
     }
     this.sceneData=data;
-    const key=data.scene_key;
+    const key=data.render_key||data.scene_key;
     if(key!==this.sceneKey){
       this.sceneKey=key;
       await this._rebuildStatic(data);
@@ -173,10 +266,11 @@ export class Black2World3D {
     this._disposeActorMarkers();
     const o=data.scene_origin||{};
     this.origin.set(finite(o.x)??0, 0, finite(o.z)??0);
+    if(this.navigationPath.length)this.setNavigationPath(this.navigationPath);
     const st=data.static||{};
     this.scene.fog.density = data.environment==='interior' ? 0.0013 : 0.00055;
     const terrain=st.terrains||[], buildings=st.buildings||[];
-    this._progress(0, terrain.length+buildings.length, 'loading original 3D world');
+    this._progress(0, terrain.length+buildings.length, 'loadingScene');
     let done=0;
     await this._pool(terrain, 4, async item=>{
       if(generation!==this.loadingGeneration)return;
@@ -187,7 +281,7 @@ export class Black2World3D {
         obj.position.copy(this._canonicalToDisplay(item.world));
         this.staticRoot.add(obj);
       }catch(e){ console.debug('terrain source-only', item, e); }
-      this._progress(++done, terrain.length+buildings.length, 'terrain/buildings');
+      this._progress(++done, terrain.length+buildings.length, 'terrainBuildings');
     });
     await this._pool(buildings, 3, async item=>{
       if(generation!==this.loadingGeneration)return;
@@ -200,7 +294,7 @@ export class Black2World3D {
         this.staticRoot.add(obj);
         if(item.has_door_metadata) this._addDoorDebug(item);
       }catch(e){ console.debug('building source-only', item, e); }
-      this._progress(++done, terrain.length+buildings.length, 'terrain/buildings');
+      this._progress(++done, terrain.length+buildings.length, 'terrainBuildings');
     });
     this._progress(done, terrain.length+buildings.length, 'ready');
     this._frameCamera(data.environment);
@@ -219,7 +313,21 @@ export class Black2World3D {
   async _loadModel(url){
     if(this.modelCache.has(url)) return this.modelCache.get(url);
     const p=new Promise((resolve,reject)=>this.loader.load(url,g=>{
-      g.scene.traverse(o=>{if(o.isMesh){o.frustumCulled=true; if(o.material){o.material.side=THREE.DoubleSide;}}});
+      g.scene.traverse(o=>{if(o.isMesh){
+        o.frustumCulled=true;
+        const materials=Array.isArray(o.material)?o.material:[o.material];
+        for(const material of materials.filter(Boolean)){
+          material.side=THREE.DoubleSide;
+          if(material.map){
+            material.map.colorSpace=THREE.SRGBColorSpace;
+            material.map.magFilter=THREE.NearestFilter;
+            material.map.minFilter=THREE.NearestFilter;
+            material.map.generateMipmaps=false;
+            material.map.needsUpdate=true;
+          }
+          material.needsUpdate=true;
+        }
+      }});
       resolve(g.scene);
     },undefined,reject));
     this.modelCache.set(url,p);
@@ -273,6 +381,7 @@ export class Black2World3D {
 
   applyPlayer(p){
     if(!p||p.status==='unresolved')return;
+    const firstKnownPlayer=!this.player;
     const zoneChanged=this.player&&p.zone_id!==this.player.zone_id;
     this.player=p;
     const display=this._canonicalToDisplay(p.world||{});
@@ -283,7 +392,7 @@ export class Black2World3D {
     if(yaw!=null && this.playerVisualMode!=='original_billboard') this.playerAnchor.rotation.y=yaw*Math.PI/180;
     if(this.playerVisualMode==='original_billboard') this._updateBillboardFrame(p).catch(()=>{});
     this._updatePlayerHUD(p);
-    if(zoneChanged) this.refreshScene(true).catch(()=>{});
+    if(firstKnownPlayer||zoneChanged) this.refreshScene(true).catch(()=>{});
   }
 
 
@@ -348,7 +457,12 @@ export class Black2World3D {
   _disposeActorMarkers(){for(const [_,m] of this.actorMarkers){this.actorRoot.remove(m);this._disposeObject(m);}this.actorMarkers.clear();}
   _disposeGroup(g){for(const o of [...g.children])this._disposeObject(o);}
   _disposeObject(o){o.traverse?.(x=>{if(x.geometry)x.geometry.dispose?.();if(x.material){const ms=Array.isArray(x.material)?x.material:[x.material];for(const m of ms){if(m.map)m.map.dispose?.();m.dispose?.();}}});}
-  dispose(){this.disposed=true;this.renderer.dispose();this.controls.dispose();}
+  dispose(){
+    this.disposed=true;
+    this.renderer.domElement.removeEventListener('pointerdown',this._onCameraInteraction,true);
+    this.renderer.domElement.removeEventListener('wheel',this._onCameraInteraction,true);
+    this.renderer.dispose();this.controls.dispose();
+  }
 }
 
 export { esc };

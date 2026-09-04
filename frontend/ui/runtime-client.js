@@ -77,7 +77,8 @@
       ['player','/frontend/player-state.html','Player'],
       ['dialogue','/frontend/dialogue-inspector.html','Dialogue'],
       ['world','/frontend/map-runtime.html','World'],
-      ['original-map','/original-map','Original Map v5'],
+      ['original-map','/original-map','3D World Viewport'],
+      ['monitor','/runtime-monitor','Monitor'],
       ['dumper','/ram-dumper','RAM Dumper'],
       ['trainer','/frontend/trainer-state.html','Trainer'],
       ['tools','/frontend/controller.html','Tools']

@@ -143,6 +143,12 @@ class World3DSceneService:
     _identity_cache: dict[str, Any] | None = None
     _identity_time: float = 0.0
     _identity_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # A loaded BMD0/BTX0 visual binding is expensive to establish because it
+    # verifies headers against the current ARM9 map window.  It is therefore
+    # filled only by an explicit scene refresh and reused only while the same
+    # Zone/Matrix remains current.  This is display data, never a substitute
+    # for live player/actor state.
+    _loaded_visual_cache: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         if self.exported is None:
@@ -189,7 +195,7 @@ class World3DSceneService:
                     "y": 0.0,
                     "z": (float(cell["y"]) + 0.5) * span,
                 },
-                "asset_url": f"/api/v1/map/v5/terrain/{zone_id}/{cell['x']}/{cell['y']}.glb",
+                "asset_url": f"/api/v1/map/v5/terrain/{zone_id}/{cell['x']}/{cell['y']}/model.glb",
             })
         buildings = []
         for item in world.get("buildings", []):
@@ -205,7 +211,7 @@ class World3DSceneService:
                 "rotation_degrees": item.get("rotation_degrees"),
                 "door_uid": (item.get("resource") or {}).get("door_uid"),
                 "has_door_metadata": bool((item.get("resource") or {}).get("has_door_metadata")),
-                "asset_url": f"/api/v1/map/v5/building/{zone_id}/{item.get('model_uid')}.glb",
+                "asset_url": f"/api/v1/map/v5/building/{zone_id}/{item.get('model_uid')}/model.glb",
             })
         return {
             "format": "black2-world3d-static/v6",
@@ -226,11 +232,98 @@ class World3DSceneService:
             },
         }
 
-    async def current_scene(self, reader: MemoryReader, *, force_identity: bool = False) -> dict[str, Any]:
+    def _bind_loaded_visual(
+        self,
+        static: dict[str, Any],
+        visual: dict[str, Any] | None,
+    ) -> dict[str, Any]:
+        """Replace only terrain GLBs proven loaded with their BTX-matched URLs.
+
+        ``OriginalMapAssetService`` can render a ROM terrain model with the
+        area's default texture archive.  That is useful as a static fallback,
+        but not sufficient proof that it is the archive selected by the game.
+        ``/api/v1/map/visual`` establishes the BMD0+BTX0 pairing from the live
+        ARM9 window; retain static matrix placement and only replace matching
+        cell asset URLs with those verified GLBs.
+        """
+        if not visual:
+            static["visual_binding"] = {
+                "status": "unresolved",
+                "reason": "no explicit ARM9 BMD0/BTX0 visual refresh has completed",
+            }
+            return static
+
+        matrix = static.get("matrix") or {}
+        zone_id = static.get("zone_id")
+        aligned = bool((visual.get("player_alignment") or {}).get("verified"))
+        exact_zone = visual.get("map_definition_id") == zone_id
+        exact_matrix = visual.get("matrix_id") == matrix.get("matrix_id")
+        if not (visual.get("verified") and aligned and exact_zone and exact_matrix):
+            static["visual_binding"] = {
+                "status": "rejected",
+                "reason": "loaded visual does not match the current Zone/Matrix/player chunk",
+                "visual_zone_id": visual.get("map_definition_id"),
+                "visual_matrix_id": visual.get("matrix_id"),
+            }
+            return static
+
+        loaded = {}
+        rejected_models: list[int] = []
+        for model in visual.get("models") or []:
+            cell = model.get("cell") or {}
+            x, z = cell.get("x"), cell.get("y")
+            url = model.get("asset_url")
+            if not isinstance(x, int) or not isinstance(z, int) or not isinstance(url, str):
+                continue
+            if model.get("texture_candidate"):
+                rejected_models.append(model.get("model_id"))
+                continue
+            loaded[(x, z)] = model
+
+        bound_cells: list[dict[str, int]] = []
+        for terrain in static.get("terrains") or []:
+            cell = terrain.get("cell") or {}
+            key = (cell.get("x"), cell.get("z"))
+            model = loaded.get(key)
+            if model is None:
+                continue
+            terrain["asset_url"] = model["asset_url"]
+            terrain["texture_binding"] = {
+                "status": "verified",
+                "source": "ARM9 loaded BMD0 + ROM material-matched BTX0",
+                "model_id": model.get("model_id"),
+                "texture_id": model.get("texture_id"),
+                "texture_match": model.get("texture_match"),
+            }
+            bound_cells.append({"x": key[0], "z": key[1]})
+
+        cache_key = visual.get("cache_key") or (visual.get("cache") or {}).get("key")
+        static["visual_binding"] = {
+            "status": "verified" if bound_cells else "unresolved",
+            "source": "ARM9 loaded BMD0 + ROM material-matched BTX0",
+            "cache_key": cache_key,
+            "texture_id": visual.get("texture_id"),
+            "bound_cells": bound_cells,
+            "rejected_model_ids": rejected_models,
+        }
+        return static
+
+    async def current_scene(
+        self,
+        reader: MemoryReader,
+        *,
+        force_identity: bool = False,
+        loaded_visual: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         player = self.player_live()
-        identity = await self._refresh_identity(reader, force=force_identity)
         zone_id = player.get("zone_id") if isinstance(player.get("zone_id"), int) else None
-        verified_zone = ((identity.get("zone_identity") or {}).get("value") if identity else None)
+        # A browser refresh must never start a fresh 4 MiB discovery pass just
+        # because the player cache has not been resolved yet.  That work is an
+        # explicit reverse-engineering probe, not a normal render-loop task.
+        # It previously made ``/scene/current`` wait behind dozens of bridge
+        # reads and left the 3D UI on its loading screen indefinitely.
+        cached_identity = self._identity_cache
+        verified_zone = ((cached_identity.get("zone_identity") or {}).get("value") if cached_identity else None)
         if zone_id is None and isinstance(verified_zone, int):
             zone_id = verified_zone
         if zone_id is None:
@@ -238,19 +331,40 @@ class World3DSceneService:
                 "format": "black2-world3d-scene/v6",
                 "status": "unresolved",
                 "player": player,
-                "identity": identity,
+                "identity": cached_identity,
                 "reason": "no runtime ZoneID is available",
             }
+
+        # Full identity validation remains available only to an explicit
+        # caller.  Normal UI polling consumes the latest RAM-derived Player
+        # cache and any already-completed identity result.
+        identity = await self._refresh_identity(reader, force=True) if force_identity else cached_identity
         span = None
         runtime_mapper = (identity.get("runtime") or {}).get("mapper") if identity else None
         if runtime_mapper:
             span = runtime_mapper.get("chunk_span_world")
         static = self.static_scene(zone_id, live_span=span)
+        static_matrix = (static.get("matrix") or {}).get("matrix_id")
+        if loaded_visual is not None:
+            self._loaded_visual_cache = {
+                "zone_id": zone_id,
+                "matrix_id": static_matrix,
+                "visual": loaded_visual,
+            }
+        cached_visual = self._loaded_visual_cache or {}
+        matching_visual = (
+            cached_visual.get("visual")
+            if cached_visual.get("zone_id") == zone_id and cached_visual.get("matrix_id") == static_matrix
+            else None
+        )
+        static = self._bind_loaded_visual(static, matching_visual)
+        visual_key = (static.get("visual_binding") or {}).get("cache_key") or "rom-fallback"
         return {
             "format": "black2-world3d-scene/v6",
             "status": "resolved" if player.get("status") in {"resolved", "candidate"} else "candidate",
             "confidence": identity.get("confidence") if identity else player.get("confidence"),
             "scene_key": f"zone:{zone_id}:matrix:{(static.get('matrix') or {}).get('matrix_id')}",
+            "render_key": f"zone:{zone_id}:matrix:{static_matrix}:visual:{visual_key}",
             "zone_id": zone_id,
             "environment": static.get("environment"),
             "coordinate_space": "gen5-field-world-v1",

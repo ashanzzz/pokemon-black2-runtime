@@ -251,3 +251,10 @@ class SocketTransport(BizHawkTransport):
                 self.pending_futures.pop(req_id, None)
                 _bridge_log.warning("request_timeout op=%s id=%s timeout=%s", op, req_id, timeout)
                 raise TimeoutError(f"Bridge socket command '{op}' timed out after {timeout}s")
+            except asyncio.CancelledError:
+                # HTTP route time limits cancel the awaiting task.  Do not
+                # retain a ghost future: a later bridge response must not
+                # accumulate in ``pending_futures`` or block a fresh request.
+                self.pending_futures.pop(req_id, None)
+                _bridge_log.info("request_cancelled op=%s id=%s", op, req_id)
+                raise

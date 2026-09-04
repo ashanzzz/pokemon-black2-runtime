@@ -37,3 +37,6 @@ pi.exe
 Thumbs.db
 .idea/
 .vscode/
+.claude/
+node_modules/
+
