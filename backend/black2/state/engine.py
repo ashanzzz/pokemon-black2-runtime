@@ -73,8 +73,8 @@ class SemanticGameState(BaseModel):
     ready_for_input: bool = True
     suggested_buttons: List[str] = ["A"]
     map_section_id: Optional[int] = None
-    player_facing: str = "South"
-    movement_state: str = "Idle (静止)"
+    player_facing: str = "Unresolved"
+    movement_state: str = "Unresolved"
     player_world_pos: Dict[str, Any] = Field(
         default_factory=lambda: {"x": None, "y": None, "z": None}
     )

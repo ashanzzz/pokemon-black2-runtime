@@ -143,12 +143,22 @@ AI Agent & Native Map Viewer
 * **实时对话与时序流**：`GET /api/observer/presentation`
 * **全域硬件内存原子导出**：`POST /api/dev/dump_full_ram`
 * **快照清册与一键 ZIP**：`GET /api/dev/dumps`
+* **主角运行时状态工作台页面**：`http://127.0.0.1:8765/frontend/player-state.html`
+* **主角高频运行时状态 API**：`GET /api/v1/player/runtime`
 * **运行时 Field 对象解析**：`GET /api/v1/map/runtime/field`
 * **物理真理与 ROM 对齐地图**：`GET /api/v1/map/truth/current`
 
 ---
 
 ## 6. 版本里程碑与发布历史 (Milestone Releases)
+
+### `v2.2.0` - Player Runtime v3 & Cardinal Facing Coherence (2026-09-04)
+* **主角真实朝向与时序运动判定 (Player Runtime v3)**：
+  - 新增 `GET /api/v1/player/runtime` 与前端控制台 `player-state.html`。
+  - **朝向双源强闭环**：以 `FieldActor.FaceDir` 为主要物理事实，并与 `PlayerState.RotationAngle` (0=North, 0x4000=West, 0x8000=South, 0xC000=East) 进行 1:1 精确交叉校验（四方向实测 4/4 全部一致）。
+  - **明确区分 FaceDir 与 MotionDir**：`MotionDir` 仅作为动画/移动过渡方向，不篡改当前物理朝向。
+  - **逐帧速度与步态计算**：基于 `FieldActor.WPos` 真实连续位移与模拟器帧差，实时测算水平运动速度，摆脱对离散动画状态枚举的猜测。
+  - **升级 `runtime_field_resolver.py`**：进一步完善 Field -> Player -> Core -> GridPos/WPos/TileType 闭环链路。
 
 ### `v2.1.0` - Map Truth v2 & Full Non-ROM Hardware Memory Exporter (2026-09-04)
 * **Map Truth v2 闭环落地**：

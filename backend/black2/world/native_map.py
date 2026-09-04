@@ -17,6 +17,7 @@ from ..memory.reader import MemoryReader
 from ..decoders.field import get_map_name
 from .rom_maps import NativeMapEngine
 from .rom_reader import NarcArchive
+from .runtime_player_state import player_runtime_service
 from .runtime_field_resolver import RuntimeFieldLocator
 
 
@@ -44,8 +45,8 @@ class LiveMapState:
     y: int | None
     elevation: int | None
     verified: bool
-    facing: str = "South"
-    movement_state: str = "Idle"
+    facing: str = "Unresolved"
+    movement_state: str = "Unresolved"
 
 
 def _bytes_from_result(result: dict[str, Any]) -> bytes:
@@ -60,55 +61,49 @@ def _u16(data: bytes) -> int:
 
 
 async def read_live_map_state(reader: MemoryReader) -> LiveMapState:
-    """Resolve the live player through Field -> FieldPlayerCore -> FieldActor.
+    """Resolve the live player from the runtime Field object graph.
 
-    The first successful call performs one structural discovery pass across
-    Main RAM. Later calls use bounded reads and validate every cached back
-    pointer. No absolute runtime object address is hard-coded.
+    FaceDir is authoritative for current cardinal orientation and is checked
+    against PlayerState.RotationAngle.  No fixed pseudo-player address is used.
     """
-    last_error: Exception | None = None
-    for attempt in range(3):
-        try:
-            sample = await _RUNTIME_FIELD_LOCATOR.sample_player(reader)
-            gpos = sample.get("grid_position") or {}
-            if (
-                sample.get("status") in {"resolved", "candidate"}
-                and gpos.get("x") is not None
-                and gpos.get("z") is not None
-            ):
-                # ``map_id`` historically meant a legacy Map-Section mirror.
-                # Runtime PlayerState.ZoneID is deliberately *not* stuffed into
-                # that field; MapTruthService resolves the Map Header separately.
-                return LiveMapState(
-                    map_id=None,
-                    x=int(gpos["x"]),
-                    y=int(gpos["z"]),
-                    elevation=int(gpos.get("y") or 0),
-                    verified=sample.get("confidence") == "probable",
-                    facing=str(sample.get("facing") or "Unresolved"),
-                    movement_state=str(sample.get("move_status") or "Unresolved"),
-                )
-            last_error = NativeMapError(sample.get("reason", "runtime Field player is unresolved"))
-        except (ConnectionError, TimeoutError, OSError, RuntimeError) as error:
-            last_error = error
-        if attempt < 2:
-            await asyncio.sleep(0.05)
-
-    # Keep the old map-ID mirrors only as a candidate fallback.  They never
-    # fabricate a player position and therefore cannot anchor a rendered map.
-    fallback_error: Exception | None = None
-    for attempt in range(3):
-        try:
-            results = await reader.read_batch_ranges(_live_state_ranges())
-            if results:
-                return _decode_live_map_state(results)
-            fallback_error = NativeMapError("BizHawk bridge returned an empty map-state batch")
-        except (ConnectionError, TimeoutError, OSError, RuntimeError) as error:
-            fallback_error = error
-        if attempt < 2:
-            await asyncio.sleep(0.05)
-    raise NativeMapError("BizHawk bridge is connected but Field runtime is unresolved") from (last_error or fallback_error)
-
+    sample = await player_runtime_service.sample(reader)
+    if sample.get("status") not in {"resolved", "candidate"}:
+        fallback_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                results = await reader.read_batch_ranges(_live_state_ranges())
+                if results:
+                    return _decode_live_map_state(results)
+                fallback_error = NativeMapError("BizHawk bridge returned an empty map-state batch")
+            except (ConnectionError, TimeoutError, OSError, RuntimeError) as error:
+                fallback_error = error
+            if attempt < 2:
+                await asyncio.sleep(0.05)
+        return LiveMapState(
+            map_id=None, x=None, y=None, elevation=None, verified=False,
+            facing="Unresolved", movement_state="Unresolved",
+        )
+    position = sample.get("position", {}).get("grid", {})
+    orientation = sample.get("orientation", {})
+    locomotion = sample.get("locomotion", {})
+    x = position.get("x")
+    z = position.get("z")
+    elevation = position.get("y")
+    verified = bool(
+        sample.get("status") == "resolved"
+        and orientation.get("verified")
+        and isinstance(x, int) and isinstance(z, int)
+    )
+    return LiveMapState(
+        # ZoneID / Map Header is not silently relabelled as Map Section ID.
+        map_id=None,
+        x=x if verified else None,
+        y=z if verified else None,
+        elevation=elevation if verified else None,
+        verified=verified,
+        facing=orientation.get("facing", "Unresolved") if verified else "Unresolved",
+        movement_state=locomotion.get("semantic_state", "Unresolved") if verified else "Unresolved",
+    )
 
 def _live_state_ranges() -> list[dict[str, int | str]]:
     return [

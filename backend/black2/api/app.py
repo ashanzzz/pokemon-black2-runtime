@@ -1,4 +1,4 @@
-﻿# Pokémon Black 2 AI Semantic Runtime - FastAPI Web & Bridge API Server
+# Pokémon Black 2 AI Semantic Runtime - FastAPI Web & Bridge API Server
 
 import os
 import asyncio
@@ -37,6 +37,7 @@ from .map_routes import (
     start_cache_observer,
     stop_cache_observer,
 )
+from .player_routes import configure_player_routes, router as player_router
 
 
 # Global singletons
@@ -49,6 +50,7 @@ onboarding_flow: OnboardingFlow = OnboardingFlow(client, state_engine)
 doctor: BizHawkDoctor = BizHawkDoctor(client)
 dev_wb: DeveloperTestWorkbench = init_dev_workbench(client, state_engine)
 configure_map_routes(memory_reader, client)
+configure_player_routes(memory_reader)
 
 
 @asynccontextmanager
@@ -76,6 +78,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(map_router)
+app.include_router(player_router)
 
 
 class PressButtonRequest(BaseModel):

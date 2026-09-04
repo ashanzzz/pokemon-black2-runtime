@@ -41,6 +41,43 @@ PLAYER_CORE = {
     "move_status": 0x14,
     "sex": 0x18,
     "actor": 0x1C,
+    "key_move_dir_h": 0x20,
+    "key_move_dir_v": 0x22,
+    "special_sequence": 0x24,
+    "terrain_fx_tcb": 0x28,
+    "field_2c": 0x2C,
+    "field_2e": 0x2E,
+    "state_change_func_idx": 0x30,
+    "is_state_change_done": 0x32,
+}
+PLAYER_STATE = {
+    "zone_id": 0x00,
+    "vec_x": 0x04,
+    "vec_y": 0x08,
+    "vec_z": 0x0C,
+    "rail_component_id": 0x10,
+    "rail_component_is_line": 0x12,
+    "rail_direction": 0x13,
+    "rail_pos_side": 0x14,
+    "rail_pos_front": 0x16,
+    "rotation_angle": 0x18,
+    "field_1a": 0x1A,
+    "is_pos_rail": 0x1B,
+    "now_objcode": 0x1C,
+    "field_1e": 0x1E,
+    "ex_state": 0x40,
+}
+PLAYER_GRID = {
+    "status": 0x00,
+    "last_command": 0x04,
+    "flags": 0x08,
+    "core": 0x0C,
+    "field": 0x10,
+    "catwalk_focus_break_counter": 0x14,
+    "catwalk_interrupted_by_menu": 0x16,
+    "now_sfx": 0x18,
+    "sfx_counter": 0x1A,
+    "vertical_move_only": 0x1C,
 }
 ACTOR_SYSTEM = {
     "capacity": 0x04,
@@ -64,6 +101,9 @@ ACTOR = {
     "default_dir": 0x16,
     "face_dir": 0x18,
     "motion_dir": 0x1A,
+    "last_face_dir": 0x1C,
+    "last_motion_dir": 0x1E,
+    "next_acmd": 0x26,
     "gpos_x": 0x3C,
     "gpos_y": 0x3E,
     "gpos_z": 0x40,
@@ -72,6 +112,15 @@ ACTOR = {
     "wpos_z": 0x4C,
     "tile_class": 0x74,
     "tile_flags": 0x76,
+    "tile_orig_y_class": 0x78,
+    "tile_orig_y_flags": 0x7A,
+    "collision_width": 0x7C,
+    "collision_height": 0x7D,
+    "model_pos_offset_x": 0x7E,
+    "model_pos_offset_y": 0x7F,
+    "model_pos_offset_z": 0x80,
+    "shadow_group": 0x81,
+    "tcb": 0x84,
     "actor_system": 0x88,
 }
 MAPPER = {
@@ -157,8 +206,13 @@ PROP_INFO = {
 PROP_INSTANCE_STRIDE = 0x14
 
 DIRECTIONS = {0: "North", 1: "South", 2: "West", 3: "East", 8: "Any", 9: "None"}
+DIRECTION_ZH = {0: "上", 1: "下", 2: "左", 3: "右", 8: "任意", 9: "无"}
+ROTATION_TO_DIRECTION = {0x0000: 0, 0x8000: 1, 0x4000: 2, 0xC000: 3}
 MOVE_STATUS = {0: "Stand", 1: "Move", 2: "Turn"}
 ACTION_STATUS = {0: "Idle", 1: "Begin", 2: "Performing", 3: "Finished"}
+GRID_STATUS = {0: "Idle", 1: "Move", 2: "Turn", 3: "Brake", 4: "Catwalk", 5: "CatwalkExit", 6: "CatwalkExitWait", 7: "Fall"}
+GRID_COMMAND = {0: "Busy", 1: "Idle", 2: "Move", 3: "Turn", 4: "Brake", 5: "Jump", 6: "CatwalkBalance", 7: "CatwalkExit", 8: "CatwalkExitWait", 9: "Fall"}
+EX_STATE = {0: "OnFoot", 1: "Cycling", 2: "Surf", 3: "Dive"}
 
 
 @dataclass(frozen=True)
@@ -335,6 +389,8 @@ def _decode_actor(r: _Ram, address: int, actor_system: int | None = None) -> dic
     }
     face = r.u16(address, ACTOR["face_dir"])
     motion = r.u16(address, ACTOR["motion_dir"])
+    last_face = r.u16(address, ACTOR["last_face_dir"])
+    last_motion = r.u16(address, ACTOR["last_motion_dir"])
     return {
         "address": f"0x{address:08X}",
         "flags": r.u32(address, ACTOR["flags"]),
@@ -346,9 +402,18 @@ def _decode_actor(r: _Ram, address: int, actor_system: int | None = None) -> dic
         "event_type": r.u16(address, ACTOR["event_type"]),
         "spawn_flag": r.u16(address, ACTOR["spawn_flag"]),
         "script_id": r.u16(address, ACTOR["script_id"]),
+        "default_direction_raw": r.u16(address, ACTOR["default_dir"]),
         "default_direction": DIRECTIONS.get(r.u16(address, ACTOR["default_dir"]), r.u16(address, ACTOR["default_dir"])),
+        "face_direction_raw": face,
         "facing": DIRECTIONS.get(face, face),
+        "facing_zh": DIRECTION_ZH.get(face, str(face)),
+        "motion_direction_raw": motion,
         "motion_direction": DIRECTIONS.get(motion, motion),
+        "last_face_direction_raw": last_face,
+        "last_facing": DIRECTIONS.get(last_face, last_face),
+        "last_motion_direction_raw": last_motion,
+        "last_motion_direction": DIRECTIONS.get(last_motion, last_motion),
+        "next_acmd_raw": r.u16(address, ACTOR["next_acmd"]),
         "grid_position": gpos,
         "world_position_fx32": {
             "x": r.s32(address, ACTOR["wpos_x"]),
@@ -363,7 +428,18 @@ def _decode_actor(r: _Ram, address: int, actor_system: int | None = None) -> dic
         "tile_under": {
             "class": r.u16(address, ACTOR["tile_class"]),
             "flags": r.u16(address, ACTOR["tile_flags"]),
+            "original_y_class": r.u16(address, ACTOR["tile_orig_y_class"]),
+            "original_y_flags": r.u16(address, ACTOR["tile_orig_y_flags"]),
             "semantic_status": "raw TileType; class/flag gameplay meaning is not inferred",
+        },
+        "collision_box": {
+            "width": r.u8(address, ACTOR["collision_width"]),
+            "height": r.u8(address, ACTOR["collision_height"]),
+        },
+        "model_position_offset": {
+            "x": r.u8(address, ACTOR["model_pos_offset_x"]),
+            "y": r.u8(address, ACTOR["model_pos_offset_y"]),
+            "z": r.u8(address, ACTOR["model_pos_offset_z"]),
         },
         "actor_system_backref": f"0x{(r.u32(address, ACTOR['actor_system']) or 0):08X}",
         "structure_coherent": (
@@ -698,14 +774,43 @@ def resolve_runtime_field_from_ram(ram: bytes, *, frame: int | None = None) -> d
     core_action = r.u32(core, PLAYER_CORE["action_status"]) if r.valid_ptr(core) else None
     core_move = r.u32(core, PLAYER_CORE["move_status"]) if r.valid_ptr(core) else None
     player_state = r.u32(core, PLAYER_CORE["state"]) if r.valid_ptr(core) else None
+    player_grid = r.u32(player, PLAYER["grid"]) if r.valid_ptr(player) else None
+    rotation = r.u16(player_state, PLAYER_STATE["rotation_angle"]) if r.valid_ptr(player_state) else None
+    rotation_dir = ROTATION_TO_DIRECTION.get(rotation)
+    face_dir = r.u16(player_actor, ACTOR["face_dir"]) if r.valid_ptr(player_actor) else None
+    grid_status = r.u32(player_grid, PLAYER_GRID["status"]) if r.valid_ptr(player_grid) else None
+    grid_cmd = r.u32(player_grid, PLAYER_GRID["last_command"]) if r.valid_ptr(player_grid) else None
+    ex_state = r.u32(player_state, PLAYER_STATE["ex_state"]) if r.valid_ptr(player_state) else None
     player_block = {
         "field_player": f"0x{(player or 0):08X}",
         "field_player_core": f"0x{(core or 0):08X}",
+        "field_player_grid": f"0x{(player_grid or 0):08X}",
         "player_state": f"0x{(player_state or 0):08X}",
-        "zone_id": r.u16(player_state, 0x00) if r.valid_ptr(player_state) else None,
+        "zone_id": r.u16(player_state, PLAYER_STATE["zone_id"]) if r.valid_ptr(player_state) else None,
         "actor": player_data,
+        "orientation": {
+            "face_dir_raw": face_dir,
+            "facing": DIRECTIONS.get(face_dir, face_dir),
+            "facing_zh": DIRECTION_ZH.get(face_dir, str(face_dir)),
+            "rotation_angle_raw": rotation,
+            "rotation_angle_hex": f"0x{rotation:04X}" if rotation is not None else None,
+            "rotation_direction_raw": rotation_dir,
+            "rotation_direction": DIRECTIONS.get(rotation_dir, rotation_dir),
+            "sources_agree": face_dir in (0, 1, 2, 3) and rotation_dir == face_dir,
+        },
+        "action_status_raw": core_action,
         "action_status": ACTION_STATUS.get(core_action, core_action),
+        "move_status_raw": core_move,
         "move_status": MOVE_STATUS.get(core_move, core_move),
+        "grid_status_raw": grid_status,
+        "grid_status": GRID_STATUS.get(grid_status, grid_status),
+        "grid_last_command_raw": grid_cmd,
+        "grid_last_command": GRID_COMMAND.get(grid_cmd, grid_cmd),
+        "ex_state_raw": ex_state,
+        "ex_state": EX_STATE.get(ex_state, ex_state),
+        "key_move_dir_h": r.u16(core, PLAYER_CORE["key_move_dir_h"]) if r.valid_ptr(core) else None,
+        "key_move_dir_v": r.u16(core, PLAYER_CORE["key_move_dir_v"]) if r.valid_ptr(core) else None,
+        "special_sequence": r.u32(core, PLAYER_CORE["special_sequence"]) if r.valid_ptr(core) else None,
         "sex_raw": r.u32(core, PLAYER_CORE["sex"]) if r.valid_ptr(core) else None,
         "chunk_matches_gpos": chunk_consistency,
     }
@@ -761,7 +866,7 @@ async def read_main_ram(reader: MemoryReader, *, chunk_size: int = 0x20000) -> b
     blocks = []
     for offset in range(0, MAIN_RAM_SIZE, chunk_size):
         size = min(chunk_size, MAIN_RAM_SIZE - offset)
-        block = await reader.read_bytes(offset, size, "Main RAM", timeout=10.0)
+        block = await reader.read_bytes(offset, size, "Main RAM")
         if len(block) != size:
             raise RuntimeError(
                 f"Main RAM read truncated at 0x{offset:06X}: expected {size}, got {len(block)}"
@@ -823,6 +928,7 @@ class RuntimeFieldLocator:
                 "mapper": int(mapper["address"], 16),
                 "player": int(player["field_player"], 16),
                 "core": int(player["field_player_core"], 16),
+                "grid": int(player["field_player_grid"], 16),
                 "state": int(player["player_state"], 16),
                 "player_actor": int(player["actor"]["address"], 16),
                 "actor_system": int(actor_system["address"], 16),
@@ -848,16 +954,26 @@ class RuntimeFieldLocator:
             {"id": "mapper", "addr": a["mapper"], "length": 0x78},
             {"id": "player", "addr": a["player"], "length": 0x10},
             {"id": "core", "addr": a["core"], "length": 0x40},
-            {"id": "state", "addr": a["state"], "length": 0x48},
+            {"id": "grid", "addr": a["grid"], "length": 0x20},
+            {"id": "state", "addr": a["state"], "length": 0x44},
             {"id": "actor", "addr": a["player_actor"], "length": ACTOR["stride"]},
             {"id": "actor_system", "addr": a["actor_system"], "length": 0x50},
         ]
-        results = await reader.read_batch_ranges(ranges)
+        payload = await reader.read_batch_snapshot(ranges)
+        results = payload.get("results", {}) if isinstance(payload, dict) else {}
+        frame = int(payload.get("frame", 0)) if isinstance(payload, dict) else 0
         blobs = {key: _result_bytes(results.get(key, {})) for key in (
-            "field", "mapper", "player", "core", "state", "actor", "actor_system"
+            "field", "mapper", "player", "core", "grid", "state", "actor", "actor_system"
         )}
         if any(not blob for blob in blobs.values()):
             return None
+
+        def u8(name: str, off: int) -> int:
+            return blobs[name][off]
+
+        def s8(name: str, off: int) -> int:
+            value = blobs[name][off]
+            return value - 256 if value >= 128 else value
 
         def u16(name: str, off: int) -> int:
             return int.from_bytes(blobs[name][off:off + 2], "little")
@@ -877,9 +993,12 @@ class RuntimeFieldLocator:
             u32("field", FIELD["actor_system"]) == a["actor_system"],
             u32("player", PLAYER["field"]) == a["field"],
             u32("player", PLAYER["core"]) == a["core"],
+            u32("player", PLAYER["grid"]) == a["grid"],
             u32("core", PLAYER_CORE["field"]) == a["field"],
             u32("core", PLAYER_CORE["state"]) == a["state"],
             u32("core", PLAYER_CORE["actor"]) == a["player_actor"],
+            u32("grid", PLAYER_GRID["core"]) == a["core"],
+            u32("grid", PLAYER_GRID["field"]) == a["field"],
             u32("actor", ACTOR["actor_system"]) == a["actor_system"],
             u32("actor_system", ACTOR_SYSTEM["field"]) == a["field"],
             u32("actor_system", ACTOR_SYSTEM["g3d_mapper"]) == a["mapper"],
@@ -914,31 +1033,136 @@ class RuntimeFieldLocator:
                 chunk_matches = gpos["x"] // size == chunk["x"] and gpos["z"] // size == chunk["y"]
 
         face = u16("actor", ACTOR["face_dir"])
+        motion = u16("actor", ACTOR["motion_dir"])
+        last_face = u16("actor", ACTOR["last_face_dir"])
+        last_motion = u16("actor", ACTOR["last_motion_dir"])
+        rotation = u16("state", PLAYER_STATE["rotation_angle"])
+        rotation_dir = ROTATION_TO_DIRECTION.get(rotation)
+        orientation_agrees = face in (0, 1, 2, 3) and rotation_dir == face
+
         move = u32("core", PLAYER_CORE["move_status"])
         action = u32("core", PLAYER_CORE["action_status"])
+        grid_status = u32("grid", PLAYER_GRID["status"])
+        grid_command = u32("grid", PLAYER_GRID["last_command"])
+        ex_state = u32("state", PLAYER_STATE["ex_state"])
+
+        if grid_status == 7 or grid_command == 9:
+            phase = "Fall"
+        elif grid_status in (4, 5, 6) or grid_command in (6, 7, 8):
+            phase = GRID_STATUS.get(grid_status, GRID_COMMAND.get(grid_command, "Catwalk"))
+        elif grid_status == 3 or grid_command == 4:
+            phase = "Brake"
+        elif move == 2 or grid_status == 2 or grid_command == 3:
+            phase = "Turning"
+        elif move == 1 or grid_status == 1 or grid_command == 2:
+            phase = "Moving"
+        elif move == 0 and grid_status == 0:
+            phase = "Idle"
+        else:
+            phase = "Unknown"
+
+        transport = EX_STATE.get(ex_state, f"Unknown({ex_state})")
+        if transport == "Cycling":
+            semantic_movement = "Cycling (骑行)" if phase == "Moving" else f"Cycling · {phase}"
+        elif transport == "Surf":
+            semantic_movement = "Surfing (冲浪)" if phase == "Moving" else f"Surf · {phase}"
+        elif transport == "Dive":
+            semantic_movement = "Diving (潜水)" if phase == "Moving" else f"Dive · {phase}"
+        elif phase == "Idle":
+            semantic_movement = "Idle (静止)"
+        elif phase == "Turning":
+            semantic_movement = "Turning (原地转向)"
+        elif phase == "Moving":
+            semantic_movement = "On-foot moving (步行/跑步待速度判定)"
+        else:
+            semantic_movement = phase
+
+        world_fx = {
+            "x": s32("actor", ACTOR["wpos_x"]),
+            "y": s32("actor", ACTOR["wpos_y"]),
+            "z": s32("actor", ACTOR["wpos_z"]),
+        }
         return {
-            "format": "black2-runtime-player-live/v2",
-            "status": "resolved" if chunk_matches else "candidate",
-            "confidence": self.discovery_confidence if chunk_matches else "candidate",
+            "format": "black2-runtime-player-live/v3",
+            "status": "resolved" if chunk_matches and orientation_agrees else "candidate",
+            "confidence": self.discovery_confidence if chunk_matches and orientation_agrees else "candidate",
+            "frame": frame,
             "root": {key: f"0x{value:08X}" for key, value in a.items()},
-            "zone_id": u16("state", 0x00),
-            "grid_position": gpos,
-            "world_position_fx32": {
-                "x": s32("actor", ACTOR["wpos_x"]),
-                "y": s32("actor", ACTOR["wpos_y"]),
-                "z": s32("actor", ACTOR["wpos_z"]),
+            "zone_id": u16("state", PLAYER_STATE["zone_id"]),
+            "position": {
+                "grid": gpos,
+                "world_fx32": world_fx,
+                "world": {axis: _fx32(value) for axis, value in world_fx.items()},
+                "player_state_vec_fx32": {
+                    "x": s32("state", PLAYER_STATE["vec_x"]),
+                    "y": s32("state", PLAYER_STATE["vec_y"]),
+                    "z": s32("state", PLAYER_STATE["vec_z"]),
+                },
+                "is_rail_position": bool(u8("state", PLAYER_STATE["is_pos_rail"])),
             },
-            "world_position": {
-                "x": _fx32(s32("actor", ACTOR["wpos_x"])),
-                "y": _fx32(s32("actor", ACTOR["wpos_y"])),
-                "z": _fx32(s32("actor", ACTOR["wpos_z"])),
+            "orientation": {
+                "verified": orientation_agrees,
+                "primary_source": "FieldActor.FaceDir",
+                "cross_check_source": "PlayerState.RotationAngle",
+                "face_dir_raw": face,
+                "facing": DIRECTIONS.get(face, face),
+                "facing_zh": DIRECTION_ZH.get(face, str(face)),
+                "rotation_angle_raw": rotation,
+                "rotation_angle_hex": f"0x{rotation:04X}",
+                "rotation_direction_raw": rotation_dir,
+                "rotation_direction": DIRECTIONS.get(rotation_dir, rotation_dir),
+                "sources_agree": orientation_agrees,
+                "motion_dir_raw": motion,
+                "motion_direction": DIRECTIONS.get(motion, motion),
+                "last_face_dir_raw": last_face,
+                "last_facing": DIRECTIONS.get(last_face, last_face),
+                "last_motion_dir_raw": last_motion,
+                "last_motion_direction": DIRECTIONS.get(last_motion, last_motion),
+                "next_acmd_raw": u16("actor", ACTOR["next_acmd"]),
+                "note": "MotionDir is animation/motion direction and is not used as the authoritative current facing.",
             },
-            "facing": DIRECTIONS.get(face, face),
-            "move_status": MOVE_STATUS.get(move, move),
-            "action_status": ACTION_STATUS.get(action, action),
-            "tile_under": {
-                "class": u16("actor", ACTOR["tile_class"]),
-                "flags": u16("actor", ACTOR["tile_flags"]),
+            "locomotion": {
+                "semantic_state": semantic_movement,
+                "phase": phase,
+                "transport_mode_raw": ex_state,
+                "transport_mode": transport,
+                "gait": "NotApplicable" if transport != "OnFoot" else ("Stationary" if phase != "Moving" else "UnresolvedWalkVsRun"),
+                "gait_confidence": "unresolved" if transport == "OnFoot" and phase == "Moving" else "verified-enum",
+                "move_status_raw": move,
+                "move_status": MOVE_STATUS.get(move, move),
+                "grid_status_raw": grid_status,
+                "grid_status": GRID_STATUS.get(grid_status, grid_status),
+                "grid_last_command_raw": grid_command,
+                "grid_last_command": GRID_COMMAND.get(grid_command, grid_command),
+                "action_status_raw": action,
+                "action_status": ACTION_STATUS.get(action, action),
+                "key_move_dir_h": u16("core", PLAYER_CORE["key_move_dir_h"]),
+                "key_move_dir_v": u16("core", PLAYER_CORE["key_move_dir_v"]),
+                "special_sequence": u32("core", PLAYER_CORE["special_sequence"]),
+                "state_change_func_idx": u16("core", PLAYER_CORE["state_change_func_idx"]),
+                "state_change_done": bool(u16("core", PLAYER_CORE["is_state_change_done"])),
+                "grid_flags_raw": u32("grid", PLAYER_GRID["flags"]),
+                "vertical_move_only": bool(u32("grid", PLAYER_GRID["vertical_move_only"])),
+                "actor_movement_flags_raw": u32("actor", ACTOR["movement_flags"]),
+            },
+            "environment": {
+                "tile_under": {
+                    "class": u16("actor", ACTOR["tile_class"]),
+                    "flags": u16("actor", ACTOR["tile_flags"]),
+                },
+                "tile_under_original_y": {
+                    "class": u16("actor", ACTOR["tile_orig_y_class"]),
+                    "flags": u16("actor", ACTOR["tile_orig_y_flags"]),
+                },
+                "collision_box": {
+                    "width": u8("actor", ACTOR["collision_width"]),
+                    "height": u8("actor", ACTOR["collision_height"]),
+                },
+                "model_position_offset": {
+                    "x": s8("actor", ACTOR["model_pos_offset_x"]),
+                    "y": s8("actor", ACTOR["model_pos_offset_y"]),
+                    "z": s8("actor", ACTOR["model_pos_offset_z"]),
+                },
             },
             "mapper": {
                 "matrix_width": width,
@@ -951,6 +1175,11 @@ class RuntimeFieldLocator:
                     "x": blobs["mapper"][MAPPER["load_diameter_x"]],
                     "z": blobs["mapper"][MAPPER["load_diameter_z"]],
                 },
+            },
+            "evidence": {
+                "structure_coherent": True,
+                "orientation_crosscheck": orientation_agrees,
+                "walk_run_status": "requires moving labeled samples or a separately verified gait field; not guessed from MotionDir",
             },
         }
 

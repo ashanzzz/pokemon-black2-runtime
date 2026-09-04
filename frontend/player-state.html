@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Player Runtime Workbench · Pokémon Black 2</title>
+<style>
+:root{--bg:#080b10;--panel:#0d121a;--panel2:#101722;--line:#253040;--line2:#182231;--text:#d8e1ec;--muted:#758399;--cyan:#58c8e8;--green:#6fd39a;--amber:#e4b463;--red:#e37d7d;--purple:#aa8cff;--blue:#75a7ff}*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 15% -10%,#10202b 0,transparent 30%),var(--bg);color:var(--text);font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}.top{height:62px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#090d13e8;position:sticky;top:0;z-index:10;backdrop-filter:blur(10px)}h1{font-size:15px;margin:0}.sub{color:var(--muted);font-size:11px;margin-top:3px}.statusline{display:flex;gap:8px;align-items:center}.pill{border:1px solid var(--line);background:#0e1620;padding:5px 8px;border-radius:5px;color:var(--muted)}.pill.ok{color:var(--green);border-color:#28503e}.pill.warn{color:var(--amber);border-color:#5c4724}.layout{display:grid;grid-template-columns:300px minmax(460px,1fr) 390px;gap:12px;padding:12px;max-width:1800px;margin:auto}.stack{display:flex;flex-direction:column;gap:12px}.panel{background:linear-gradient(180deg,#101720,#0c1118);border:1px solid var(--line);border-radius:7px;overflow:hidden}.ph{height:37px;padding:0 11px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line2);background:#0f1620}.ph b{font-size:11px;letter-spacing:.4px}.tag{font-size:10px;border:1px solid var(--line);padding:2px 5px;border-radius:3px;color:var(--muted)}.body{padding:10px}.hero{padding:14px}.bigstate{font-size:22px;font-weight:800;margin:3px 0;color:#f2f6fb}.transport{color:var(--cyan);font-size:12px}.compass{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,54px);gap:5px;margin:13px 0}.dir{border:1px solid var(--line2);border-radius:5px;display:flex;align-items:center;justify-content:center;background:#0a1017;color:#4f5c70;font-size:17px}.dir.on{color:#e9fbff;border-color:#3e91a8;background:#112630;box-shadow:inset 0 0 0 1px #58c8e833}.dir.center{font-size:10px;color:var(--muted)}.kv{display:grid;grid-template-columns:145px minmax(0,1fr);min-height:27px;border-bottom:1px solid #151e2a}.kv:last-child{border-bottom:0}.k{padding:6px 8px;color:var(--muted)}.v{padding:6px 8px;text-align:right;overflow:hidden;text-overflow:ellipsis}.addr{color:#7893af}.good{color:var(--green)}.bad{color:var(--red)}.accent{color:var(--cyan)}.amber{color:var(--amber)}.purple{color:var(--purple)}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}.metric{background:#090f16;border:1px solid var(--line2);border-radius:5px;padding:9px}.metric .label{color:var(--muted);font-size:10px}.metric .num{font-size:15px;font-weight:700;margin-top:2px}.layers{display:grid;grid-template-columns:1fr 1fr;gap:12px}.memory{border-left:2px solid var(--blue)}.memory.state{border-left-color:var(--purple)}.memory.grid{border-left-color:var(--amber)}.memory.actor{border-left-color:var(--green)}.evidence{font-size:11px}.ev{display:flex;gap:8px;padding:7px 0;border-bottom:1px solid var(--line2)}.dot{width:8px;height:8px;border-radius:50%;background:#59677c;margin-top:4px;flex:0 0 auto}.dot.ok{background:var(--green)}.dot.warn{background:var(--amber)}button{font:inherit;color:var(--text);background:#131c28;border:1px solid #34445b;border-radius:5px;padding:7px 9px;cursor:pointer}button:hover{border-color:#61738b;background:#172231}button.primary{border-color:#2c6a7d;color:#9ceaff}button.run{border-color:#6c5125;color:#ffd38c}button.danger{border-color:#653737;color:#f0a0a0}.buttons{display:flex;gap:7px;flex-wrap:wrap}.stategrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.statebox{border:1px solid var(--line2);border-radius:5px;padding:8px;background:#090f16}.statebox b{display:block;margin-bottom:3px}.statebox small{color:var(--muted)}.statebox.active{border-color:#3c7c62;background:#0d1b17}.raw{white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto;color:#8ea1b8;background:#080d13;padding:8px;border:1px solid var(--line2);border-radius:4px}.foot{padding:0 12px 14px;color:var(--muted);max-width:1800px;margin:auto}@media(max-width:1200px){.layout{grid-template-columns:280px 1fr}.right{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px}}@media(max-width:780px){.layout{grid-template-columns:1fr}.layers,.grid2,.right{grid-template-columns:1fr}.stategrid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<header class="top"><div><h1>PLAYER RUNTIME WORKBENCH</h1><div class="sub">Field → FieldPlayer → Core / Grid / PlayerState → PlayerActor · IREJ v1.1</div></div><div class="statusline"><span id="resolver" class="pill">resolver --</span><span id="frame" class="pill">frame --</span><span id="conn" class="pill">polling</span></div></header>
+<main class="layout">
+<section class="stack">
+  <div class="panel hero"><div class="sub">SEMANTIC PLAYER STATE</div><div id="semantic" class="bigstate">UNRESOLVED</div><div id="transport" class="transport">--</div>
+    <div class="compass"><div></div><div id="d0" class="dir">↑</div><div></div><div id="d2" class="dir">←</div><div class="dir center">FACE DIR</div><div id="d3" class="dir">→</div><div></div><div id="d1" class="dir">↓</div><div></div></div>
+    <div class="grid2"><div class="metric"><div class="label">GRID POSITION</div><div id="gpos" class="num">--</div></div><div class="metric"><div class="label">WORLD POSITION</div><div id="wpos" class="num">--</div></div></div>
+  </div>
+  <div class="panel"><div class="ph"><b>运动判定</b><span class="tag">derived</span></div><div class="body">
+    <div class="grid2"><div class="metric"><div class="label">Phase</div><div id="phase" class="num">--</div></div><div class="metric"><div class="label">Gait</div><div id="gait" class="num">--</div></div><div class="metric"><div class="label">Horizontal speed</div><div id="speed" class="num">--</div></div><div class="metric"><div class="label">Transport</div><div id="mode" class="num">--</div></div></div>
+  </div></div>
+  <div class="panel"><div class="ph"><b>走路 / 跑步速度标定</b><span class="tag">operator labelled</span></div><div class="body">
+    <div class="buttons"><button class="primary" onclick="calibrate('walk')">记录当前为走路</button><button class="run" onclick="calibrate('run')">记录当前为跑步</button><button class="danger" onclick="clearCal()">清空标定</button></div>
+    <div id="calText" class="sub" style="margin-top:9px">需要各至少一个稳定移动样本。</div>
+  </div></div>
+</section>
+<section class="stack">
+  <div class="layers">
+    <div class="panel memory state"><div class="ph"><b>PlayerState</b><span id="addrState" class="tag">--</span></div><div id="stateRows"></div></div>
+    <div class="panel memory"><div class="ph"><b>FieldPlayerCore</b><span id="addrCore" class="tag">--</span></div><div id="coreRows"></div></div>
+    <div class="panel memory grid"><div class="ph"><b>FieldPlayerGrid</b><span id="addrGrid" class="tag">--</span></div><div id="gridRows"></div></div>
+    <div class="panel memory actor"><div class="ph"><b>Player FieldActor</b><span id="addrActor" class="tag">--</span></div><div id="actorRows"></div></div>
+  </div>
+  <div class="panel"><div class="ph"><b>原生状态分类</b><span class="tag">Swan enums</span></div><div class="body"><div class="stategrid">
+    <div id="sIdle" class="statebox"><b>Idle</b><small>Stand + Grid Idle</small></div><div id="sTurn" class="statebox"><b>Turn</b><small>MoveStatus TURN</small></div><div id="sMove" class="statebox"><b>Move</b><small>Grid MOVE</small></div><div id="sBrake" class="statebox"><b>Brake</b><small>Grid BRAKE</small></div>
+    <div id="sBike" class="statebox"><b>Cycling</b><small>ExState 1</small></div><div id="sSurf" class="statebox"><b>Surf</b><small>ExState 2</small></div><div id="sDive" class="statebox"><b>Dive</b><small>ExState 3</small></div><div id="sSpecial" class="statebox"><b>Special</b><small>Catwalk / Fall / Rail</small></div>
+  </div></div></div>
+  <div class="panel"><div class="ph"><b>内存分层原则</b><span class="tag">architecture</span></div><div class="body evidence">
+    <div class="ev"><span class="dot ok"></span><div><b>PlayerState</b>：区域、位置副本、RotationAngle、Rail、ExState。偏“持久的玩家场景状态”。</div></div>
+    <div class="ev"><span class="dot ok"></span><div><b>FieldPlayerCore</b>：ActionStatus、MoveStatus、方向输入、特殊序列。偏“控制器状态机”。</div></div>
+    <div class="ev"><span class="dot ok"></span><div><b>FieldPlayerGrid</b>：Move / Turn / Brake / Catwalk / Fall。偏“格子移动执行器”。</div></div>
+    <div class="ev"><span class="dot ok"></span><div><b>FieldActor</b>：FaceDir、动画方向、GPos/WPos、TileType、碰撞盒。偏“当前世界中的实体事实”。</div></div>
+  </div></div>
+</section>
+<section class="stack right">
+  <div class="panel"><div class="ph"><b>朝向证据</b><span id="faceProof" class="tag">--</span></div><div class="body evidence">
+    <div class="ev"><span id="faceDot" class="dot"></span><div><b>主证据：</b><span id="facePrimary">FieldActor.FaceDir --</span></div></div>
+    <div class="ev"><span id="rotDot" class="dot"></span><div><b>交叉证据：</b><span id="faceRotation">PlayerState.RotationAngle --</span></div></div>
+    <div class="ev"><span class="dot warn"></span><div><b>MotionDir：</b><span id="motionNote">只显示，不作为当前朝向。</span></div></div>
+  </div></div>
+  <div class="panel"><div class="ph"><b>Field Root Chain</b><span class="tag">pointer coherence</span></div><div id="rootRows"></div></div>
+  <div class="panel"><div class="ph"><b>Environment / Contact</b><span class="tag">raw</span></div><div id="envRows"></div></div>
+  <div class="panel"><div class="ph"><b>Raw JSON</b><button onclick="toggleRaw()">展开/收起</button></div><div class="body"><pre id="raw" class="raw" style="display:none">--</pre></div></div>
+</section>
+</main>
+<div class="foot">设计原则：UI 不把未验证字段升级成语义。当前朝向使用 FaceDir，并以 RotationAngle 交叉验证；走/跑由实际帧间速度标定；骑行/冲浪/潜水来自官方逆向结构中的 PlayerExState。</div>
+<script>
+const $=id=>document.getElementById(id);let latest=null;
+const fmt=v=>v===null||v===undefined?'--':v;const num=v=>typeof v==='number'?v.toFixed(4):'--';
+function rows(items){return items.map(([k,v,c])=>`<div class="kv"><div class="k">${k}</div><div class="v ${c||''}">${fmt(v)}</div></div>`).join('')}
+function setActive(id,on){$(id).classList.toggle('active',!!on)}
+async function poll(){try{const r=await fetch('/api/v1/player/runtime',{cache:'no-store'});if(!r.ok)throw new Error(await r.text());const d=await r.json();latest=d;render(d);$('conn').textContent='online';$('conn').className='pill ok'}catch(e){$('conn').textContent='offline';$('conn').className='pill warn';console.error(e)}}
+function render(d){$('resolver').textContent=`${d.status||'--'} · ${d.confidence||'--'}`;$('resolver').className='pill '+(d.status==='resolved'?'ok':'warn');$('frame').textContent='frame '+fmt(d.frame);$('raw').textContent=JSON.stringify(d,null,2);
+ const o=d.orientation||{},l=d.locomotion||{},p=d.position||{},t=d.temporal||{},e=d.environment||{},root=d.root||{};
+ $('semantic').textContent=l.semantic_state||'UNRESOLVED';$('transport').textContent=`${fmt(l.transport_mode)} · ${fmt(l.phase)}`;$('phase').textContent=fmt(l.phase);$('gait').textContent=fmt(l.gait);$('speed').textContent=typeof t.horizontal_speed_world_units_per_frame==='number'?t.horizontal_speed_world_units_per_frame.toFixed(4):'--';$('mode').textContent=fmt(l.transport_mode);
+ const gp=p.grid||{},wp=p.world||{};$('gpos').textContent=`${fmt(gp.x)}, ${fmt(gp.y)}, ${fmt(gp.z)}`;$('wpos').textContent=`${num(wp.x)}, ${num(wp.y)}, ${num(wp.z)}`;[0,1,2,3].forEach(x=>$('d'+x).classList.toggle('on',o.face_dir_raw===x));
+ $('addrState').textContent=root.state||'--';$('addrCore').textContent=root.core||'--';$('addrGrid').textContent=root.grid||'--';$('addrActor').textContent=root.player_actor||'--';
+ $('stateRows').innerHTML=rows([['ZoneID',d.zone_id,'accent'],['RotationAngle',o.rotation_angle_hex,'purple'],['Rotation→Dir',o.rotation_direction,'good'],['ExState',l.transport_mode, 'accent'],['Rail position',p.is_rail_position,''],['PlayerState Vec',JSON.stringify(p.player_state_vec_fx32||{}),'addr']]);
+ $('coreRows').innerHTML=rows([['MoveStatus',l.move_status,'good'],['ActionStatus',l.action_status,'accent'],['KeyMoveDirH',l.key_move_dir_h,''],['KeyMoveDirV',l.key_move_dir_v,''],['SpecialSequence',l.special_sequence,''],['StateChange',`${fmt(l.state_change_func_idx)} / done=${fmt(l.state_change_done)}`,'addr']]);
+ $('gridRows').innerHTML=rows([['Grid Status',l.grid_status,'amber'],['Last Command',l.grid_last_command,'amber'],['Flags',`0x${Number(l.grid_flags_raw||0).toString(16).padStart(8,'0')}`,'addr'],['Vertical only',l.vertical_move_only,'']]);
+ $('actorRows').innerHTML=rows([['FaceDir',`${fmt(o.face_dir_raw)} · ${fmt(o.facing)}`,'good'],['MotionDir',`${fmt(o.motion_dir_raw)} · ${fmt(o.motion_direction)}`,'amber'],['LastFaceDir',`${fmt(o.last_face_dir_raw)} · ${fmt(o.last_facing)}`,''],['NextAcmd',o.next_acmd_raw,''],['MovementFlags',`0x${Number(l.actor_movement_flags_raw||0).toString(16).padStart(8,'0')}`,'addr'],['GPos',JSON.stringify(gp),''],['WPos',JSON.stringify(p.world_fx32||{}),'addr']]);
+ $('faceProof').textContent=o.sources_agree?'VERIFIED':'CHECK';$('faceProof').className='tag '+(o.sources_agree?'good':'amber');$('faceDot').className='dot '+(o.face_dir_raw>=0&&o.face_dir_raw<=3?'ok':'warn');$('rotDot').className='dot '+(o.sources_agree?'ok':'warn');$('facePrimary').textContent=`FieldActor.FaceDir = ${fmt(o.face_dir_raw)} → ${fmt(o.facing)} / ${fmt(o.facing_zh)}`;$('faceRotation').textContent=`RotationAngle = ${fmt(o.rotation_angle_hex)} → ${fmt(o.rotation_direction)}`;$('motionNote').textContent=`MotionDir=${fmt(o.motion_dir_raw)} (${fmt(o.motion_direction)}), 非当前朝向主证据。`;
+ $('rootRows').innerHTML=rows(Object.entries(root).map(([k,v])=>[k,v,'addr']));$('envRows').innerHTML=rows([['TileType',JSON.stringify(e.tile_under||{}),''],['TileType origY',JSON.stringify(e.tile_under_original_y||{}),''],['Collision box',JSON.stringify(e.collision_box||{}),''],['Model offset',JSON.stringify(e.model_position_offset||{}),'']]);
+ setActive('sIdle',l.phase==='Idle');setActive('sTurn',l.phase==='Turning');setActive('sMove',l.phase==='Moving');setActive('sBrake',l.phase==='Brake');setActive('sBike',l.transport_mode==='Cycling');setActive('sSurf',l.transport_mode==='Surf');setActive('sDive',l.transport_mode==='Dive');setActive('sSpecial',['Fall','Catwalk','CatwalkExit','CatwalkExitWait'].includes(l.phase)||p.is_rail_position);
+ const c=l.gait_calibration||{};$('calText').textContent=c.status==='ready'?`已就绪 · walk median=${num(c.walk_median)} · run median=${num(c.run_median)} · threshold=${num(c.decision_threshold)}`:`待标定 · walk ${c.walk_sample_count||0} 条 / run ${c.run_sample_count||0} 条。保持对应动作持续移动后点击记录。`;
+}
+async function calibrate(label){try{const r=await fetch('/api/v1/player/calibration',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({label})});const j=await r.json();if(!r.ok)throw new Error(JSON.stringify(j));await poll()}catch(e){alert('标定失败：'+e.message)}}
+async function clearCal(){await fetch('/api/v1/player/calibration',{method:'DELETE'});await poll()}function toggleRaw(){$('raw').style.display=$('raw').style.display==='none'?'block':'none'}
+setInterval(poll,160);poll();
+</script>
+</body>
+</html>
