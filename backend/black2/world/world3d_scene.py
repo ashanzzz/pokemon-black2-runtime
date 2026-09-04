@@ -195,6 +195,8 @@ class World3DSceneService:
         for item in world.get("buildings", []):
             if item.get("belongs_to_zone") is False:
                 continue
+            if not item.get("resource"):
+                continue
             p = item.get("world_position") or item.get("world_position_candidate") or {}
             buildings.append({
                 "id": item.get("instance_id"),
