@@ -609,22 +609,24 @@ class Gen5RomMap:
         self.zone_data = self.rom.read_file(ZONE_DATA_PATH)
         self.area_data = self.rom.read_file(AREA_DATA_PATH)
         self._archive_cache: dict[str, NarcArchive] = {}
-        if len(self.zone_data) % ZONE_RECORD_SIZE:
+        self.zone_count_actual, self.zone_data_trailing = divmod(len(self.zone_data), ZONE_RECORD_SIZE)
+        if self.zone_count_actual == 0:
             raise Gen5MapFormatError(
-                f"ZoneData size {len(self.zone_data)} is not divisible by 0x30"
+                f"ZoneData size {len(self.zone_data)} is too small for a 0x30 record"
             )
-        if len(self.area_data) % AREA_RECORD_SIZE:
+        self.area_count_actual, self.area_data_trailing = divmod(len(self.area_data), AREA_RECORD_SIZE)
+        if self.area_count_actual == 0:
             raise Gen5MapFormatError(
-                f"AreaData size {len(self.area_data)} is not divisible by 10"
+                f"AreaData size {len(self.area_data)} is too small for an AREA record"
             )
 
     @property
     def zone_count(self) -> int:
-        return len(self.zone_data) // ZONE_RECORD_SIZE
+        return self.zone_count_actual
 
     @property
     def area_count(self) -> int:
-        return len(self.area_data) // AREA_RECORD_SIZE
+        return self.area_count_actual
 
     def archive(self, path: str) -> NarcArchive:
         if path not in self._archive_cache:
