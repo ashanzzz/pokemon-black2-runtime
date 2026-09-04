@@ -226,6 +226,9 @@ async def schema() -> dict[str, Any]:
             "runtime_monitor_status": "/api/v1/runtime/control/status",
             "runtime_monitor_logs": "/api/v1/runtime/control/logs",
             "component_versions": "/api/v1/runtime/versions",
+            "workbench_bootstrap": "/api/v1/workbench/bootstrap",
+            "workbench_schema": "/api/v1/workbench/schema",
+            "workbench_events": "/api/v1/workbench/events",
         },
         "components": {
             "runtime_control": {
@@ -236,4 +239,5 @@ async def schema() -> dict[str, Any]:
             "version_registry": {"version": RUNTIME_RELEASE_VERSION, "capabilities": {"expected_observed_comparison": True}},
         },
         "frontend_rule": "Never infer Backend/Bridge offline from a semantic/map/player request failure.",
+        "workbench_rule": "Workbench aggregation is cache-first; heavy RAM discovery stays explicit and operator initiated.",
     }

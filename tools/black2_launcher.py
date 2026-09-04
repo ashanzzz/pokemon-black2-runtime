@@ -90,7 +90,7 @@ def start(open_browser=True):
     if not bridge(c):
         p=subprocess.Popen([c['bizhawk_path'],f"--lua={(ROOT/'bridge'/'bizhawk'/'black2_bridge.lua').resolve()}",c['rom_path']],cwd=Path(c['bizhawk_path']).parent,env=env);st['emuhawk_pid']=p.pid;_log(f'EmuHawk {p.pid}');wait(lambda:bridge(c),12)
     st.update({'updated_at':datetime.now().isoformat(timespec='seconds'),'rom_path':c['rom_path'],'bizhawk_path':c['bizhawk_path']});_save(STATE,st)
-    if open_browser:webbrowser.open(url(c)+'/original-map')
+    if open_browser:webbrowser.open(url(c)+'/')
     return status()
 
 def stop():
@@ -121,7 +121,7 @@ def status():
 def gui():
     import tkinter as tk
     from tkinter import filedialog,messagebox
-    root=tk.Tk();root.title('Pokémon Black 2 Runtime · 一键启动器');root.geometry('720x430');c=cfg();biz=tk.StringVar(value=str(c.get('bizhawk_path') or ''));rom=tk.StringVar(value=str(c.get('rom_path') or ''));st=tk.StringVar(value='')
+    root=tk.Tk();root.title('Pokémon Black 2 Workbench · 一键启动器');root.geometry('720x430');c=cfg();biz=tk.StringVar(value=str(c.get('bizhawk_path') or ''));rom=tk.StringVar(value=str(c.get('rom_path') or ''));st=tk.StringVar(value='')
     def save():cc=cfg();cc['bizhawk_path']=biz.get().strip();cc['rom_path']=rom.get().strip();_save(CONFIG,cc)
     def choose_biz():
         p=filedialog.askopenfilename(title='选择 EmuHawk.exe',filetypes=[('EmuHawk','EmuHawk.exe'),('EXE','*.exe')]);
@@ -140,7 +140,7 @@ def gui():
         except Exception as e:messagebox.showerror('停止失败',str(e))
     tk.Label(root,text='Pokémon Black 2 Runtime Workbench',font=('Segoe UI',18,'bold')).pack(anchor='w',padx=20,pady=(18,4));tk.Label(root,text='第一次选择 BizHawk 和 ROM，之后只点“一键启动”。ROM 路径只保存在本机 runtime 目录。',fg='#555').pack(anchor='w',padx=20,pady=(0,14));f=tk.Frame(root);f.pack(fill='x',padx=20);f.columnconfigure(1,weight=1)
     for row,(label,var,cmd) in enumerate([('BizHawk',biz,choose_biz),('NDS ROM',rom,choose_rom)]):tk.Label(f,text=label,width=10,anchor='w').grid(row=row,column=0,padx=6,pady=8);tk.Entry(f,textvariable=var).grid(row=row,column=1,sticky='ew',padx=6,pady=8);tk.Button(f,text='选择…',command=cmd).grid(row=row,column=2,padx=6,pady=8)
-    tk.Label(root,textvariable=st,font=('Segoe UI',10,'bold')).pack(anchor='w',padx=26,pady=12);a=tk.Frame(root);a.pack(padx=20,pady=8);tk.Button(a,text='▶ 一键启动',width=18,height=2,command=go).grid(row=0,column=0,padx=6);tk.Button(a,text='■ 安全停止',width=18,height=2,command=halt).grid(row=0,column=1,padx=6);tk.Button(a,text='打开 3D Workbench',width=18,height=2,command=lambda:webbrowser.open(url(cfg())+'/original-map')).grid(row=1,column=0,padx=6,pady=8);tk.Button(a,text='运行时监控',width=18,height=2,command=lambda:webbrowser.open(url(cfg())+'/runtime-monitor')).grid(row=1,column=1,padx=6,pady=8);refresh();root.mainloop()
+    tk.Label(root,textvariable=st,font=('Segoe UI',10,'bold')).pack(anchor='w',padx=26,pady=12);a=tk.Frame(root);a.pack(padx=20,pady=8);tk.Button(a,text='▶ 一键启动',width=18,height=2,command=go).grid(row=0,column=0,padx=6);tk.Button(a,text='■ 安全停止',width=18,height=2,command=halt).grid(row=0,column=1,padx=6);tk.Button(a,text='打开 3D Workbench',width=18,height=2,command=lambda:webbrowser.open(url(cfg())+'/#world')).grid(row=1,column=0,padx=6,pady=8);tk.Button(a,text='运行时监控',width=18,height=2,command=lambda:webbrowser.open(url(cfg())+'/#monitor')).grid(row=1,column=1,padx=6,pady=8);refresh();root.mainloop()
 
 def main():
     ap=argparse.ArgumentParser();ap.add_argument('cmd',nargs='?',default='gui',choices=['gui','start','stop','status']);ap.add_argument('--no-browser',action='store_true');a=ap.parse_args()

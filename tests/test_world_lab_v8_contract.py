@@ -2,13 +2,15 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 
-def test_world_lab_replaces_obsolete_map_pages():
-    for name in ["native-map.html","map-runtime.html","navigation.html"]:
+
+def test_v9_supersedes_v8_map_pages_without_restoring_obsolete_2d_pages():
+    for name in ["native-map.html","map-runtime.html","navigation.html","original-map.html","original-map-ui.js","world-lab.css"]:
         assert not (ROOT/"frontend"/name).exists()
-    html=(ROOT/"frontend"/"original-map.html").read_text(encoding="utf-8")
-    assert "Observed Nav Nodes" in html
-    assert "结束并导出" in html
-    assert "建筑" in html and "NPC" in html and "主角" in html
+    html=(ROOT/"frontend"/"workbench.html").read_text(encoding="utf-8")
+    assert 'data-workspace="world"' in html
+    assert 'data-dock="calibration"' in html
+    assert 'data-dock="navigation"' in html
+    assert 'id="inspector"' in html
 
 
 def test_renderer_is_event_driven_and_reports_failures():

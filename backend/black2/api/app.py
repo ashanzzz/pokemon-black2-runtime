@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from pydantic import BaseModel
 
 from ..bizhawk.process_probe import probe_bizhawk_process
@@ -35,6 +35,7 @@ from ..decoders.dialogue import dialogue_timeline
 from ..dev.tester import init_dev_workbench, DeveloperTestWorkbench
 from ..world.navigation import navigation_service, ReachabilityResult
 from .runtime_routes import configure_runtime_routes, router as runtime_router
+from .workbench_routes import configure_workbench_routes, router as workbench_router
 from .map_v5_routes import configure_map_v5_routes, router as map_v5_router
 from .world_lab_routes import configure_world_lab_routes, router as world_lab_router
 from .player_routes import configure_player_routes, router as player_router
@@ -71,6 +72,7 @@ configure_map_v5_routes(memory_reader)
 configure_world_lab_routes(memory_reader)
 configure_player_routes(memory_reader)
 configure_runtime_routes(runtime_hub)
+configure_workbench_routes(runtime_hub)
 
 
 @asynccontextmanager
@@ -126,6 +128,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(runtime_router)
+app.include_router(workbench_router)
 app.include_router(player_router)
 app.include_router(map_router)
 app.include_router(map_v5_router)
@@ -1135,22 +1138,41 @@ async def ram_dumper_page():
 
 @app.get("/runtime-monitor")
 async def runtime_monitor_page():
-    """Friendly short URL for local service lifecycle monitoring."""
-    page = os.path.join(FRONTEND_DIR, "runtime-monitor.html")
+    """Runtime monitor is a Workbench workspace; the old page remains under /frontend for forensic compatibility."""
+    return RedirectResponse(url="/#monitor", status_code=307)
+
+
+@app.get("/workbench")
+async def workbench_page():
+    page = os.path.join(FRONTEND_DIR, "workbench.html")
     if os.path.exists(page):
         return FileResponse(page)
-    raise HTTPException(status_code=404, detail="runtime-monitor.html not found")
+    raise HTTPException(status_code=404, detail="workbench.html not found")
+
+
+@app.get("/player")
+async def player_workbench_page():
+    return RedirectResponse(url="/#player", status_code=307)
+
+
+@app.get("/dialogue")
+async def dialogue_workbench_page():
+    return RedirectResponse(url="/#dialogue", status_code=307)
+
+
+@app.get("/memory")
+async def memory_workbench_page():
+    return RedirectResponse(url="/#memory", status_code=307)
+
+
+@app.get("/evidence")
+async def evidence_workbench_page():
+    return RedirectResponse(url="/#evidence", status_code=307)
 
 
 @app.get("/")
 async def root():
-    index_file = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return {
-        "title": "Pokémon Black 2 Semantic Runtime API",
-        "version": "4.0.0",
-        "docs_url": "/docs",
-        "bizhawk_status_url": "/api/bizhawk/status",
-        "observer_url": "/api/observer/presentation"
-    }
+    page = os.path.join(FRONTEND_DIR, "workbench.html")
+    if os.path.exists(page):
+        return FileResponse(page)
+    return {"title": "Pokémon Black 2 Reverse Engineering Workbench", "version": RUNTIME_RELEASE_VERSION, "docs_url": "/docs"}

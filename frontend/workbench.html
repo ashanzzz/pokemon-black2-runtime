@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pokémon Black 2 逆向工作台</title>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
+<link rel="stylesheet" href="/frontend/workbench.css">
+<script src="/frontend/ui/i18n.js"></script>
+<script src="/frontend/ui/runtime-client.js"></script>
+</head>
+<body>
+<div class="wb" id="workbench">
+  <header class="commandbar">
+    <a class="wb-brand" href="/#world"><span class="brand-glyph">B2</span><span><strong data-i18n="app.title">Pokémon Black 2 逆向工作台</strong><small data-i18n="app.subtitle">IREJ · RAM/ROM 实证语义运行时</small></span></a>
+    <div class="breadcrumb"><span id="workspaceTitle" data-i18n="workspace.world">世界</span><span>›</span><span id="editorTitle">3D World</span></div>
+    <button class="command-button" id="commandButton"><span>⌘</span><span data-i18n="app.command">命令</span><kbd>Ctrl K</kbd></button>
+    <div class="command-grow"></div>
+    <div class="top-health"><span class="health-chip" data-health="http">HTTP</span><span class="health-chip" data-health="bridge">Bridge</span><span class="health-chip" data-health="player">Player</span><span class="health-chip" data-health="scene">Scene</span></div>
+    <select class="locale-select" id="localeSelect" aria-label="Language"><option value="zh-CN">中文</option><option value="en">English</option></select>
+  </header>
+
+  <aside class="activity" id="activityRail" aria-label="Workspaces">
+    <button data-workspace="world" class="active" title="World"><span class="rail-icon">◫</span><span data-i18n="workspace.world">世界</span></button>
+    <button data-workspace="player" title="Player"><span class="rail-icon">●</span><span data-i18n="workspace.player">主角</span></button>
+    <button data-workspace="dialogue" title="Dialogue"><span class="rail-icon">▤</span><span data-i18n="workspace.dialogue">对话</span></button>
+    <button data-workspace="memory" title="Memory"><span class="rail-icon">⌗</span><span data-i18n="workspace.memory">内存</span></button>
+    <button data-workspace="evidence" title="Evidence"><span class="rail-icon">◆</span><span data-i18n="workspace.evidence">证据</span></button>
+    <button data-workspace="monitor" title="Monitor"><span class="rail-icon">⌁</span><span data-i18n="workspace.monitor">监控</span></button>
+    <div class="activity-grow"></div>
+    <button data-workspace="tools" title="Tools"><span class="rail-icon">⚙</span><span data-i18n="workspace.tools">工具</span></button>
+  </aside>
+
+  <aside class="explorer panel" id="explorer">
+    <div class="panel-title"><span data-i18n="explorer.title">资源浏览器</span><span class="panel-meta" id="explorerMeta">—</span></div>
+    <div class="explorer-search"><input id="explorerFilter" data-i18n-placeholder="explorer.filter" placeholder="筛选对象…"></div>
+    <div class="panel-scroll" id="explorerBody"></div>
+  </aside>
+
+  <main class="editor" id="editor">
+    <section class="editor-pane active" data-editor="world">
+      <div class="editor-toolbar">
+        <button class="tool active" id="followButton" data-i18n="world.follow">跟随主角</button>
+        <button class="tool" id="frameButton" data-i18n="world.frame">定位主角</button>
+        <button class="tool" id="refreshSceneButton" data-i18n="world.refresh">重载场景</button>
+        <span class="toolbar-sep"></span>
+        <label class="toggle-tool"><input type="checkbox" id="terrainToggle" checked><span data-i18n="world.terrain">地形</span></label>
+        <label class="toggle-tool"><input type="checkbox" id="buildingToggle" checked><span data-i18n="world.buildings">建筑</span></label>
+        <label class="toggle-tool"><input type="checkbox" id="npcToggle"><span data-i18n="world.npc">显示 NPC</span></label>
+        <label class="toggle-tool"><input type="checkbox" id="gridToggle"><span data-i18n="world.grid">证据网格</span></label>
+        <div class="toolbar-grow"></div><span class="toolbar-note" data-i18n="world.selectHint">点击 3D 对象可在右侧查看证据</span>
+      </div>
+      <div id="world" class="world-canvas"></div>
+      <div class="viewport-overlay" id="worldOverlay" data-state="waiting"><strong data-i18n="world.statusWaiting">等待 PlayerRuntime…</strong><span id="worldOverlayDetail">HTTP → Bridge → Player → Scene</span></div>
+    </section>
+    <section class="editor-pane" data-editor="player"><div class="document-view" id="playerEditor"></div></section>
+    <section class="editor-pane" data-editor="dialogue"><div class="document-view" id="dialogueEditor"></div></section>
+    <section class="editor-pane" data-editor="memory"><div class="document-view" id="memoryEditor"></div></section>
+    <section class="editor-pane" data-editor="evidence"><div class="document-view" id="evidenceEditor"></div></section>
+    <section class="editor-pane" data-editor="monitor"><div class="document-view" id="monitorEditor"></div></section>
+    <section class="editor-pane" data-editor="tools"><div class="document-view" id="toolsEditor"></div></section>
+  </main>
+
+  <aside class="inspector panel" id="inspector">
+    <div class="panel-title"><span data-i18n="inspector.title">属性检查器</span><span class="confidence-badge unresolved" id="selectionConfidence" data-i18n="confidence.unresolved">未解析</span></div>
+    <div class="panel-scroll" id="inspectorBody"><div class="empty-state" data-i18n="inspector.nothing">选择场景中的主角、建筑、NPC 或资源以查看证据。</div></div>
+  </aside>
+
+  <section class="dock panel" id="bottomDock">
+    <div class="dock-tabs" id="dockTabs">
+      <button class="active" data-dock="events" data-i18n="dock.events">事件</button>
+      <button data-dock="assets" data-i18n="dock.assets">资源错误</button>
+      <button data-dock="navigation" data-i18n="dock.navigation">导航</button>
+      <button data-dock="calibration" data-i18n="dock.calibration">校准</button>
+      <button data-dock="performance" data-i18n="dock.performance">性能</button>
+      <button data-dock="memory" data-i18n="dock.memory">原始/结构</button>
+      <div class="dock-grow"></div><button class="dock-collapse" id="dockCollapse">⌄</button>
+    </div>
+    <div class="dock-body" id="dockBody"></div>
+  </section>
+
+  <footer class="statusbar">
+    <span><i class="status-dot" data-dot="http"></i><span data-i18n="status.http">HTTP</span></span>
+    <span><i class="status-dot" data-dot="bridge"></i><span data-i18n="status.bridge">Bridge</span></span>
+    <span><i class="status-dot" data-dot="player"></i><span data-i18n="status.player">Player</span></span>
+    <span><i class="status-dot" data-dot="scene"></i><span data-i18n="status.scene">Scene</span></span>
+    <span class="status-grow" id="statusMessage">初始化 Workbench…</span>
+    <span id="statusZone">Zone —</span><span id="statusFrame">F —</span><span id="statusFps">FPS —</span><span id="statusReads">RAM: cached</span>
+  </footer>
+</div>
+<div class="palette" id="palette" hidden><div class="palette-box"><input id="paletteInput" placeholder="Command…"><div id="paletteResults"></div></div></div>
+<script type="module" src="/frontend/workbench.js"></script>
+</body>
+</html>

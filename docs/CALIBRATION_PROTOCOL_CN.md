@@ -1,4 +1,4 @@
-# v8 空间校准协议
+# Workbench v9 空间校准协议
 
 建议每类至少录一次独立 session：
 
@@ -10,7 +10,7 @@
 6. `building`：围绕一栋当前缺失/错位建筑走动。
 7. `npc`：靠近一个 NPC，并从四个方向观察。
 
-录制过程中 World Lab 每约 350 ms 采一份已经存在的 PlayerRuntime 缓存，不触发 4 MiB full-RAM discovery。
+Workbench 校准录制过程中约每 450 ms 调用一次 calibration sample；样本来自已经存在的 PlayerRuntime / Scene cache，不触发 4 MiB full-RAM discovery。
 
 ## 通过条件
 

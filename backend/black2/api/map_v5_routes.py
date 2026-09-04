@@ -316,9 +316,10 @@ async def v6_player_asset_sprite(frame: int, gender: str = "male"):
 
 @router.get("/original-map")
 async def original_map_page():
-    path = Path(__file__).resolve().parents[3] / "frontend" / "original-map.html"
+    """Compatibility URL: World Lab now lives inside the unified Workbench."""
+    path = Path(__file__).resolve().parents[3] / "frontend" / "workbench.html"
     if not path.is_file():
-        raise HTTPException(status_code=404, detail="frontend/original-map.html is missing")
+        raise HTTPException(status_code=404, detail="frontend/workbench.html is missing")
     return FileResponse(path)
 
 

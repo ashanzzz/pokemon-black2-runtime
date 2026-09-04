@@ -1,8 +1,19 @@
-# Pokémon Black 2 Runtime Workbench v8
+# Pokémon Black 2 Reverse Engineering Workbench v9
 
-面向《宝可梦 黑2》IREJ / 日版 v1.1 的只读 RAM 观察、ROM 原版世界重建与逆向诊断项目。
+面向《宝可梦 黑2》IREJ / 日版 v1.1 的只读 RAM 观察、ROM 原版世界重建、3D 运行时可视化与逆向诊断项目。
 
-v8 的重点不是继续增加独立测试页，而是把地图相关问题集中到一个 **World Lab** 中排查：3D 地形、建筑、主角、Runtime NPC、分层寻路、校准和可导出报告使用同一套坐标与证据等级。
+v9 的核心不是增加更多页面，而是把整个项目统一成一个 **Reverse Engineering Workbench**：
+
+```text
+Activity Rail
++ Explorer
++ Main Editor / 3D World
++ Context Inspector
++ Bottom Dock
++ Status Bar
+```
+
+默认语言为中文，可在右上角切换 English；选择会保存在浏览器 `localStorage`。
 
 ## 最简单的启动方式
 
@@ -12,105 +23,135 @@ Windows 双击：
 BLACK2_LAUNCHER.cmd
 ```
 
-第一次只需要选择：
+第一次只需选择：
 
 1. BizHawk 的 `EmuHawk.exe`
 2. 你自己合法持有的 Pokémon Black 2 `.nds`
 
-路径只保存在本机 `runtime/runtime.local.json`，不会进入 Git。若项目没有 `.venv`，启动器会第一次自动创建并安装 `requirements.txt`。
+以后启动器会自动启动 Backend、BizHawk、Lua Bridge 并打开 Workbench。
 
-以后直接点击“一键启动”。停止时双击 `STOP_BLACK2.cmd`，它只停止本项目后端，并尝试正常关闭由启动器启动的 BizHawk，不强杀模拟器。
+## 主入口
 
-## 核心页面
+- `/` — **Workbench v9**
+- `/workbench` — Workbench 同义入口
+- `/original-map` — 兼容入口，进入 Workbench 的 World workspace
+- `/player` — 跳转 Workbench → Player
+- `/dialogue` — 跳转 Workbench → Dialogue
+- `/memory` — 跳转 Workbench → Memory
+- `/evidence` — 跳转 Workbench → Evidence
+- `/runtime-monitor` — 跳转 Workbench → Monitor
 
-- `/` — Runtime 总览
-- `/original-map` — **World Lab**，主地图与排错入口
-- `/frontend/player-state.html` — Player Runtime 细节
-- `/frontend/dialogue-inspector.html` — Dialogue / Printer / Timeline
-- `/runtime-monitor` — HTTP / Bridge / 版本 / 服务状态
-- `/ram-dumper` — 显式全量证据采集
-- `/frontend/controller.html` — 输入控制
-- `/frontend/memory-tracer.html` — 内存实验
+旧的独立 World UI 与 Runtime Monitor UI 已从发布结构移除，避免同一事实被多套主界面重复解释。
 
-旧的 `native-map.html`、`map-runtime.html`、`navigation.html` 等重复地图页已从发布版删除，避免同一个事实被多套前端重复解释。
+## Workbench Workspaces
 
-## World Lab 的事实分层
+### World
 
-### 静态 ROM / exported world
+唯一主地图界面。纯 3D：Terrain、Building、Player、Runtime NPC、Warp / Trigger 定义使用同一 Gen5 Field World 坐标体系。
 
-不需要实时读取：Zone、Area、Matrix、Terrain、Building placement/model、Door metadata、静态 NPC/Warp/Trigger 定义。
+3D 对象可以直接点击；选中的 Player / Building / NPC / Terrain 会进入右侧 Inspector，并显示：
 
-### Runtime RAM
+- Runtime / ROM 来源
+- 位置与旋转
+- Model / DoorUID
+- confidence
+- 原始 JSON
+- 与对象相关的操作
 
-只读取真正变化的内容：Player WPos/GPos、朝向、移动、Zone、Runtime Actor、Prop 生命周期。
+### Player
 
-### 性能策略
+集中查看：GPos、WPos、Facing、Movement、Chunk、Grid↔World residual 和 Root Chain。
 
-- Player 页面高频读取 **RuntimeHub 缓存**，不额外扫描 Main RAM。
-- NPC 默认关闭；打开时只读 ActorSystem + bounded actor heap。
-- 3D Scene 只在第一次解析 Player、Zone 变化、手动刷新时重建。
-- legacy NativeMap 周期性 4 MiB 扫描默认关闭。
-- 旧二维自动寻路默认禁止执行。
+日常读取缓存；只有用户点击“显式发现主角”时才允许一次受控 discovery。
 
-## 桥、楼梯、楼层与寻路
+### Dialogue
 
-v8 新增 `Observed 3D Navigation Graph`。节点不是 `(x,z)`，而是：
+Current Dialogue、Visible Text、Loaded Stream、Printer Evidence 与 Dialogue Timeline 在同一 workspace。
+
+### Memory
+
+默认只看已解析结构和 RuntimeHub raw cache。全量 RAM、write trace、pattern scan 仍属于显式高级工具，不会因打开 workspace 自动执行。
+
+### Evidence
+
+空间校准、桥/楼梯高度、Observed 3D Navigation Graph 和报告下载统一管理。
+
+### Monitor
+
+HTTP、Bridge、Semantic、组件版本、生命周期日志和性能策略。
+
+### Tools
+
+保留 Controller、RAM Dumper、Memory Tracer、Dialogue Checkpoints、API Docs 等高级实验入口。
+
+## Bottom Dock
+
+Workbench 底部统一承载辅助信息：
+
+- Events
+- Asset Errors
+- Navigation
+- Calibration
+- Performance
+- Raw / Structure
+
+这些信息不再永久挤占左右 Inspector。
+
+## API v9
+
+新增只读聚合层：
 
 ```text
-(zone_id, GPos.x, GPos.y, GPos.z)
+GET /api/v1/workbench/bootstrap
+GET /api/v1/workbench/events
+GET /api/v1/workbench/evidence
+GET /api/v1/workbench/versions
+GET /api/v1/workbench/schema
 ```
 
-因此桥上和桥下即使 X/Z 相同，也属于不同高度层。你真实走过一个 tile transition 后，系统记录这条可通行边；楼梯/坡道会记录 elevation change。
+`bootstrap` 只读取 RuntimeHub / PlayerRuntime 缓存与元数据，**不会隐藏触发完整 RAM discovery**。
 
-ROM permission byte 仍可作为候选研究材料，但在语义没有验证前不会被当成执行级真值。
+重型操作仍保留在原有显式 API：
 
-## 校准与给 ChatGPT 的报告
+- `/api/v1/player/runtime` — operator-initiated Player discovery
+- `/api/dev/memory_*` — bounded RE experiments
+- `/ram-dumper` — Universal Evidence
+- legacy NativeMap 4 MiB scan 仍默认关闭
 
-World Lab → `校准`：
+## 世界与导航事实原则
 
-1. 选择测试类型，例如室外、室内、桥、楼梯、门、建筑、NPC。
-2. 点击“开始录制”。
-3. 在 NDS 里正常走动。
-4. 点击“结束并导出”。
-5. 下载生成的 `calibration_*.zip` 发到后续对话。
+- ROM = Static World Database
+- RAM = Runtime Overlay
+- Player renderer 使用 FieldActor.WPos
+- AI / navigation 使用 FieldActor.GPos
+- Observed navigation node = `(zone_id, x, y, z)`
+- 桥上 / 桥下不会压成一个二维节点
+- ROM permission 在语义完全验证前仍是 candidate
 
-报告包含：
+## Confidence
 
-- 每个样本的 GPos / WPos / Zone / Chunk / Facing
-- Grid→World 残差
-- 高度变化
-- 已观察路线边
-- 最近建筑与 DoorUID
-- Terrain / Building 资源失败列表
-- Player/NPC renderer mode
-- FPS 与场景加载时间
+Workbench 统一使用：
 
-这比只发截图更适合继续定位“坐标问题 / ROM 资源问题 / Actor 映射问题 / renderer 问题”。
+- VERIFIED
+- PROBABLE
+- CANDIDATE
+- UNRESOLVED
+- ERROR
 
-## 重型逆向功能
+`UNRESOLVED` 是正常逆向状态，不等于 HTTP / Bridge 出错。
 
-正常运行默认关闭。需要时可显式开启：
+## 性能策略
 
-```bat
-set BLACK2_ENABLE_LEGACY_MAP_CACHE=1
-```
+- Player：cache-first
+- Scene：事件驱动，不每秒重建
+- Runtime NPC：默认关闭；开启后 bounded ActorSystem + heap 读取
+- 3D：30 FPS、DPR ≤ 1.25、MSAA off
+- legacy Main-RAM visual scan：默认关闭
+- Workbench aggregation：不做全 RAM scan
 
-这会恢复 legacy NativeMap 的周期性 BMD0/BTX0 Main-RAM 扫描。
+详细架构见：
 
-旧二维自动移动实验需要显式：
-
-```bat
-set BLACK2_ENABLE_LEGACY_NAVIGATION=1
-```
-
-不建议用于桥、楼梯或多层地图。
-
-## 证据原则
-
-- RAM 当前事实优先。
-- ROM 描述原版静态世界，不负责猜当前状态。
-- `candidate` 不自动升级成 `verified`。
-- UI fallback 只表示“为了看得见的占位”，不冒充原版贴图或模型。
-- 不写游戏内存，除非用户主动使用现有输入控制接口；世界解析本身只读。
-
-更多内容见 `docs/WORLD_LAB_V8_CN.md` 与 `docs/CALIBRATION_PROTOCOL_CN.md`。
+- `docs/WORKBENCH_V9_CN.md`
+- `docs/API_WORKBENCH_V9.md`
+- `docs/CALIBRATION_PROTOCOL_CN.md`
+- `docs/UNIFIED_RUNTIME_ARCHITECTURE_CN.md`

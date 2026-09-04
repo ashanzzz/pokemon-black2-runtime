@@ -19,7 +19,7 @@ class TestRuntimeMonitor(unittest.TestCase):
             journal.record("backend_startup", "ready", bridge_port=8766)
             entries = journal.recent(10)
 
-        self.assertEqual(RUNTIME_MONITOR_VERSION, "8.0.0")
+        self.assertEqual(RUNTIME_MONITOR_VERSION, "9.0.0")
         self.assertEqual(first["component"], "runtime-monitor")
         self.assertNotIn("memory", first["details"])
         self.assertNotIn("restart_token", first["details"])

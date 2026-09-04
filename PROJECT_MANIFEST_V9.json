@@ -1,0 +1,33 @@
+{
+  "project": "pokemon-black2-runtime",
+  "release": "9.0.0",
+  "ui": "Workbench v9",
+  "default_locale": "zh-CN",
+  "supported_locales": ["zh-CN", "en"],
+  "primary_entrypoints": {
+    "workbench": "/",
+    "world": "/#world",
+    "player": "/#player",
+    "dialogue": "/#dialogue",
+    "memory": "/#memory",
+    "evidence": "/#evidence",
+    "monitor": "/#monitor",
+    "tools": "/#tools"
+  },
+  "api": {
+    "bootstrap": "/api/v1/workbench/bootstrap",
+    "events": "/api/v1/workbench/events",
+    "evidence": "/api/v1/workbench/evidence",
+    "versions": "/api/v1/workbench/versions",
+    "schema": "/api/v1/workbench/schema"
+  },
+  "ui_architecture": ["activity-rail", "explorer", "main-editor", "context-inspector", "bottom-dock", "status-bar"],
+  "data_policy": {
+    "rom": "static world facts",
+    "ram": "runtime overlay facts",
+    "workbench_aggregation": "cache-first and read-mostly",
+    "heavy_discovery": "explicit operator action only"
+  },
+  "removed_primary_ui": ["original-map.html", "original-map-ui.js", "world-lab.css", "runtime-monitor.html"],
+  "legacy_tools_preserved": ["controller.html", "player-state.html", "dialogue-inspector.html", "memory-tracer.html", "ram-dumper.html", "dialogue-checkpoints.html"]
+}

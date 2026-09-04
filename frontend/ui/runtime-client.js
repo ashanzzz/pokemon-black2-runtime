@@ -5,6 +5,9 @@
   const listeners = new Set();
   let timer = null, running = false, inFlight = false;
   let last = { health: null, snapshot: null, httpOnline: true, error: null, updatedAt: 0 };
+  const LOCALE_KEY='black2.workbench.locale';
+  function locale(){ const v=localStorage.getItem(LOCALE_KEY)||'zh-CN'; return v==='en'?'en':'zh-CN'; }
+  function legacyText(){ return locale()==='en'?{workbench:'Workbench',player:'Player',dialogue:'Dialogue',monitor:'Monitor',evidence:'Evidence',tools:'Tools',httpOn:'HTTP online',httpOff:'HTTP offline',bridgeOn:'Bridge connected',bridgeWait:'Bridge waiting',semantic:'Semantic'}:{workbench:'工作台',player:'主角',dialogue:'对话',monitor:'监控',evidence:'证据',tools:'工具',httpOn:'HTTP 在线',httpOff:'HTTP 离线',bridgeOn:'Bridge 已连接',bridgeWait:'Bridge 等待',semantic:'语义'}; }
 
   async function jsonFetch(path, options = {}, timeout = REQUEST_TIMEOUT) {
     const ctrl = new AbortController();
@@ -65,22 +68,23 @@
     const bridge=document.querySelector('[data-status="bridge"]');
     const semantic=document.querySelector('[data-status="semantic"]');
     const frame=document.querySelector('[data-status="frame"]');
-    if(http){ http.className=`status-pill ${model.httpOnline?'good':'bad'}`; http.querySelector('.value').textContent=model.httpOnline?'HTTP online':'HTTP offline'; }
-    if(bridge){ bridge.className=`status-pill ${transportClass(h,model.httpOnline)}`; bridge.querySelector('.value').textContent=h.bridge_connected?'Bridge connected':'Bridge waiting'; }
-    if(semantic){ const st=h.semantic_status||'unresolved'; semantic.className=`status-pill ${runtimeClass(st)}`; semantic.querySelector('.value').textContent=`Semantic ${st}`; }
+    if(http){ http.className=`status-pill ${model.httpOnline?'good':'bad'}`; const L=legacyText(); http.querySelector('.value').textContent=model.httpOnline?L.httpOn:L.httpOff; }
+    if(bridge){ bridge.className=`status-pill ${transportClass(h,model.httpOnline)}`; const L2=legacyText(); bridge.querySelector('.value').textContent=h.bridge_connected?L2.bridgeOn:L2.bridgeWait; }
+    if(semantic){ const st=h.semantic_status||'unresolved'; semantic.className=`status-pill ${runtimeClass(st)}`; semantic.querySelector('.value').textContent=`${legacyText().semantic} ${st}`; }
     if(frame) frame.textContent=`F ${safe(h.frame,0)}`;
   }
   function mountShell(active='runtime'){
     const host=document.querySelector('[data-runtime-shell]'); if(!host) return;
+    const L=legacyText();
     const nav=[
-      ['runtime','/','Runtime'],
-      ['world','/original-map','World Lab'],
-      ['player','/frontend/player-state.html','Player'],
-      ['dialogue','/frontend/dialogue-inspector.html','Dialogue'],
-      ['monitor','/runtime-monitor','Monitor'],
-      ['dumper','/ram-dumper','Evidence'],
-      ['tools','/frontend/controller.html','Tools']
-    ];    host.innerHTML=`<header class="topbar"><a class="brand" href="/"><div class="brand-mark">B2</div><div><div class="brand-title">Pokémon Black 2 Runtime</div><div class="brand-sub">RAM-grounded observer · IREJ</div></div></a><nav class="nav">${nav.map(([id,href,label])=>`<a href="${href}" class="${id===active?'active':''}">${label}</a>`).join('')}</nav><div class="status-strip"><span class="status-pill" data-status="http"><span class="dot"></span><span class="value">HTTP ...</span></span><span class="status-pill" data-status="bridge"><span class="dot"></span><span class="value">Bridge ...</span></span><span class="status-pill" data-status="semantic"><span class="dot"></span><span class="value">Semantic ...</span></span><span class="status-pill"><span data-status="frame">F 0</span></span></div></header>`;
+      ['runtime','/#world',L.workbench],
+      ['player','/#player',L.player],
+      ['dialogue','/#dialogue',L.dialogue],
+      ['monitor','/#monitor',L.monitor],
+      ['dumper','/#evidence',L.evidence],
+      ['tools','/#tools',L.tools]
+    ];    host.innerHTML=`<header class="topbar"><a class="brand" href="/"><div class="brand-mark">B2</div><div><div class="brand-title">Pokémon Black 2 Runtime</div><div class="brand-sub">Legacy / advanced tool · Workbench v9</div></div></a><nav class="nav">${nav.map(([id,href,label])=>`<a href="${href}" class="${id===active?'active':''}">${label}</a>`).join('')}</nav><div class="status-strip"><span class="status-pill" data-status="http"><span class="dot"></span><span class="value">HTTP ...</span></span><span class="status-pill" data-status="bridge"><span class="dot"></span><span class="value">Bridge ...</span></span><span class="status-pill" data-status="semantic"><span class="dot"></span><span class="value">Semantic ...</span></span><span class="status-pill"><span data-status="frame">F 0</span></span><select id="legacyLocale" class="field" style="width:auto;padding:4px 6px"><option value="zh-CN">中文</option><option value="en">English</option></select></div></header>`;
+    const picker=host.querySelector('#legacyLocale'); if(picker){picker.value=locale();picker.onchange=()=>{localStorage.setItem(LOCALE_KEY,picker.value);location.reload();};}
     subscribe(updateShell); start();
   }
 
