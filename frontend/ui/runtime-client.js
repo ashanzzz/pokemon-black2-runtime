@@ -73,8 +73,13 @@
   function mountShell(active='runtime'){
     const host=document.querySelector('[data-runtime-shell]'); if(!host) return;
     const nav=[
-      ['runtime','/','Runtime'],['player','/frontend/player-state.html','Player'],['dialogue','/frontend/dialogue-inspector.html','Dialogue'],
-      ['world','/frontend/map-runtime.html','World'],['trainer','/frontend/trainer-state.html','Trainer'],['tools','/frontend/controller.html','Tools']
+      ['runtime','/','Runtime'],
+      ['player','/frontend/player-state.html','Player'],
+      ['dialogue','/frontend/dialogue-inspector.html','Dialogue'],
+      ['world','/frontend/map-runtime.html','World'],
+      ['dumper','/ram-dumper','RAM Dumper'],
+      ['trainer','/frontend/trainer-state.html','Trainer'],
+      ['tools','/frontend/controller.html','Tools']
     ];
     host.innerHTML=`<header class="topbar"><a class="brand" href="/"><div class="brand-mark">B2</div><div><div class="brand-title">Pokémon Black 2 Runtime</div><div class="brand-sub">RAM-grounded observer · IREJ</div></div></a><nav class="nav">${nav.map(([id,href,label])=>`<a href="${href}" class="${id===active?'active':''}">${label}</a>`).join('')}</nav><div class="status-strip"><span class="status-pill" data-status="http"><span class="dot"></span><span class="value">HTTP ...</span></span><span class="status-pill" data-status="bridge"><span class="dot"></span><span class="value">Bridge ...</span></span><span class="status-pill" data-status="semantic"><span class="dot"></span><span class="value">Semantic ...</span></span><span class="status-pill"><span data-status="frame">F 0</span></span></div></header>`;
     subscribe(updateShell); start();
