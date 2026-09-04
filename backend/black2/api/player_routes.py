@@ -32,7 +32,10 @@ class GaitCalibrationRequest(BaseModel):
 @router.get("/runtime")
 async def runtime_player(reader: MemoryReader = Depends(_player_reader)) -> dict[str, Any]:
     try:
-        return await player_runtime_service.sample(reader)
+        # This route is an explicit operator request.  It may perform one
+        # bounded full-RAM discovery pass when no cached Field chain exists;
+        # the background runtime hub never does.
+        return await player_runtime_service.sample(reader, allow_discovery=True)
     except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -49,7 +52,7 @@ async def record_gait_calibration(
 ) -> dict[str, Any]:
     # Refresh immediately so the labelled sample is as close as possible to the
     # operator-observed walk/run state.
-    await player_runtime_service.sample(reader)
+    await player_runtime_service.sample(reader, allow_discovery=False)
     result = player_runtime_service.record_gait_sample(request.label)
     if not result.get("ok"):
         raise HTTPException(status_code=409, detail=result)

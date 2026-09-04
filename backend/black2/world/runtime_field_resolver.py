@@ -1183,11 +1183,18 @@ class RuntimeFieldLocator:
             },
         }
 
-    async def sample_player(self, reader: MemoryReader) -> dict[str, Any]:
+    async def sample_player(self, reader: MemoryReader, *, allow_discovery: bool = False) -> dict[str, Any]:
         cached = await self._sample_cached(reader)
         if cached is not None:
             return cached
         self.invalidate()
+        if not allow_discovery:
+            return {
+                "format": "black2-runtime-player-live/v2",
+                "status": "unresolved",
+                "confidence": "unresolved",
+                "reason": "Field discovery is disabled for background sampling; run an explicit runtime discovery probe",
+            }
         since = time.monotonic() - self.last_discovery_attempt
         if self.last_discovery_attempt and since < self.min_discovery_interval:
             return {

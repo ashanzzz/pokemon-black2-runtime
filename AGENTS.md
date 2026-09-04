@@ -125,6 +125,15 @@ reverse_engineering/
 
 每完成一个重要阶段必须输出并落盘 `TEST REPORT`，包含：Goal、Hypothesis、Method、Actions performed、Memory ranges、Candidate addresses、Raw observations、SWAN correspondence、支持与反对证据、Confidence、Verified fields、Unresolved fields、Files changed、Next recommended experiment。
 
+### 组件版本与日志契约
+
+所有会参与运行时事实采集、导出或解释的部件必须带有可观察版本号和结构化日志：BizHawk Lua Bridge、FastAPI/导出器、解析器、前端页面、导出 ZIP schema。每次协议、导出格式或能力发生变化时，必须同步提高对应部件版本，并在启动/连接状态、导出 manifest 和日志中报告它。
+
+- 能力声明必须由真实已注册的 handler 支撑；不得只提高版本或把 capability 标为 `true` 而没有可执行实现。
+- 调用端必须验证所需的版本与 capability，再进行破坏性或昂贵的工作；不匹配时必须失败关闭，且明确提示重载哪个组件。
+- 采集日志至少记录 component/version、请求 operation、frame、结果、错误和生成的 artifact/校验状态；不得把原始内存内容写进普通日志。
+- 每次发现“版本宣称”和实际 handler 不一致时，必须写 TEST REPORT，并将该能力视为 `rejected`，直到端到端实测通过。
+
 当前阶段工作流固定为：Agent 提假设 → 编写 Probe → 给出具体测试步骤 → 用户在真实游戏中测试 → Agent 收集数据 → 输出结果 → **停止**，等待用户决定下一阶段。不能在未获得真实测试数据时连续堆叠大量假设。
 
 第一次阶段结束时必须输出 `RUNTIME REVERSE ENGINEERING REPORT`，至少包含 ROM information、Memory Domains、Experiment sequence、Frames captured、Changed/Filtered address counts、Top direction/coordinate/movement/SWAN-structure candidates、Best FieldActor candidate、pointer chain、confidence、evidence、failed hypotheses、unknowns、文件变更和向用户请求的精确下一测试；然后停止。

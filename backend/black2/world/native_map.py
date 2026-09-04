@@ -58,7 +58,13 @@ def _u16(data: bytes) -> int:
     return struct.unpack_from("<H", data)[0] if len(data) >= 2 else 0
 
 
-async def read_live_map_state(reader: MemoryReader, *, force_sample: bool = False) -> LiveMapState:
+async def read_live_map_state(
+    reader: MemoryReader,
+    *,
+    force_sample: bool = False,
+    allow_discovery: bool = False,
+    allow_fallback: bool = False,
+) -> LiveMapState:
     """Read the live player from the verified runtime Field object graph.
 
     Current facing is FieldActor.FaceDir, cross-checked by
@@ -72,10 +78,19 @@ async def read_live_map_state(reader: MemoryReader, *, force_sample: bool = Fals
     sample = player_runtime_service.latest
     if force_sample or not sample:
         try:
-            sample = await player_runtime_service.sample(reader)
+            sample = await player_runtime_service.sample(reader, allow_discovery=allow_discovery)
         except Exception:
             sample = None
     if not sample or sample.get("status") not in {"resolved", "candidate"}:
+        # Never let dashboard/cache polling turn into a repeated RAM-wide
+        # discovery or repeated fallback batch.  Unknown is the correct live
+        # answer until an explicit reverse-engineering request establishes a
+        # valid Field -> PlayerActor chain.
+        if not allow_fallback:
+            return LiveMapState(
+                map_id=None, x=None, y=None, elevation=None, verified=False,
+                facing="Unresolved", movement_state="Unresolved",
+            )
         fallback_error: Exception | None = None
         for attempt in range(3):
             try:

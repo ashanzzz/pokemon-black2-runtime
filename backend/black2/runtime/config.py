@@ -18,7 +18,10 @@ class RuntimeConfig:
     http_port: int = _env_int("BLACK2_HTTP_PORT", 8765)
     bridge_host: str = os.getenv("BLACK2_BRIDGE_HOST", "127.0.0.1")
     bridge_port: int = _env_int("BLACK2_BRIDGE_PORT", 8766)
-    semantic_sample_interval: float = float(os.getenv("BLACK2_SAMPLE_INTERVAL", "0.20"))
+    # The bridge runs inside the emulator frame loop.  One-second observer
+    # sampling keeps normal play responsive; explicit RE probes can request
+    # denser samples without turning the background UI into a RAM scanner.
+    semantic_sample_interval: float = float(os.getenv("BLACK2_SAMPLE_INTERVAL", "1.00"))
 
     def public_schema(self) -> dict:
         return {

@@ -1,9 +1,12 @@
 -- ============================================================================
--- Pokémon Black 2 - BizHawk Greenfield Bridge v1.3.0
+-- Pokémon Black 2 - BizHawk Greenfield Bridge v1.5.1
 -- 100% Background LuaSocket TCP Bridge (Zero Window Focus Needed)
 -- ============================================================================
 
-local BRIDGE_VERSION = "1.3.0-write-trace"
+-- This version advertises the raw, non-ROM multi-domain evidence dump API.
+-- Reload this file in BizHawk's Lua Console after changing it: Lua scripts are
+-- loaded into the emulator process and do not hot-reload from disk.
+local BRIDGE_VERSION = "1.5.1-universal-dump"
 local SOCKET_HOST = "127.0.0.1"
 local SOCKET_PORT = 8766
 
@@ -341,6 +344,83 @@ local function safe_screenshot(path)
     return true, nil
 end
 
+local function write_binary_file(path, data)
+    local file, open_error = io.open(path, "wb")
+    if not file then return false, "io.open failed: " .. tostring(open_error) end
+    local ok, write_error = pcall(function() file:write(data) end)
+    local close_ok, close_error = pcall(function() file:close() end)
+    if not ok then return false, "file write failed: " .. tostring(write_error) end
+    if not close_ok then return false, "file close failed: " .. tostring(close_error) end
+    return true, nil
+end
+
+local function capture_registers()
+    local registers = {}
+    local ok, raw = pcall(function()
+        return emu.getregisters and emu.getregisters() or nil
+    end)
+    if not ok or type(raw) ~= "table" then
+        return registers
+    end
+    -- Preserve only JSON scalar values.  The raw memory files remain the
+    -- authority; this is an optional, emulator-provided register annotation.
+    for key, value in pairs(raw) do
+        if type(key) == "string" and (type(value) == "number" or type(value) == "string" or type(value) == "boolean") then
+            registers[key] = value
+        end
+    end
+    return registers
+end
+
+local function dump_universal_memory(payload, current_frame)
+    local dump_dir = payload.dump_dir
+    local domains = payload.domains or {}
+    local results = {}
+    local all_domains_ok = true
+
+    if type(dump_dir) ~= "string" or dump_dir == "" then
+        return nil, "dump_dir is required"
+    end
+
+    for _, spec in ipairs(domains) do
+        local name = spec.name
+        local file_name = spec.file
+        local expected_size = tonumber(spec.size) or 0
+        local result = { size = 0, success = false }
+        results[name or tostring(#results + 1)] = result
+
+        if type(name) ~= "string" or type(file_name) ~= "string" or expected_size <= 0 then
+            result.error = "invalid domain specification"
+            all_domains_ok = false
+        else
+            local bytes = read_binary(name, 0, expected_size)
+            result.size = #bytes
+            if #bytes ~= expected_size then
+                result.error = "read size mismatch: expected " .. expected_size .. ", got " .. #bytes
+                all_domains_ok = false
+            else
+                local wrote, write_error = write_binary_file(dump_dir .. "/" .. file_name, bytes)
+                if wrote then
+                    result.success = true
+                else
+                    result.error = write_error
+                    all_domains_ok = false
+                end
+            end
+        end
+    end
+
+    local screenshot_saved, screenshot_error = safe_screenshot(payload.png_path)
+    return {
+        frame = current_frame,
+        domains = results,
+        domains_complete = all_domains_ok,
+        screenshot_saved = screenshot_saved,
+        screenshot_error = screenshot_error,
+        registers = capture_registers(),
+    }, nil
+end
+
 -- LuaSocket may return a partial write for large memory responses.
 local function send_all(sock, data)
     local next_index = 1
@@ -455,6 +535,7 @@ local function get_capabilities()
         pause_resume = true,
         frame_advance = true,
         savestate = true,
+        universal_dump = true,
         watch_write = false,
         a_edge_capture = true,
         -- The bridge advertises no successful writer-PC trace until the live
@@ -827,6 +908,21 @@ local function handle_command(cmd)
 
     elseif op == "memory.domains" then
         resp.payload = get_memory_domains()
+
+    elseif op == "memory.dump_universal" then
+        console.log("[Bridge][memory.dump_universal] frame=" .. tostring(current_frame) .. " requested_domains=" .. tostring(#(payload.domains or {})))
+        local dumped, dump_error = dump_universal_memory(payload, current_frame)
+        if not dumped then
+            resp.ok = false
+            resp.error = dump_error
+            console.log("[Bridge][memory.dump_universal][ERROR] " .. tostring(dump_error))
+        else
+            resp.payload = dumped
+            console.log(
+                "[Bridge][memory.dump_universal] complete=" .. tostring(dumped.domains_complete)
+                .. " screenshot=" .. tostring(dumped.screenshot_saved)
+            )
+        end
 
     elseif op == "memory.scan_headers" then
         resp.payload = scan_loaded_headers(payload)

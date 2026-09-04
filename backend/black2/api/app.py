@@ -447,11 +447,38 @@ async def get_dev_debug_dialogue():
     }
 
 
+def _require_universal_dump_bridge() -> None:
+    """Fail before capture when BizHawk still runs a stale Lua bridge."""
+    capabilities = transport.hello_data.get("capabilities") or {}
+    required_version = "1.5.1-universal-dump"
+    if (
+        capabilities.get("universal_dump") is True
+        and transport.bridge_version == required_version
+    ):
+        return
+
+    raise HTTPException(
+        status_code=409,
+        detail={
+            "message": "当前 BizHawk Lua Bridge 的 universal dump 实现不是已验证版本，未创建任何导出文件。",
+            "bridge_version": transport.bridge_version,
+            "required_bridge_version": required_version,
+            "required_capability": "universal_dump",
+            "action": (
+                "在 BizHawk 的 Lua Console 停止当前脚本，然后重新打开并运行 "
+                "bridge/bizhawk/black2_bridge.lua；连接恢复后确认 /api/bizhawk/status "
+                "显示 bridge_version 为 1.5.1-universal-dump 且 capabilities.universal_dump 为 true。"
+            ),
+        },
+    )
+
+
 @app.post("/api/dev/dump_full_ram")
 async def post_dump_full_ram(req: FullRamDumpRequest):
-    """Universal atomic dump of 4MB Main RAM, native screenshot, registers, and context."""
+    """Create a raw, non-ROM multi-domain evidence bundle when the bridge supports it."""
     if not client.is_connected:
         raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    _require_universal_dump_bridge()
 
     try:
         res = await universal_snapshot_manager.create_snapshot(
@@ -533,22 +560,6 @@ async def post_dev_automation_pause(req: AutomationPauseRequest):
 @app.post("/api/dev/snapshot")
 async def post_dev_snapshot(req: SnapshotRequest):
     return await dev_wb.create_test_snapshot(req.label)
-
-
-@app.post("/api/dev/dump_full_ram")
-async def post_dump_full_ram(req: FullRamDumpRequest):
-    """Create a portable read-only evidence bundle (4 MiB Main RAM + context)."""
-    if not client.is_connected:
-        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
-    return await universal_snapshot_manager.create_snapshot(
-        transport, state_engine, category=req.category, label=req.label, notes=req.notes
-    )
-
-
-@app.get("/api/dev/dumps")
-async def get_full_ram_dumps(limit: int = 50):
-    entries = universal_snapshot_manager.list_snapshots(limit=max(1, min(limit, 200)))
-    return {"ok": True, "count": len(entries), "dumps": entries}
 
 
 @app.post("/api/dev/savestate/save")
