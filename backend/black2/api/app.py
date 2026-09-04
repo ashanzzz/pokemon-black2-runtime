@@ -447,6 +447,47 @@ async def get_dev_debug_dialogue():
     }
 
 
+@app.post("/api/dev/dump_full_ram")
+async def post_dump_full_ram(req: FullRamDumpRequest):
+    """Universal atomic dump of 4MB Main RAM, native screenshot, registers, and context."""
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+
+    try:
+        res = await universal_snapshot_manager.create_snapshot(
+            transport=transport,
+            state_engine=state_engine,
+            category=req.category,
+            label=req.label,
+            notes=req.notes,
+        )
+        return res
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Universal snapshot creation failed: {exc}") from exc
+
+
+@app.get("/api/dev/dumps")
+async def get_dev_dumps(limit: int = 50):
+    """List all saved full 4MB RAM ground-truth snapshots."""
+    snapshots = universal_snapshot_manager.list_snapshots(limit=limit)
+    return {"count": len(snapshots), "dumps": snapshots}
+
+
+@app.get("/api/dev/dumps/{snapshot_id}/download")
+async def download_verified_dump(snapshot_id: str):
+    """Serve only a ZIP whose screenshot, raw domains, and hashes validate."""
+    bundle_path, verification = universal_snapshot_manager.verified_bundle_path(snapshot_id)
+    if bundle_path is None:
+        raise HTTPException(status_code=409, detail={"message": "ZIP verification failed", "verification": verification})
+    return FileResponse(bundle_path, media_type="application/zip", filename=bundle_path.name)
+
+
+@app.post("/api/dev/dumps/clear")
+async def clear_dev_dumps():
+    """Delete locally generated dump_* artifacts after the UI confirmation."""
+    return universal_snapshot_manager.clear_snapshots()
+
+
 @app.get("/api/dev/dump_region")
 async def get_dev_dump_region(offset: str = "0x246000", length: str = "0x4000", domain: str = "Main RAM"):
     offset_int = int(offset, 0) if isinstance(offset, str) else int(offset)

@@ -1173,7 +1173,7 @@ end
 local function socket_process_events()
     local cur_frame = emu.framecount and emu.framecount() or 0
     if not state.sock or not state.connected then
-        if cur_frame - state.last_retry_frame > 20 then
+        if cur_frame - state.last_retry_frame > 20 or cur_frame < state.last_retry_frame then
             state.last_retry_frame = cur_frame
             connect_socket()
         end
@@ -1181,16 +1181,19 @@ local function socket_process_events()
     end
 
     -- Send periodic heartbeat every 20 frames with version
-    if cur_frame % 20 == 0 then
+    if cur_frame % 20 == 0 or cur_frame ~= state.last_heartbeat_frame then
+        state.last_heartbeat_frame = cur_frame
         local ok, send_err = pcall(function()
             local ping_str = json.encode({type = "heartbeat", version = BRIDGE_VERSION, frame = cur_frame}) .. "\n"
             local res, err = send_all(state.sock, ping_str)
             if not res then
+                if state.sock then pcall(function() state.sock:close() end) end
                 state.sock = nil
                 state.connected = false
             end
         end)
         if not ok then
+            if state.sock then pcall(function() state.sock:close() end) end
             state.sock = nil
             state.connected = false
             return
