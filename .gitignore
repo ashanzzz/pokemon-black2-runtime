@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# Runtime output
+logs/
+/runtime/
+test_logs_tmp/
+*.log
+
+# Emulator / proprietary game data
+*.nds
+*.sav
+*.dsv
+*.State
+*.state
+
+# Backup files
+*.bak
+*.v4bak
+*.v6bak
+*.maptruth_v2.bak
+*.playerstate_v3.bak
+
+# Evidence output (large generated artifacts)
+reverse_engineering/v6_evidence/
+
+# Large local tooling / generated binaries
+pi.exe
+*.wasm
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.claude/
+node_modules/
+
+
+*.v7bak
+*.v8bak
+reverse_engineering/dumps/
+runtime/calibration_reports/

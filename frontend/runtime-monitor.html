@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>后台监控 · Pokémon Black 2 Runtime</title>
+  <link rel="stylesheet" href="/frontend/ui/runtime.css">
+  <style>
+    .monitor-status { min-height: 20px; margin: 0 0 14px; font-size: 12px; color: var(--muted); }
+    .monitor-status.good { color: var(--good); }.monitor-status.bad { color: var(--bad); }.monitor-status.warn { color: var(--warn); }
+    .log-details { max-width: 440px; color: var(--muted); white-space: normal; overflow-wrap: anywhere; }
+    .refresh-note { color: var(--quiet); font-size: 11px; margin-top: 9px; }
+    .version-ok { color: var(--good); }.version-warn { color: var(--warn); }.version-bad { color: var(--bad); }
+    .protocols { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div data-runtime-shell></div>
+    <main class="page">
+      <section class="page-head">
+        <div>
+          <div class="eyebrow" data-i18n="eyebrow">LOCAL SERVICE OBSERVER</div>
+          <h1 data-i18n="title">后台服务监控</h1>
+          <p class="page-desc" data-i18n="description">查询运行时是否已启动、Bridge 是否连接，以及最近的启动与重启结果。日志仅包含服务元数据，不包含 RAM 内容。</p>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="refreshButton" type="button" data-i18n="refresh">刷新</button>
+          <button class="btn danger" id="restartButton" type="button" data-i18n="restart">重启后端</button>
+        </div>
+      </section>
+      <div class="monitor-status" id="monitorStatus" role="status" aria-live="polite"></div>
+
+      <section class="card">
+        <div class="card-head"><div><div class="card-title" data-i18n="serviceState">服务状态</div><div class="card-sub" data-i18n="serviceStateSub">来自运行时控制 API 的本机只读状态</div></div><span class="tag" id="lastUpdated">--</span></div>
+        <div class="card-body"><div class="metric-grid" id="metrics"></div></div>
+      </section>
+
+      <section class="card" style="margin-top:14px">
+        <div class="card-head"><div><div class="card-title" data-i18n="versionTitle">组件版本</div><div class="card-sub" data-i18n="versionSub">期望版本与当前进程实际版本</div></div><span class="tag" id="releaseVersion">--</span></div>
+        <div class="card-body">
+          <div class="table-wrap"><table><thead><tr>
+            <th data-i18n="component">组件</th><th data-i18n="kind">类型</th><th data-i18n="expected">期望版本</th><th data-i18n="observed">实际版本</th><th data-i18n="compatibility">兼容状态</th>
+          </tr></thead><tbody id="versionRows"></tbody></table></div>
+          <div class="protocols" id="protocolVersions"></div>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top:14px">
+        <div class="card-head"><div><div class="card-title" data-i18n="logTitle">生命周期日志</div><div class="card-sub" data-i18n="logSub">持久化 JSONL 日志，最新记录在前</div></div><span class="tag" id="logCount">0</span></div>
+        <div class="card-body">
+          <div class="table-wrap"><table><thead><tr>
+            <th data-i18n="time">时间</th><th data-i18n="operation">操作</th><th data-i18n="result">结果</th><th data-i18n="pid">PID</th><th data-i18n="details">详情</th>
+          </tr></thead><tbody id="logRows"></tbody></table></div>
+          <div class="refresh-note" data-i18n="pollNote">页面每 2 秒读取一次本机状态与日志；不会自动重启服务。</div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="/frontend/ui/runtime-client.js"></script>
+  <script>
+  (() => {
+    'use strict';
+    const zh = (navigator.languages || [navigator.language || 'en']).some(v => /^zh(?:-|$)/i.test(v));
+    const text = zh ? {
+      eyebrow:'本机服务观察器', title:'后台服务监控', description:'查询运行时是否已启动、Bridge 是否连接，以及最近的启动与重启结果。日志仅包含服务元数据，不包含 RAM 内容。',
+      refresh:'刷新', restart:'重启后端', serviceState:'服务状态', serviceStateSub:'来自运行时控制 API 的本机只读状态', logTitle:'生命周期日志', logSub:'持久化 JSONL 日志，最新记录在前',
+      versionTitle:'组件版本', versionSub:'期望版本与当前进程实际版本', component:'组件', kind:'类型', expected:'期望版本', observed:'实际版本', compatibility:'兼容状态',
+      time:'时间', operation:'操作', result:'结果', pid:'PID', details:'详情', pollNote:'页面每 2 秒读取一次本机状态与日志；不会自动重启服务。',
+      http:'HTTP 服务', bridge:'BizHawk Bridge', semantic:'语义运行时', process:'运行时进程', restartState:'重启状态', parent:'重启来源 PID',
+      unavailable:'监控 API 不可用。双击项目根目录 restart_runtime.cmd 完成一次升级重启。', updated:'已更新', noLogs:'尚无生命周期日志。', noVersions:'版本注册表不可用。', restarting:'正在安排后端重启；页面会自动重新连接。', restartFailed:'无法安排重启：', loading:'正在读取本机服务状态…'
+    } : {
+      eyebrow:'LOCAL SERVICE OBSERVER', title:'Backend Service Monitor', description:'Check whether the runtime started, whether the Bridge is connected, and recent startup/restart outcomes. Logs contain service metadata only, never RAM contents.',
+      refresh:'Refresh', restart:'Restart backend', serviceState:'Service state', serviceStateSub:'Local read-only status from the runtime control API', logTitle:'Lifecycle log', logSub:'Persistent JSONL journal; latest records first',
+      versionTitle:'Component versions', versionSub:'Expected versions compared with the running process', component:'Component', kind:'Kind', expected:'Expected', observed:'Observed', compatibility:'Compatibility',
+      time:'Time', operation:'Operation', result:'Result', pid:'PID', details:'Details', pollNote:'This page reads local status and logs every 2 seconds. It never restarts services automatically.',
+      http:'HTTP service', bridge:'BizHawk Bridge', semantic:'Semantic runtime', process:'Runtime process', restartState:'Restart state', parent:'Restart parent PID',
+      unavailable:'The monitor API is unavailable. Double-click restart_runtime.cmd in the project root for the one-time upgrade restart.', updated:'Updated', noLogs:'No lifecycle records yet.', noVersions:'Version registry unavailable.', restarting:'Backend restart scheduled; this page will reconnect automatically.', restartFailed:'Could not schedule restart: ', loading:'Reading local service status…'
+    };
+    document.documentElement.lang = zh ? 'zh-CN' : 'en'; document.title = `${text.title} · Pokémon Black 2 Runtime`;
+    document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = text[el.dataset.i18n] || el.textContent; });
+    Black2Runtime.mountShell('monitor');
+    const $ = selector => document.querySelector(selector);
+    const safe = Black2Runtime.safe, esc = Black2Runtime.esc;
+    let timer = null, refreshing = false;
+    function status(message, kind='') { const target=$('#monitorStatus'); target.textContent=message; target.className=`monitor-status ${kind}`; }
+    function healthTag(yes, yesLabel, noLabel) { return `<span class="tag ${yes ? 'good' : 'warn'}">${esc(yes ? yesLabel : noLabel)}</span>`; }
+    function metric(label, value, note='') { return `<div class="metric"><div class="metric-label">${esc(label)}</div><div class="metric-value">${value}</div>${note ? `<div class="metric-note">${esc(note)}</div>` : ''}</div>`; }
+    function renderStatus(model) {
+      const h = model.health || {}, ports = model.ports || {}, httpPort = ports.http || {};
+      $('#metrics').innerHTML = [
+        metric(text.http, healthTag(true, 'ONLINE', 'OFFLINE'), `${safe(httpPort.host)}:${safe(httpPort.port)}`),
+        metric(text.bridge, healthTag(!!h.bridge_connected, 'CONNECTED', 'WAITING'), `${safe(h.bridge_state)}`),
+        metric(text.semantic, `<span class="tag ${h.semantic_status === 'ready' ? 'good' : 'unresolved'}">${esc(safe(h.semantic_status))}</span>`, `frame ${safe(h.frame, 0)}`),
+        metric(text.process, esc(`${safe(model.pid)} · v${safe(model.version)}`), `log: ${safe(model.log_file)}`),
+        metric(text.restartState, `<span class="tag ${model.restart_scheduled ? 'warn' : 'good'}">${esc(model.restart_scheduled ? 'SCHEDULED' : 'IDLE')}</span>`),
+        metric(text.parent, esc(safe(model.restart_parent_pid)), '')
+      ].join('');
+      $('#lastUpdated').textContent = `${text.updated} ${new Date().toLocaleTimeString()}`;
+    }
+    function renderLogs(entries) {
+      $('#logCount').textContent = String(entries.length);
+      $('#logRows').innerHTML = entries.length ? entries.map(item => `<tr><td>${esc(item.timestamp_utc || '--')}</td><td>${esc(item.operation || '--')}</td><td>${esc(item.result || '--')}</td><td>${esc(item.pid || '--')}</td><td class="log-details">${esc(JSON.stringify(item.details || {}))}</td></tr>`).join('') : `<tr><td colspan="5" class="empty">${esc(text.noLogs)}</td></tr>`;
+    }
+    function renderVersions(model) {
+      const statusClass = value => value === 'compatible' ? 'good' : value === 'mismatch' ? 'bad' : 'warn';
+      $('#releaseVersion').className = `tag ${statusClass(model.status)}`;
+      $('#releaseVersion').textContent = `release ${safe(model.release)}`;
+      const components = model.components || [];
+      $('#versionRows').innerHTML = components.length ? components.map(item => `<tr><td>${esc(item.name || item.id)}</td><td>${esc(item.kind || '--')}</td><td>${esc(item.expected_version || '--')}</td><td>${esc(item.observed_version || '--')}</td><td><span class="tag ${statusClass(item.status)}">${esc(item.status || '--')}</span></td></tr>`).join('') : `<tr><td colspan="5" class="empty">${esc(text.noVersions)}</td></tr>`;
+      $('#protocolVersions').innerHTML = (model.protocols || []).map(item => `<span class="tag">${esc(item.name)} · ${esc(item.version)}</span>`).join('');
+    }
+    async function refresh() {
+      if (refreshing) return; refreshing = true; status(text.loading);
+      try {
+        const [state, logs, versions] = await Promise.all([
+          Black2Runtime.jsonFetch('/api/v1/runtime/control/status', {}, 1600),
+          Black2Runtime.jsonFetch('/api/v1/runtime/control/logs?limit=120', {}, 1600),
+          Black2Runtime.jsonFetch('/api/v1/runtime/versions', {}, 1600)
+        ]);
+        renderStatus(state); renderLogs(logs.entries || []); renderVersions(versions); status(`${text.updated} ${new Date().toLocaleTimeString()}`, versions.status === 'compatible' ? 'good' : 'warn');
+        $('#restartButton').disabled = false;
+      } catch (error) { status(`${text.unavailable} (${String(error.message || error)})`, 'warn'); }
+      finally { refreshing = false; }
+    }
+    async function restart() {
+      $('#restartButton').disabled = true;
+      try {
+        const control = await Black2Runtime.jsonFetch('/api/v1/runtime/control', {}, 1600);
+        if (!control.capabilities || !control.capabilities.restart_backend || !control.restart_token) throw new Error('restart capability unavailable');
+        await Black2Runtime.jsonFetch('/api/v1/runtime/restart', {method:'POST', headers:{'X-Runtime-Restart-Token': control.restart_token}}, 1600);
+        status(text.restarting, 'good');
+      } catch (error) { status(`${text.restartFailed}${String(error.message || error)}`, 'bad'); $('#restartButton').disabled = false; }
+    }
+    $('#refreshButton').addEventListener('click', refresh); $('#restartButton').addEventListener('click', restart);
+    refresh(); timer = setInterval(refresh, 2000); window.addEventListener('beforeunload', () => clearInterval(timer));
+  })();
+  </script>
+</body>
+</html>

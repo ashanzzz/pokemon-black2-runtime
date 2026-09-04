@@ -1,0 +1,29 @@
+{
+  "name": "pokemon-black2-runtime-v8-world-lab",
+  "version": "8.0.0",
+  "base_uploaded_project_commit": "ddb7dc123da2434d18874bd1cf26c4467e04e576",
+  "release_type": "clean complete Git source project",
+  "design": "single 3D World Lab with evidence-first calibration and layered navigation",
+  "excluded_from_release": [
+    ".venv and Python caches",
+    "runtime caches and generated GLB assets",
+    "historical full RAM dumps and large experimental evidence",
+    "logs and temporary test output",
+    "obsolete duplicate map frontends and backup files",
+    "unrelated frontend/tooling assets"
+  ],
+  "kept_static_evidence": "reverse_engineering/derived/v5",
+  "validation": {
+    "pytest": "59 passed, 6 skipped",
+    "python_compileall": "pass",
+    "javascript_syntax": "pass",
+    "backend_import_without_rom": "pass"
+  },
+  "runtime_policy": {
+    "static_world": "ROM/exported v5 data, cached",
+    "player": "PlayerRuntime cache, low-cost polling",
+    "npc_overlay": "bounded ActorSystem + actor heap reads, opt-in",
+    "legacy_full_ram_map_scan": "disabled by default",
+    "navigation": "observed layered graph for verified movement; static permission is candidate-only"
+  }
+}
