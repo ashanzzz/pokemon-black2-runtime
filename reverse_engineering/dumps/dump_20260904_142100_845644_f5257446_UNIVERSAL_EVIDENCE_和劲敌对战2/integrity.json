@@ -1,0 +1,367 @@
+{
+  "schema": "snapshot_integrity/v1",
+  "snapshot_id": "dump_20260904_142100_845644_f5257446_UNIVERSAL_EVIDENCE_和劲敌对战2",
+  "physical_dump_frame": 5257448,
+  "expected_main_ram_bytes": 4194304,
+  "capture_complete": true,
+  "capture_errors": [],
+  "memory_domains": [
+    {
+      "name": "Main RAM",
+      "file": "main_ram.bin",
+      "expected_size": 4194304,
+      "actual_size": 4194304,
+      "bridge_size": 4194304,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "226b6587efdd1a828e1b28b3e433f71eca300fed4bf49264a47b51d53b172bca"
+    },
+    {
+      "name": "ARM7 BIOS",
+      "file": "arm7_bios.bin",
+      "expected_size": 16384,
+      "actual_size": 16384,
+      "bridge_size": 16384,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "80ae613b1cfd4cd56dd49f9e985b9788563388facaf0d0f5f78ea2b185f3f7c5"
+    },
+    {
+      "name": "ARM7 WRAM",
+      "file": "arm7_wram.bin",
+      "expected_size": 65536,
+      "actual_size": 65536,
+      "bridge_size": 65536,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "24bbe10e78db4141fd6afff1e1639472e8b5d0adaf2d92c02f27eca8d11b208a"
+    },
+    {
+      "name": "ARM9 BIOS",
+      "file": "arm9_bios.bin",
+      "expected_size": 4096,
+      "actual_size": 4096,
+      "bridge_size": 4096,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "ec78d3e8e068e31a4c9368c5bb3d35bdeb37783e8a57efbb0ae0fa80c502d005"
+    },
+    {
+      "name": "Data TCM",
+      "file": "dtcm.bin",
+      "expected_size": 16384,
+      "actual_size": 16384,
+      "bridge_size": 16384,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "94c37d563efa1356402bdaea6640647bad11abb6d3e649fb3276f3634a2becc2"
+    },
+    {
+      "name": "Firmware",
+      "file": "firmware.bin",
+      "expected_size": 131072,
+      "actual_size": 131072,
+      "bridge_size": 131072,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "da783c9312cbdd132774f17c7db5b4ee0a1ab49ecf5039479e9bf93bc63682be"
+    },
+    {
+      "name": "Instruction TCM",
+      "file": "itcm.bin",
+      "expected_size": 32768,
+      "actual_size": 32768,
+      "bridge_size": 32768,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "167617acf41237e97f0b298c4d91d7950dced60a29ac1a64dd42b63f5093731c"
+    },
+    {
+      "name": "SRAM",
+      "file": "sram.bin",
+      "expected_size": 524288,
+      "actual_size": 524288,
+      "bridge_size": 524288,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "aa732fa07993ef919b21d62fc7cfd2d07581b382c9fc7f9b0dc045b55623594a"
+    },
+    {
+      "name": "Shared WRAM",
+      "file": "shared_wram.bin",
+      "expected_size": 32768,
+      "actual_size": 32768,
+      "bridge_size": 32768,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "db78ce573e03067212f9f0c9c25266ca17d7fae3a3ca321f0a35c70396da2522"
+    },
+    {
+      "name": "Waterbox PageData",
+      "file": "waterbox_pagedata.bin",
+      "expected_size": 251217,
+      "actual_size": 251217,
+      "bridge_size": 251217,
+      "bridge_success": true,
+      "complete": true,
+      "sha256": "7e72746030cf72d7d8aec1faba495e3582638db061cfc44ad94a301613344eb7"
+    }
+  ],
+  "memory_domain_inventory": {
+    "schema": "pokemon_black2_memory_inventory/v1",
+    "inventory_status": "verified",
+    "source": "BizHawk memory.domains immediately before memory.dump_universal",
+    "reported_domains": {
+      "Data TCM": {
+        "name": "Data TCM",
+        "size": 16384,
+        "writable": true,
+        "readable": true
+      },
+      "ARM9 System Bus": {
+        "name": "ARM9 System Bus",
+        "size": 0,
+        "writable": true,
+        "readable": true
+      },
+      "ARM7 BIOS": {
+        "name": "ARM7 BIOS",
+        "size": 16384,
+        "writable": true,
+        "readable": true
+      },
+      "ARM7 WRAM": {
+        "name": "ARM7 WRAM",
+        "size": 65536,
+        "writable": true,
+        "readable": true
+      },
+      "Main RAM": {
+        "name": "Main RAM",
+        "size": 4194304,
+        "writable": true,
+        "readable": true
+      },
+      "Shared WRAM": {
+        "name": "Shared WRAM",
+        "size": 32768,
+        "writable": true,
+        "readable": true
+      },
+      "Instruction TCM": {
+        "name": "Instruction TCM",
+        "size": 32768,
+        "writable": true,
+        "readable": true
+      },
+      "ARM7 System Bus": {
+        "name": "ARM7 System Bus",
+        "size": 0,
+        "writable": true,
+        "readable": true
+      },
+      "ROM": {
+        "name": "ROM",
+        "size": 536870912,
+        "writable": true,
+        "readable": true
+      },
+      "ARM9 BIOS": {
+        "name": "ARM9 BIOS",
+        "size": 4096,
+        "writable": true,
+        "readable": true
+      },
+      "Firmware": {
+        "name": "Firmware",
+        "size": 131072,
+        "writable": true,
+        "readable": true
+      },
+      "Waterbox PageData": {
+        "name": "Waterbox PageData",
+        "size": 251217,
+        "writable": true,
+        "readable": true
+      },
+      "SRAM": {
+        "name": "SRAM",
+        "size": 524288,
+        "writable": true,
+        "readable": true
+      }
+    },
+    "excluded": [
+      {
+        "name": "ARM9 System Bus",
+        "size": 0,
+        "reason": "virtual bus alias has no independent byte range"
+      },
+      {
+        "name": "ARM7 System Bus",
+        "size": 0,
+        "reason": "virtual bus alias has no independent byte range"
+      },
+      {
+        "name": "ROM",
+        "size": 536870912,
+        "reason": "ROM/game file is explicitly excluded"
+      }
+    ],
+    "physical_dump_frame": 5257448,
+    "exported_domains": [
+      {
+        "name": "Main RAM",
+        "file": "main_ram.bin",
+        "expected_size": 4194304
+      },
+      {
+        "name": "ARM7 BIOS",
+        "file": "arm7_bios.bin",
+        "expected_size": 16384
+      },
+      {
+        "name": "ARM7 WRAM",
+        "file": "arm7_wram.bin",
+        "expected_size": 65536
+      },
+      {
+        "name": "ARM9 BIOS",
+        "file": "arm9_bios.bin",
+        "expected_size": 4096
+      },
+      {
+        "name": "Data TCM",
+        "file": "dtcm.bin",
+        "expected_size": 16384
+      },
+      {
+        "name": "Firmware",
+        "file": "firmware.bin",
+        "expected_size": 131072
+      },
+      {
+        "name": "Instruction TCM",
+        "file": "itcm.bin",
+        "expected_size": 32768
+      },
+      {
+        "name": "SRAM",
+        "file": "sram.bin",
+        "expected_size": 524288
+      },
+      {
+        "name": "Shared WRAM",
+        "file": "shared_wram.bin",
+        "expected_size": 32768
+      },
+      {
+        "name": "Waterbox PageData",
+        "file": "waterbox_pagedata.bin",
+        "expected_size": 251217
+      }
+    ]
+  },
+  "artifacts": {
+    "main_ram.bin": {
+      "exists": true,
+      "size": 4194304,
+      "sha256": "226b6587efdd1a828e1b28b3e433f71eca300fed4bf49264a47b51d53b172bca"
+    },
+    "arm7_bios.bin": {
+      "exists": true,
+      "size": 16384,
+      "sha256": "80ae613b1cfd4cd56dd49f9e985b9788563388facaf0d0f5f78ea2b185f3f7c5"
+    },
+    "arm7_wram.bin": {
+      "exists": true,
+      "size": 65536,
+      "sha256": "24bbe10e78db4141fd6afff1e1639472e8b5d0adaf2d92c02f27eca8d11b208a"
+    },
+    "arm9_bios.bin": {
+      "exists": true,
+      "size": 4096,
+      "sha256": "ec78d3e8e068e31a4c9368c5bb3d35bdeb37783e8a57efbb0ae0fa80c502d005"
+    },
+    "dtcm.bin": {
+      "exists": true,
+      "size": 16384,
+      "sha256": "94c37d563efa1356402bdaea6640647bad11abb6d3e649fb3276f3634a2becc2"
+    },
+    "firmware.bin": {
+      "exists": true,
+      "size": 131072,
+      "sha256": "da783c9312cbdd132774f17c7db5b4ee0a1ab49ecf5039479e9bf93bc63682be"
+    },
+    "itcm.bin": {
+      "exists": true,
+      "size": 32768,
+      "sha256": "167617acf41237e97f0b298c4d91d7950dced60a29ac1a64dd42b63f5093731c"
+    },
+    "sram.bin": {
+      "exists": true,
+      "size": 524288,
+      "sha256": "aa732fa07993ef919b21d62fc7cfd2d07581b382c9fc7f9b0dc045b55623594a"
+    },
+    "shared_wram.bin": {
+      "exists": true,
+      "size": 32768,
+      "sha256": "db78ce573e03067212f9f0c9c25266ca17d7fae3a3ca321f0a35c70396da2522"
+    },
+    "waterbox_pagedata.bin": {
+      "exists": true,
+      "size": 251217,
+      "sha256": "7e72746030cf72d7d8aec1faba495e3582638db061cfc44ad94a301613344eb7"
+    },
+    "screen.png": {
+      "exists": true,
+      "size": 22135,
+      "sha256": "d9a80313525b7a56942a4e46c42c2615d3e8a258eae83fafdd2c5df7dcfdfdba"
+    },
+    "manifest.json": {
+      "exists": true,
+      "size": 11444,
+      "sha256": "72c99189f397664e42965a142e3aa566c7b224b0b2c3a6b187a7b66d89c336e9"
+    },
+    "metadata.json": {
+      "exists": true,
+      "size": 5358,
+      "sha256": "016e47d2356cefd24c13d4dfb23a894b98b0b94ea1088b7afe74b7543f7dcb6f"
+    },
+    "semantic_state.json": {
+      "exists": true,
+      "size": 5441,
+      "sha256": "f74ff6011f0736e4d3bdb4bfe5c3c2899f5204d3004fd9eec83f01d3a56e00e0"
+    },
+    "registers.json": {
+      "exists": true,
+      "size": 759,
+      "sha256": "fcfad6f7f2edf33aca191a882f855e85fd73f9842497c7f6becbdd2329c6257c"
+    },
+    "critical_ranges.json": {
+      "exists": true,
+      "size": 112459,
+      "sha256": "c36ba764e83709933cfc996f4f2e14b381535b14524d49c8c429d3f451611336"
+    },
+    "heap_candidates.json": {
+      "exists": true,
+      "size": 673994,
+      "sha256": "841e18e80fbbdb8ba11bd10457e75d34a36c0140d43267078abe4cbc027bb8f1"
+    },
+    "memory_domains.json": {
+      "exists": true,
+      "size": 3262,
+      "sha256": "779c91bb46f9029e2eb4b5a6d28dd16193be14617639ee41f058f102aee4d380"
+    },
+    "memory_domain_inventory.json": {
+      "exists": true,
+      "size": 3407,
+      "sha256": "c18a34dd2dd4c13a056eeb23eec1051780dd8522b1fd1dc0298ad2e2f5357b00"
+    },
+    "runtime_world.json": {
+      "exists": true,
+      "size": 3122,
+      "sha256": "159c3b02e96e30bcc638349aec16ca3c5172dc375508463c29a2e7b002b6292d"
+    }
+  }
+}

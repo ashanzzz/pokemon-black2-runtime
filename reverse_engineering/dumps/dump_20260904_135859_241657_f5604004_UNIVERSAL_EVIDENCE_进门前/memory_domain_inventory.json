@@ -1,0 +1,155 @@
+{
+  "schema": "pokemon_black2_memory_inventory/v1",
+  "inventory_status": "verified",
+  "source": "BizHawk memory.domains immediately before memory.dump_universal",
+  "reported_domains": {
+    "Data TCM": {
+      "name": "Data TCM",
+      "size": 16384,
+      "writable": true,
+      "readable": true
+    },
+    "ARM9 System Bus": {
+      "name": "ARM9 System Bus",
+      "size": 0,
+      "writable": true,
+      "readable": true
+    },
+    "ARM7 BIOS": {
+      "name": "ARM7 BIOS",
+      "size": 16384,
+      "writable": true,
+      "readable": true
+    },
+    "ARM7 WRAM": {
+      "name": "ARM7 WRAM",
+      "size": 65536,
+      "writable": true,
+      "readable": true
+    },
+    "Main RAM": {
+      "name": "Main RAM",
+      "size": 4194304,
+      "writable": true,
+      "readable": true
+    },
+    "Shared WRAM": {
+      "name": "Shared WRAM",
+      "size": 32768,
+      "writable": true,
+      "readable": true
+    },
+    "Instruction TCM": {
+      "name": "Instruction TCM",
+      "size": 32768,
+      "writable": true,
+      "readable": true
+    },
+    "ARM7 System Bus": {
+      "name": "ARM7 System Bus",
+      "size": 0,
+      "writable": true,
+      "readable": true
+    },
+    "ROM": {
+      "name": "ROM",
+      "size": 536870912,
+      "writable": true,
+      "readable": true
+    },
+    "ARM9 BIOS": {
+      "name": "ARM9 BIOS",
+      "size": 4096,
+      "writable": true,
+      "readable": true
+    },
+    "Firmware": {
+      "name": "Firmware",
+      "size": 131072,
+      "writable": true,
+      "readable": true
+    },
+    "Waterbox PageData": {
+      "name": "Waterbox PageData",
+      "size": 251217,
+      "writable": true,
+      "readable": true
+    },
+    "SRAM": {
+      "name": "SRAM",
+      "size": 524288,
+      "writable": true,
+      "readable": true
+    }
+  },
+  "excluded": [
+    {
+      "name": "ARM9 System Bus",
+      "size": 0,
+      "reason": "virtual bus alias has no independent byte range"
+    },
+    {
+      "name": "ARM7 System Bus",
+      "size": 0,
+      "reason": "virtual bus alias has no independent byte range"
+    },
+    {
+      "name": "ROM",
+      "size": 536870912,
+      "reason": "ROM/game file is explicitly excluded"
+    }
+  ],
+  "physical_dump_frame": 5604005,
+  "exported_domains": [
+    {
+      "name": "Main RAM",
+      "file": "main_ram.bin",
+      "expected_size": 4194304
+    },
+    {
+      "name": "ARM7 BIOS",
+      "file": "arm7_bios.bin",
+      "expected_size": 16384
+    },
+    {
+      "name": "ARM7 WRAM",
+      "file": "arm7_wram.bin",
+      "expected_size": 65536
+    },
+    {
+      "name": "ARM9 BIOS",
+      "file": "arm9_bios.bin",
+      "expected_size": 4096
+    },
+    {
+      "name": "Data TCM",
+      "file": "dtcm.bin",
+      "expected_size": 16384
+    },
+    {
+      "name": "Firmware",
+      "file": "firmware.bin",
+      "expected_size": 131072
+    },
+    {
+      "name": "Instruction TCM",
+      "file": "itcm.bin",
+      "expected_size": 32768
+    },
+    {
+      "name": "SRAM",
+      "file": "sram.bin",
+      "expected_size": 524288
+    },
+    {
+      "name": "Shared WRAM",
+      "file": "shared_wram.bin",
+      "expected_size": 32768
+    },
+    {
+      "name": "Waterbox PageData",
+      "file": "waterbox_pagedata.bin",
+      "expected_size": 251217
+    }
+  ]
+}

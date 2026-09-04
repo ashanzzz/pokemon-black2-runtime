@@ -1,0 +1,303 @@
+{
+  "schema_version": "universal_snapshot/v2",
+  "snapshot_id": "dump_20260904_141349_871950_f5233080_UNIVERSAL_EVIDENCE_stable-screen-capture",
+  "timestamp_utc": "2026-09-04T06:13:50.262283+00:00",
+  "frame": 5233082,
+  "semantic_state_frame": 5233080,
+  "frame_delta": 2,
+  "category": "UNIVERSAL_EVIDENCE",
+  "label": "stable-screen-capture",
+  "operator_notes": "性能修复后的完整运行时证据采集",
+  "rom_hash": "8DB71663502BBF3B43AC3C9052EC390C390BE62F",
+  "capture_complete": true,
+  "capture_errors": [],
+  "files": {
+    "main_ram_bin": "main_ram.bin",
+    "screen_png": "screen.png",
+    "semantic_state_json": "semantic_state.json",
+    "registers_json": "registers.json",
+    "critical_ranges_json": "critical_ranges.json",
+    "heap_candidates_json": "heap_candidates.json",
+    "memory_domains_json": "memory_domains.json",
+    "memory_domain_inventory_json": "memory_domain_inventory.json",
+    "runtime_world_json": "runtime_world.json",
+    "metadata_json": "metadata.json",
+    "memory_domain_main_ram": "main_ram.bin",
+    "memory_domain_arm7_bios": "arm7_bios.bin",
+    "memory_domain_arm7_wram": "arm7_wram.bin",
+    "memory_domain_arm9_bios": "arm9_bios.bin",
+    "memory_domain_dtcm": "dtcm.bin",
+    "memory_domain_firmware": "firmware.bin",
+    "memory_domain_itcm": "itcm.bin",
+    "memory_domain_sram": "sram.bin",
+    "memory_domain_shared_wram": "shared_wram.bin",
+    "memory_domain_waterbox_pagedata": "waterbox_pagedata.bin"
+  },
+  "artifacts": {
+    "main_ram.bin": {
+      "exists": true,
+      "size": 4194304,
+      "sha256": "a55bc99a7e58a6d0abf1a4675aa594511cb6c1d936d1baf6820502f7ac3df61c"
+    },
+    "arm7_bios.bin": {
+      "exists": true,
+      "size": 16384,
+      "sha256": "80ae613b1cfd4cd56dd49f9e985b9788563388facaf0d0f5f78ea2b185f3f7c5"
+    },
+    "arm7_wram.bin": {
+      "exists": true,
+      "size": 65536,
+      "sha256": "baf16739783ca0b3b803523f6eb788269a0546efcf340d3bdc5cf9aba0b0fd52"
+    },
+    "arm9_bios.bin": {
+      "exists": true,
+      "size": 4096,
+      "sha256": "ec78d3e8e068e31a4c9368c5bb3d35bdeb37783e8a57efbb0ae0fa80c502d005"
+    },
+    "dtcm.bin": {
+      "exists": true,
+      "size": 16384,
+      "sha256": "24a60c9c2c6211006e5a1483ae12a7486444305f7551d852c66f68cc8bc63018"
+    },
+    "firmware.bin": {
+      "exists": true,
+      "size": 131072,
+      "sha256": "da783c9312cbdd132774f17c7db5b4ee0a1ab49ecf5039479e9bf93bc63682be"
+    },
+    "itcm.bin": {
+      "exists": true,
+      "size": 32768,
+      "sha256": "167617acf41237e97f0b298c4d91d7950dced60a29ac1a64dd42b63f5093731c"
+    },
+    "sram.bin": {
+      "exists": true,
+      "size": 524288,
+      "sha256": "aa732fa07993ef919b21d62fc7cfd2d07581b382c9fc7f9b0dc045b55623594a"
+    },
+    "shared_wram.bin": {
+      "exists": true,
+      "size": 32768,
+      "sha256": "db78ce573e03067212f9f0c9c25266ca17d7fae3a3ca321f0a35c70396da2522"
+    },
+    "waterbox_pagedata.bin": {
+      "exists": true,
+      "size": 251217,
+      "sha256": "adbe257112cdba0dd5d078637f0a8388ce8703b445dbb52d493a93b3e561dc59"
+    },
+    "screen.png": {
+      "exists": true,
+      "size": 28949,
+      "sha256": "fd40b4fbbced280a8ae8f96e8b8dc94d4ebfce539e653c8b59385c0120b2f01b"
+    },
+    "semantic_state.json": {
+      "exists": true,
+      "size": 3908,
+      "sha256": "3794f21add624bc9bc2db459c38eedf31cce31e66bf82d5fa3591588f8a4daae"
+    },
+    "registers.json": {
+      "exists": true,
+      "size": 755,
+      "sha256": "d561b70edc33bbb977140449cb33c23d9306cc18f60ad8be3110d75f2bb3a40b"
+    },
+    "critical_ranges.json": {
+      "exists": true,
+      "size": 112459,
+      "sha256": "668d590a16d4dab559eb62c1abe393f3e818d5af588a74959ae116817f17901e"
+    },
+    "heap_candidates.json": {
+      "exists": true,
+      "size": 494391,
+      "sha256": "a8fced556df3f23ba06b328ec19b81c4db636df24d555cf216ad19320da06337"
+    },
+    "memory_domains.json": {
+      "exists": true,
+      "size": 3262,
+      "sha256": "06c3645ad5a89ae671f9e82682def43342eab9f946df75efdf1958c082c673ad"
+    },
+    "memory_domain_inventory.json": {
+      "exists": true,
+      "size": 3407,
+      "sha256": "8bd48e9e8312f7e8f3430d97136f774bc969dd12f63066bf8d9c97f2df0a85f4"
+    },
+    "runtime_world.json": {
+      "exists": true,
+      "size": 3121,
+      "sha256": "077fe1d56268910211c648c101d874891cbd05800f134e8e6c004aa440ce8218"
+    },
+    "metadata.json": {
+      "exists": true,
+      "size": 3830,
+      "sha256": "0cf190cd71876446b8611871415f7689aaac9620be73738890658adbbfcba8b4"
+    }
+  },
+  "registers": {
+    "ARM9 r6": 0,
+    "ARM7 r3": 262169,
+    "ARM9 r13": 50214024,
+    "ARM9 r12": 128,
+    "ARM9 r1": 32,
+    "ARM7 r10": 0,
+    "ARM7 r11": 0,
+    "ARM9 r2": 67109076,
+    "ARM9 r8": 0,
+    "ARM9 r0": 2218786934,
+    "ARM9 r10": 0,
+    "ARM7 r0": 67108864,
+    "ARM7 r4": 31,
+    "ARM7 r1": 50330684,
+    "ARM9 r14": 33524747,
+    "ARM9 r3": 2218786934,
+    "ARM7 r14": 58687720,
+    "ARM9 r5": 3,
+    "ARM9 r11": 0,
+    "ARM7 r6": 0,
+    "ARM9 r4": 0,
+    "ARM7 r5": 1,
+    "ARM7 r8": 0,
+    "ARM9 r15": 33524808,
+    "ARM7 r15": 4444,
+    "ARM7 r7": 0,
+    "ARM9 r9": 0,
+    "ARM9 r7": 0,
+    "ARM7 r9": 0,
+    "ARM7 r13": 58784616,
+    "ARM7 r12": 6,
+    "ARM7 r2": 128
+  },
+  "player": {
+    "verified": false,
+    "grid_x": null,
+    "grid_y": null,
+    "elevation_z": null,
+    "world_fx_x": null,
+    "world_fx_y": null,
+    "facing": "Unresolved",
+    "movement_state": "Unresolved",
+    "ex_posture": "Walk/Run"
+  },
+  "actors": [],
+  "map": {
+    "map_section_id": null,
+    "location_name": "实时 ARM9 地图（Map Section 未验证）",
+    "matrix_id": null,
+    "chunk_index": null
+  },
+  "dialogue": {
+    "active": true,
+    "hardware_lock": true,
+    "speaker": "城镇居民 / 剧情 NPC",
+    "speaker_category": "NPC",
+    "visible_lines": [],
+    "raw_loaded_stream": "",
+    "printer_phase": 2,
+    "source_cursor": "0x022490FA",
+    "confidence": "probable"
+  },
+  "raw_state_dump": {
+    "timestamp": 1788502429.9136832,
+    "frame": 5233080,
+    "context": {
+      "screen_type": "DIALOGUE_ACTIVE",
+      "screen_description": "【对话中】可见文字、等待按键状态和说话 Actor 尚未由 RAM 结构验证",
+      "available_actions": [
+        "按 A 键继续对话",
+        "按 B 键加速文字"
+      ],
+      "can_move_player": false,
+      "is_dialogue_active": true,
+      "dialogue_text": "",
+      "full_dialogue_text": "",
+      "loaded_dialogue_text": "",
+      "speaker": "城镇居民 / 剧情 NPC",
+      "speaker_category": "NPC",
+      "active_pointer": null,
+      "dialogue_start_time": "2026-09-04 14:13:20",
+      "dialogue_duration_sec": 29.65,
+      "printer": {
+        "is_active": true,
+        "is_printing": false,
+        "waiting_for_input": true,
+        "current_line": 0,
+        "line_pixel_y": null,
+        "cursor_x": null,
+        "cursor_y": null,
+        "full_text": "",
+        "current_page_text": "",
+        "lines": [],
+        "total_chars": null,
+        "printed_chars": null,
+        "remaining_chars": null,
+        "progress_pct": null,
+        "visible_text_confidence": "probable",
+        "visible_text_source": "DynamicDialogueResolver + VisibleTextLedger",
+        "loaded_text": "",
+        "renderer_kind": "dynamic_token_stream_resolver",
+        "control_phase": null,
+        "first_page_latch": null,
+        "current_char_pointer": null,
+        "scroll_distance_px": null,
+        "pending_control": null,
+        "line_advance_px": null,
+        "bitmap_surface_sha256": null,
+        "source_range": {},
+        "layout_scope": "unresolved",
+        "candidate_model_confidence": "verified_for_tested_dialogue",
+        "candidate_model_reason": "unresolved",
+        "candidate_lines": [],
+        "candidate_control_phase": 2,
+        "candidate_first_page_latch": 1,
+        "candidate_continuation_cursor": "0x022490FA",
+        "candidate_scroll_progress_px": null,
+        "candidate_pending_control": null,
+        "candidate_cursor_x": null,
+        "candidate_cursor_y": null,
+        "candidate_line_step_px": null,
+        "candidate_surface_sha256": null,
+        "candidate_source_range": {},
+        "candidate_layout_scope": "unresolved"
+      },
+      "choices": [],
+      "recommended_action": "手动观察后按 A；当前 RAM 解析器不会自动判定已可翻页",
+      "dialogue_history": [
+        {
+          "id": 1,
+          "start_time": "2026-09-04 14:13:20",
+          "end_time": null,
+          "unix_timestamp": 1788502400.2663603,
+          "frame_start": 5231405,
+          "frame_end": 5233080,
+          "speaker": "说话者未解析",
+          "speaker_category": "UNRESOLVED",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "",
+          "duration_seconds": 29.65,
+          "is_active": true,
+          "has_choices": false,
+          "choices": []
+        }
+      ]
+    },
+    "location": "实时 ARM9 地图（Map Section 未验证）",
+    "map_loaded": true,
+    "player_name": "zero",
+    "rival_name": "NO",
+    "gender": "男孩子 (Male)",
+    "party_count": 0,
+    "money": 3000,
+    "badges": 0,
+    "ready_for_input": false,
+    "suggested_buttons": [
+      "A"
+    ],
+    "map_section_id": null,
+    "player_facing": "Unresolved",
+    "movement_state": "Unresolved",
+    "player_world_pos": {
+      "x": null,
+      "y": null,
+      "z": null
+    },
+    "player_position_verified": false
+  }
+}

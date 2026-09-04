@@ -1,0 +1,106 @@
+{
+  "schema": "pokemon_black2_runtime_world_export/v1",
+  "physical_dump_frame": 5607497,
+  "semantic_state_frame": 5607495,
+  "frame_delta": 2,
+  "authority": {
+    "dynamic_facts": "main_ram.bin and the other raw memory-domain files at physical_dump_frame",
+    "semantic_context": "semantic_state.json sampled before the physical dump; never treat it as same-frame raw memory",
+    "static_resources": "not joined into this export until the current resource is confirmed from runtime RAM"
+  },
+  "player": {
+    "actor": {
+      "value": null,
+      "confidence": "unresolved",
+      "reason": "FieldPlayerCore -> PlayerActor chain is not verified"
+    },
+    "world_position": {
+      "value": {
+        "x": 59,
+        "y": 724,
+        "z": 1
+      },
+      "confidence": "verified",
+      "source": "semantic_state.json"
+    },
+    "facing": {
+      "value": "South",
+      "confidence": "verified"
+    },
+    "movement": {
+      "value": "Idle (静止)",
+      "confidence": "verified"
+    }
+  },
+  "map": {
+    "map_section_id": {
+      "value": null,
+      "confidence": "unresolved",
+      "physical_dump_frame": 5607497,
+      "votes": [
+        {
+          "domain": "Main RAM",
+          "offset": "0x1434A6",
+          "address": "0x021434A6",
+          "u16_le": 42,
+          "plausible": true
+        },
+        {
+          "domain": "Main RAM",
+          "offset": "0x143668",
+          "address": "0x02143668",
+          "u16_le": 23,
+          "plausible": true
+        },
+        {
+          "domain": "Main RAM",
+          "offset": "0x146CE8",
+          "address": "0x02146CE8",
+          "u16_le": 236,
+          "plausible": true
+        },
+        {
+          "domain": "Main RAM",
+          "offset": "0x146EB2",
+          "address": "0x02146EB2",
+          "u16_le": 0,
+          "plausible": false
+        }
+      ],
+      "reason": "no repeatable map-section mirror agreement in this physical dump"
+    },
+    "matrix_id": {
+      "value": null,
+      "confidence": "unresolved"
+    },
+    "loaded_chunks": {
+      "value": [],
+      "confidence": "unresolved"
+    }
+  },
+  "actors": {
+    "count": {
+      "value": null,
+      "confidence": "unresolved"
+    },
+    "runtime_actors": [],
+    "npc_names": {
+      "value": [],
+      "confidence": "unresolved",
+      "reason": "NPC names require a verified runtime actor/script/text binding"
+    },
+    "reason": "ActorHeap layout and FieldActor stride have not yet been verified for this ROM/session"
+  },
+  "interactions": {
+    "warps": [],
+    "triggers": [],
+    "objects": [],
+    "confidence": "unresolved"
+  },
+  "unresolved_runtime_subsystems": {
+    "trainer_and_party": "raw bytes are included in memory domains; a save/runtime decoder is not verified",
+    "battle": "raw bytes are included in memory domains; battle object resolver is not verified",
+    "camera": "raw bytes are included in memory domains; FieldCamera resolver is not verified",
+    "terrain_and_collision": "raw bytes are included in memory domains; current terrain resolver is not verified"
+  }
+}

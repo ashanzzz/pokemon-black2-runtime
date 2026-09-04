@@ -1,0 +1,380 @@
+{
+  "schema_version": "universal_snapshot/v2",
+  "snapshot_id": "dump_20260904_142746_931215_f5281362_UNIVERSAL_EVIDENCE_当前无法解析的文字_哎_性格是孤独___无法解析的第二页",
+  "timestamp_utc": "2026-09-04T06:27:47.726839+00:00",
+  "frame": 5281387,
+  "semantic_state_frame": 5281362,
+  "frame_delta": 25,
+  "category": "UNIVERSAL_EVIDENCE",
+  "label": "当前无法解析的文字，哎？性格是孤独……，无法解析的第二页",
+  "operator_notes": "当前无法解析的文字，哎？erq的水水獭……，在和一个宠物中心的人对话，咱们当前无法解析第一页和第二页j，第但第三页可以解析出，当前这个是第二页来",
+  "rom_hash": "8DB71663502BBF3B43AC3C9052EC390C390BE62F",
+  "capture_complete": true,
+  "capture_errors": [],
+  "files": {
+    "main_ram_bin": "main_ram.bin",
+    "screen_png": "screen.png",
+    "semantic_state_json": "semantic_state.json",
+    "registers_json": "registers.json",
+    "critical_ranges_json": "critical_ranges.json",
+    "heap_candidates_json": "heap_candidates.json",
+    "memory_domains_json": "memory_domains.json",
+    "memory_domain_inventory_json": "memory_domain_inventory.json",
+    "runtime_world_json": "runtime_world.json",
+    "metadata_json": "metadata.json",
+    "memory_domain_main_ram": "main_ram.bin",
+    "memory_domain_arm7_bios": "arm7_bios.bin",
+    "memory_domain_arm7_wram": "arm7_wram.bin",
+    "memory_domain_arm9_bios": "arm9_bios.bin",
+    "memory_domain_dtcm": "dtcm.bin",
+    "memory_domain_firmware": "firmware.bin",
+    "memory_domain_itcm": "itcm.bin",
+    "memory_domain_sram": "sram.bin",
+    "memory_domain_shared_wram": "shared_wram.bin",
+    "memory_domain_waterbox_pagedata": "waterbox_pagedata.bin"
+  },
+  "artifacts": {
+    "main_ram.bin": {
+      "exists": true,
+      "size": 4194304,
+      "sha256": "f51feaf7795cf91c97f8170b896a40ad6948d07bba5783b356bbea5a30e64aec"
+    },
+    "arm7_bios.bin": {
+      "exists": true,
+      "size": 16384,
+      "sha256": "80ae613b1cfd4cd56dd49f9e985b9788563388facaf0d0f5f78ea2b185f3f7c5"
+    },
+    "arm7_wram.bin": {
+      "exists": true,
+      "size": 65536,
+      "sha256": "a22da4964965cdfbbe1af304a82adbd5013f5ea0b240d5b4c380671001bdc44d"
+    },
+    "arm9_bios.bin": {
+      "exists": true,
+      "size": 4096,
+      "sha256": "ec78d3e8e068e31a4c9368c5bb3d35bdeb37783e8a57efbb0ae0fa80c502d005"
+    },
+    "dtcm.bin": {
+      "exists": true,
+      "size": 16384,
+      "sha256": "667cda7be43d0e463e39baea7150e7149acf613508a1bfc8719be45dc2bfdf85"
+    },
+    "firmware.bin": {
+      "exists": true,
+      "size": 131072,
+      "sha256": "da783c9312cbdd132774f17c7db5b4ee0a1ab49ecf5039479e9bf93bc63682be"
+    },
+    "itcm.bin": {
+      "exists": true,
+      "size": 32768,
+      "sha256": "167617acf41237e97f0b298c4d91d7950dced60a29ac1a64dd42b63f5093731c"
+    },
+    "sram.bin": {
+      "exists": true,
+      "size": 524288,
+      "sha256": "aa732fa07993ef919b21d62fc7cfd2d07581b382c9fc7f9b0dc045b55623594a"
+    },
+    "shared_wram.bin": {
+      "exists": true,
+      "size": 32768,
+      "sha256": "db78ce573e03067212f9f0c9c25266ca17d7fae3a3ca321f0a35c70396da2522"
+    },
+    "waterbox_pagedata.bin": {
+      "exists": true,
+      "size": 251217,
+      "sha256": "8db47d6b93f443ea74cc83639af47a1cd2adbdfc75600dc9bca38ceb0a651d31"
+    },
+    "screen.png": {
+      "exists": true,
+      "size": 22786,
+      "sha256": "8b32c6feca60c686b612e2b696456d473643688d6a42e69b8744a38c4389237a"
+    },
+    "semantic_state.json": {
+      "exists": true,
+      "size": 7016,
+      "sha256": "995b735ddf75926e025f75e355768b9d4c4b72ad5dc0c32cf9ebe17d5083c811"
+    },
+    "registers.json": {
+      "exists": true,
+      "size": 759,
+      "sha256": "d365c636d05c8c88792fb5e72f2e671bce8d30b21adc2859da03b6b3fe183523"
+    },
+    "critical_ranges.json": {
+      "exists": true,
+      "size": 112459,
+      "sha256": "153ff8a0e481128712826134b03a8a4d99367600bc0f7165ea4f80331ee1573c"
+    },
+    "heap_candidates.json": {
+      "exists": true,
+      "size": 957355,
+      "sha256": "a110df6103916089c2e63675596effb87cd053340fa6f6aad47eb7869a9300ad"
+    },
+    "memory_domains.json": {
+      "exists": true,
+      "size": 3262,
+      "sha256": "ce4d21ed73ce0864d172f2baba6cfee4fc403edff17d12bcd0c89d3a9122f513"
+    },
+    "memory_domain_inventory.json": {
+      "exists": true,
+      "size": 3407,
+      "sha256": "a63eae1a5edf23740bbcce495715eaf7d33a0060b428920b4da71689b63dbe8e"
+    },
+    "runtime_world.json": {
+      "exists": true,
+      "size": 3121,
+      "sha256": "2d8ded072bfca1a6b702aabbbc9d6a957cadb3765184a00cfd20b5ce9c4916ca"
+    },
+    "metadata.json": {
+      "exists": true,
+      "size": 7000,
+      "sha256": "b19269ce566a773f6f312a598b25c32e1bdb6aaa47ea0b7ecec3d6c82b7f3099"
+    }
+  },
+  "registers": {
+    "ARM9 r6": 32768,
+    "ARM7 r3": 262169,
+    "ARM9 r13": 50216752,
+    "ARM9 r12": 67109392,
+    "ARM9 r1": 50200608,
+    "ARM7 r10": 0,
+    "ARM7 r11": 0,
+    "ARM9 r2": 34913112,
+    "ARM9 r8": 0,
+    "ARM9 r0": 0,
+    "ARM9 r10": 0,
+    "ARM7 r0": 67108864,
+    "ARM7 r4": 31,
+    "ARM7 r1": 50330684,
+    "ARM9 r14": 34046551,
+    "ARM9 r3": 6,
+    "ARM7 r14": 58687720,
+    "ARM9 r5": 34052357,
+    "ARM9 r11": 0,
+    "ARM7 r6": 0,
+    "ARM9 r4": 1,
+    "ARM7 r5": 1,
+    "ARM7 r8": 0,
+    "ARM9 r15": 34052694,
+    "ARM7 r15": 4444,
+    "ARM7 r7": 0,
+    "ARM9 r9": 0,
+    "ARM9 r7": 0,
+    "ARM7 r9": 0,
+    "ARM7 r13": 58784616,
+    "ARM7 r12": 6,
+    "ARM7 r2": 128
+  },
+  "player": {
+    "verified": false,
+    "grid_x": null,
+    "grid_y": null,
+    "elevation_z": null,
+    "world_fx_x": null,
+    "world_fx_y": null,
+    "facing": "Unresolved",
+    "movement_state": "Unresolved",
+    "ex_posture": "Walk/Run"
+  },
+  "actors": [],
+  "map": {
+    "map_section_id": null,
+    "location_name": "实时 ARM9 地图（Map Section 未验证）",
+    "matrix_id": null,
+    "chunk_index": null
+  },
+  "dialogue": {
+    "active": true,
+    "hardware_lock": true,
+    "speaker": "城镇居民 / 剧情 NPC",
+    "speaker_category": "NPC",
+    "visible_lines": [
+      "和这宝可梦一起",
+      "肯定会有一场很有意思的冒险！"
+    ],
+    "raw_loaded_stream": "和这宝可梦一起\n肯定会有一场很有意思的冒险！",
+    "printer_phase": 2,
+    "source_cursor": "0x022490F2",
+    "confidence": "probable"
+  },
+  "raw_state_dump": {
+    "timestamp": 1788503266.9815702,
+    "frame": 5281362,
+    "context": {
+      "screen_type": "DIALOGUE_ACTIVE",
+      "screen_description": "【对话中】可见文字、等待按键状态和说话 Actor 尚未由 RAM 结构验证",
+      "available_actions": [
+        "按 A 键继续对话",
+        "按 B 键加速文字"
+      ],
+      "can_move_player": false,
+      "is_dialogue_active": true,
+      "dialogue_text": "和这宝可梦一起\n肯定会有一场很有意思的冒险！",
+      "full_dialogue_text": "和这宝可梦一起\n肯定会有一场很有意思的冒险！",
+      "loaded_dialogue_text": "和这宝可梦一起\n肯定会有一场很有意思的冒险！",
+      "speaker": "城镇居民 / 剧情 NPC",
+      "speaker_category": "NPC",
+      "active_pointer": null,
+      "dialogue_start_time": "2026-09-04 14:25:45",
+      "dialogue_duration_sec": 121.43,
+      "printer": {
+        "is_active": true,
+        "is_printing": false,
+        "waiting_for_input": true,
+        "current_line": 2,
+        "line_pixel_y": null,
+        "cursor_x": null,
+        "cursor_y": null,
+        "full_text": "",
+        "current_page_text": "和这宝可梦一起\n肯定会有一场很有意思的冒险！",
+        "lines": [
+          "和这宝可梦一起",
+          "肯定会有一场很有意思的冒险！"
+        ],
+        "total_chars": null,
+        "printed_chars": null,
+        "remaining_chars": null,
+        "progress_pct": null,
+        "visible_text_confidence": "probable",
+        "visible_text_source": "DynamicDialogueResolver + VisibleTextLedger",
+        "loaded_text": "",
+        "renderer_kind": "dynamic_token_stream_resolver",
+        "control_phase": null,
+        "first_page_latch": null,
+        "current_char_pointer": null,
+        "scroll_distance_px": null,
+        "pending_control": null,
+        "line_advance_px": null,
+        "bitmap_surface_sha256": null,
+        "source_range": {},
+        "layout_scope": "unresolved",
+        "candidate_model_confidence": "verified_for_tested_dialogue",
+        "candidate_model_reason": "unresolved",
+        "candidate_lines": [
+          "和这宝可梦一起",
+          "肯定会有一场很有意思的冒险！"
+        ],
+        "candidate_control_phase": 2,
+        "candidate_first_page_latch": 1,
+        "candidate_continuation_cursor": "0x022490F2",
+        "candidate_scroll_progress_px": null,
+        "candidate_pending_control": null,
+        "candidate_cursor_x": null,
+        "candidate_cursor_y": null,
+        "candidate_line_step_px": null,
+        "candidate_surface_sha256": null,
+        "candidate_source_range": {},
+        "candidate_layout_scope": "unresolved"
+      },
+      "choices": [],
+      "recommended_action": "手动观察后按 A；当前 RAM 解析器不会自动判定已可翻页",
+      "dialogue_history": [
+        {
+          "id": 5,
+          "start_time": "2026-09-04 14:25:45",
+          "end_time": null,
+          "unix_timestamp": 1788503145.5543606,
+          "frame_start": 5274192,
+          "frame_end": 5281363,
+          "speaker": "说话者未解析",
+          "speaker_category": "UNRESOLVED",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "和这宝可梦一起\n肯定会有一场很有意思的冒险！",
+          "duration_seconds": 121.47,
+          "is_active": true,
+          "has_choices": false,
+          "choices": []
+        },
+        {
+          "id": 4,
+          "start_time": "2026-09-04 14:25:28",
+          "end_time": "2026-09-04 14:25:44",
+          "unix_timestamp": 1788503128.8708172,
+          "frame_start": 5273194,
+          "frame_end": 5274130,
+          "speaker": "说话者未解析",
+          "speaker_category": "UNRESOLVED",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "和这宝可梦一起\n肯定会有一场很有意思的冒险！",
+          "duration_seconds": 15.64,
+          "is_active": false,
+          "has_choices": false,
+          "choices": []
+        },
+        {
+          "id": 3,
+          "start_time": "2026-09-04 14:19:17",
+          "end_time": "2026-09-04 14:25:24",
+          "unix_timestamp": 1788502757.459736,
+          "frame_start": 5251333,
+          "frame_end": 5272907,
+          "speaker": "说话者未解析",
+          "speaker_category": "UNRESOLVED",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "精灵球要怎么用！\n跟我来！",
+          "duration_seconds": 366.61,
+          "is_active": false,
+          "has_choices": false,
+          "choices": []
+        },
+        {
+          "id": 2,
+          "start_time": "2026-09-04 14:18:41",
+          "end_time": "2026-09-04 14:19:12",
+          "unix_timestamp": 1788502721.768251,
+          "frame_start": 5249226,
+          "frame_end": 5251056,
+          "speaker": "说话者未解析",
+          "speaker_category": "UNRESOLVED",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "两年前已经不一样了，\n还",
+          "duration_seconds": 30.98,
+          "is_active": false,
+          "has_choices": false,
+          "choices": []
+        },
+        {
+          "id": 1,
+          "start_time": "2026-09-04 14:13:20",
+          "end_time": "2026-09-04 14:18:40",
+          "unix_timestamp": 1788502400.2663603,
+          "frame_start": 5231405,
+          "frame_end": 5249150,
+          "speaker": "说话者未解析",
+          "speaker_category": "UNRESOLVED",
+          "location": "实时 ARM9 地图（Map Section 未验证）",
+          "map_section_id": null,
+          "text": "这就是\n红豆杉博士的请求。",
+          "duration_seconds": 320.17,
+          "is_active": false,
+          "has_choices": false,
+          "choices": []
+        }
+      ]
+    },
+    "location": "实时 ARM9 地图（Map Section 未验证）",
+    "map_loaded": true,
+    "player_name": "zero",
+    "rival_name": "NO",
+    "gender": "男孩子 (Male)",
+    "party_count": 0,
+    "money": 3000,
+    "badges": 0,
+    "ready_for_input": false,
+    "suggested_buttons": [
+      "A"
+    ],
+    "map_section_id": null,
+    "player_facing": "Unresolved",
+    "movement_state": "Unresolved",
+    "player_world_pos": {
+      "x": null,
+      "y": null,
+      "z": null
+    },
+    "player_position_verified": false
+  }
+}

@@ -8,7 +8,6 @@ venv/
 # Runtime output
 logs/
 /runtime/
-reverse_engineering/dumps/
 test_logs_tmp/
 *.log
 
