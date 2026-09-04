@@ -15,6 +15,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
+import tempfile
 import zipfile
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -25,6 +27,38 @@ from typing import Any, Dict, List, Optional
 SNAPSHOT_BASE_DIR = Path("reverse_engineering/dumps").resolve()
 MAIN_RAM_SIZE = 0x400000
 ARM9_MAIN_RAM_BASE = 0x02000000
+
+# These are the NDS memory domains exposed by the project BizHawk bridge.  A
+# universal capture is only complete when every one was written and its bytes
+# on disk match the requested size.  The raw files are the evidence; any JSON
+# derived below is an index for an AI, never a replacement for the dump.
+DUMP_DOMAINS = (
+    ("Main RAM", "main_ram.bin", 0x400000),
+    ("Instruction TCM", "itcm.bin", 0x8000),
+    ("Data TCM", "dtcm.bin", 0x4000),
+    ("Shared WRAM", "shared_wram.bin", 0x8000),
+    ("ARM7 WRAM", "arm7_wram.bin", 0x10000),
+    ("SRAM", "sram.bin", 0x80000),
+)
+
+_DOMAIN_FILE_NAMES = {
+    "Main RAM": "main_ram.bin",
+    "Instruction TCM": "itcm.bin",
+    "Data TCM": "dtcm.bin",
+    "Shared WRAM": "shared_wram.bin",
+    "ARM7 WRAM": "arm7_wram.bin",
+    "SRAM": "sram.bin",
+    "ARM9 BIOS": "arm9_bios.bin",
+    "ARM7 BIOS": "arm7_bios.bin",
+    "Firmware": "firmware.bin",
+    "Waterbox PageData": "waterbox_pagedata.bin",
+}
+_EXCLUDED_DOMAIN_NAMES = {"ROM"}
+
+# These mirrors are an evidence *candidate* for Map Section ID.  They are not
+# a verified Field/MapMtxSys pointer chain, so the export keeps both raw votes
+# and the lower confidence level instead of asserting a current map resource.
+MAP_ID_OFFSETS = (0x1434A6, 0x143668, 0x146CE8, 0x146EB2)
 
 # Convenience extracts taken from main_ram.bin itself. main_ram.bin remains the
 # authoritative source and allows discovery outside every known window.
@@ -58,7 +92,7 @@ class PlayerContext:
     world_fx_x: Optional[int] = None
     world_fx_y: Optional[int] = None
     facing: str = "Unknown"
-    movement_state: str = "Unresolved"
+    movement_state: str = "Idle"
     ex_posture: str = "Walk/Run"
 
 
@@ -170,6 +204,179 @@ def _extract_forensic_ranges(ram: bytes, frame: int) -> Dict[str, Any]:
     }
 
 
+def _domain_file_name(name: str) -> str:
+    known = _DOMAIN_FILE_NAMES.get(name)
+    if known:
+        return known
+    slug = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_") or "unnamed"
+    return f"domain_{slug}.bin"
+
+
+async def _resolve_dump_domains(transport: Any) -> tuple[tuple[tuple[str, str, int], ...], Dict[str, Any]]:
+    """Choose every readable, non-ROM memory domain reported by this BizHawk."""
+    reported: Any = {}
+    try:
+        reported = await transport.request("memory.domains")
+    except Exception as exc:
+        # The six memory domains are the verified minimum.  A failed inventory
+        # is recorded rather than quietly claiming an exhaustive export.
+        return DUMP_DOMAINS, {
+            "schema": "pokemon_black2_memory_inventory/v1",
+            "inventory_status": "fallback",
+            "reason": f"memory.domains failed: {type(exc).__name__}: {exc}",
+            "excluded": [],
+        }
+
+    if not isinstance(reported, dict):
+        reported = {}
+    selected: list[tuple[str, str, int]] = []
+    excluded: list[Dict[str, Any]] = []
+    for name, metadata in reported.items():
+        if not isinstance(name, str) or not isinstance(metadata, dict):
+            continue
+        size = metadata.get("size", 0)
+        try:
+            size = int(size)
+        except (TypeError, ValueError):
+            size = 0
+        if name in _EXCLUDED_DOMAIN_NAMES:
+            excluded.append({"name": name, "size": size, "reason": "ROM/game file is explicitly excluded"})
+        elif not metadata.get("readable", True):
+            excluded.append({"name": name, "size": size, "reason": "bridge marks domain unreadable"})
+        elif size <= 0:
+            excluded.append({"name": name, "size": size, "reason": "virtual bus alias has no independent byte range"})
+        else:
+            selected.append((name, _domain_file_name(name), size))
+
+    # A malformed/empty inventory must not turn into a successful zero-domain
+    # capture.  The known ARM9/ARM7 RAM set remains the conservative fallback.
+    if not selected:
+        return DUMP_DOMAINS, {
+            "schema": "pokemon_black2_memory_inventory/v1",
+            "inventory_status": "fallback",
+            "reason": "bridge returned no readable non-ROM domains",
+            "reported_domains": reported,
+            "excluded": excluded,
+        }
+    selected.sort(key=lambda item: (item[0] != "Main RAM", item[0]))
+    return tuple(selected), {
+        "schema": "pokemon_black2_memory_inventory/v1",
+        "inventory_status": "verified",
+        "source": "BizHawk memory.domains immediately before memory.dump_universal",
+        "reported_domains": reported,
+        "excluded": excluded,
+    }
+
+
+def _domain_evidence(
+    target_folder: Path, bridge_domains: Any, frame: int, dump_domains: tuple[tuple[str, str, int], ...]
+) -> Dict[str, Any]:
+    """Validate every requested domain against bytes actually written locally."""
+    bridge_domains = bridge_domains if isinstance(bridge_domains, dict) else {}
+    records = []
+    for name, file_name, expected_size in dump_domains:
+        path = target_folder / file_name
+        actual_size = path.stat().st_size if path.exists() and path.is_file() else 0
+        bridge = bridge_domains.get(name, {})
+        bridge_size = bridge.get("size") if isinstance(bridge, dict) else None
+        bridge_success = bool(bridge.get("success")) if isinstance(bridge, dict) else False
+        complete = actual_size == expected_size and bridge_size == expected_size and bridge_success
+        records.append({
+            "name": name,
+            "file": file_name,
+            "expected_size": expected_size,
+            "actual_size": actual_size,
+            "bridge_size": bridge_size,
+            "bridge_success": bridge_success,
+            "complete": complete,
+            "sha256": _sha256_file(path) if actual_size == expected_size else None,
+        })
+    return {
+        "schema": "pokemon_black2_memory_domains/v1",
+        "physical_dump_frame": frame,
+        "source": "BizHawk memory.dump_universal; sizes rechecked from local files",
+        "complete": all(record["complete"] for record in records),
+        "domains": records,
+    }
+
+
+def _map_identity_from_dump(ram: bytes, frame: int) -> Dict[str, Any]:
+    """Expose raw map-section mirror votes without upgrading them to Field data."""
+    votes: Dict[int, int] = {}
+    observations = []
+    for offset in MAP_ID_OFFSETS:
+        raw = ram[offset:offset + 2]
+        value = int.from_bytes(raw, "little") if len(raw) == 2 else None
+        plausible = value is not None and 0 < value < 4096
+        if plausible:
+            votes[value] = votes.get(value, 0) + 1
+        observations.append({
+            "domain": "Main RAM",
+            "offset": f"0x{offset:06X}",
+            "address": f"0x{ARM9_MAIN_RAM_BASE + offset:08X}",
+            "u16_le": value,
+            "plausible": plausible,
+        })
+    winner = max(votes, key=votes.get) if votes else None
+    matching = votes.get(winner, 0) if winner is not None else 0
+    return {
+        "value": winner if matching >= 2 else None,
+        "confidence": "candidate" if matching >= 2 else "unresolved",
+        "physical_dump_frame": frame,
+        "votes": observations,
+        "reason": (
+            "two or more RAM mirrors agree; Field/MapMtxSys pointer-chain validation is still required"
+            if matching >= 2 else "no repeatable map-section mirror agreement in this physical dump"
+        ),
+    }
+
+
+def _runtime_world_index(ram: bytes, frame: int, semantic_state: Any, semantic_frame: int) -> Dict[str, Any]:
+    """Machine-readable hand-off contract for AI analysis of one physical dump.
+
+    This deliberately does not turn static NPC spawns, dialogue guesses, or
+    legacy coordinate mirrors into runtime actors.  Those fields stay
+    unresolved until the FieldActor resolver has direct RAM evidence.
+    """
+    verified_position = bool(getattr(semantic_state, "player_position_verified", False))
+    position = getattr(semantic_state, "player_world_pos", {}) or {}
+    return {
+        "schema": "pokemon_black2_runtime_world_export/v1",
+        "physical_dump_frame": frame,
+        "semantic_state_frame": semantic_frame,
+        "frame_delta": frame - semantic_frame,
+        "authority": {
+            "dynamic_facts": "main_ram.bin and the other raw memory-domain files at physical_dump_frame",
+            "semantic_context": "semantic_state.json sampled before the physical dump; never treat it as same-frame raw memory",
+            "static_resources": "not joined into this export until the current resource is confirmed from runtime RAM",
+        },
+        "player": {
+            "actor": {"value": None, "confidence": "unresolved", "reason": "FieldPlayerCore -> PlayerActor chain is not verified"},
+            "world_position": {
+                "value": position if verified_position else None,
+                "confidence": "verified" if verified_position else "unresolved",
+                "source": "semantic_state.json" if verified_position else "no verified FieldActor position in this dump",
+            },
+            "facing": {"value": getattr(semantic_state, "player_facing", None) if verified_position else None, "confidence": "verified" if verified_position else "unresolved"},
+            "movement": {"value": getattr(semantic_state, "movement_state", None) if verified_position else None, "confidence": "verified" if verified_position else "unresolved"},
+        },
+        "map": {"map_section_id": _map_identity_from_dump(ram, frame), "matrix_id": {"value": None, "confidence": "unresolved"}, "loaded_chunks": {"value": [], "confidence": "unresolved"}},
+        "actors": {
+            "count": {"value": None, "confidence": "unresolved"},
+            "runtime_actors": [],
+            "npc_names": {"value": [], "confidence": "unresolved", "reason": "NPC names require a verified runtime actor/script/text binding"},
+            "reason": "ActorHeap layout and FieldActor stride have not yet been verified for this ROM/session",
+        },
+        "interactions": {"warps": [], "triggers": [], "objects": [], "confidence": "unresolved"},
+        "unresolved_runtime_subsystems": {
+            "trainer_and_party": "raw bytes are included in memory domains; a save/runtime decoder is not verified",
+            "battle": "raw bytes are included in memory domains; battle object resolver is not verified",
+            "camera": "raw bytes are included in memory domains; FieldCamera resolver is not verified",
+            "terrain_and_collision": "raw bytes are included in memory domains; current terrain resolver is not verified",
+        },
+    }
+
+
 def _scan_gfl_heap_candidates(ram: bytes, frame: int) -> Dict[str, Any]:
     """Record GFL-style heap headers as candidates without promoting semantics."""
     magic = b"\x44\x55\x00\x00"
@@ -247,6 +454,44 @@ def _build_bundle(target_folder: Path, snapshot_id: str, file_names: List[str]) 
     return bundle_path
 
 
+def _verify_bundle(bundle_path: Path, integrity_path: Path) -> Dict[str, Any]:
+    """Verify the downloadable archive, not merely its source directory."""
+    if not bundle_path.exists() or not bundle_path.is_file():
+        return {"ok": False, "reason": "ZIP file is missing"}
+    if not zipfile.is_zipfile(bundle_path):
+        return {"ok": False, "reason": "bundle is not a readable ZIP"}
+    try:
+        integrity = json.loads(integrity_path.read_text(encoding="utf-8"))
+        artifacts = integrity.get("artifacts", {})
+        expected = set(artifacts) | {"integrity.json"}
+        with zipfile.ZipFile(bundle_path) as archive:
+            names = set(archive.namelist())
+            corrupt_member = archive.testzip()
+            missing = sorted(expected - names)
+            mismatched = []
+            for file_name, metadata in artifacts.items():
+                expected_hash = metadata.get("sha256") if isinstance(metadata, dict) else None
+                if expected_hash and file_name in names:
+                    if _sha256_bytes(archive.read(file_name)) != expected_hash:
+                        mismatched.append(file_name)
+        if corrupt_member:
+            return {"ok": False, "reason": f"ZIP CRC failure: {corrupt_member}"}
+        if missing:
+            return {"ok": False, "reason": "ZIP missing expected members", "missing": missing}
+        if mismatched:
+            return {"ok": False, "reason": "ZIP member hash mismatch", "mismatched": mismatched}
+        if "screen.png" not in names:
+            return {"ok": False, "reason": "ZIP is missing screen.png"}
+        return {
+            "ok": True,
+            "member_count": len(names),
+            "verified_members": sorted(expected),
+            "sha256": _sha256_file(bundle_path),
+        }
+    except (OSError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        return {"ok": False, "reason": f"ZIP verification failed: {type(exc).__name__}: {exc}"}
+
+
 class UniversalSnapshotManager:
     """Create, validate, package, and list portable full-RAM snapshots."""
 
@@ -276,33 +521,65 @@ class UniversalSnapshotManager:
 
         bin_path = target_folder / "main_ram.bin"
         png_path = target_folder / "screen.png"
+        # BizHawk's embedded Lua file APIs can fail on a Unicode workspace
+        # path.  Let the bridge write to an ASCII-only temporary folder, then
+        # move the resulting raw files into the user-selected evidence folder
+        # before any validation or derived analysis occurs.
+        bridge_stage = Path(tempfile.mkdtemp(prefix="black2_dump_"))
+
+        dump_domains, domain_inventory = await _resolve_dump_domains(transport)
+        domains_spec = [
+            {"name": name, "file": file_name, "size": expected_size}
+            for name, file_name, expected_size in dump_domains
+        ]
 
         # RAM + screenshot + registers are captured by one bridge operation.
-        bridge_res = await transport.request(
-            "memory.dump_universal",
-            {
-                "bin_path": str(bin_path.resolve()),
-                "png_path": str(png_path.resolve()),
-                "domain": "Main RAM",
-                "size": MAIN_RAM_SIZE,
-            },
-        )
+        try:
+            bridge_res = await transport.request(
+                "memory.dump_universal",
+                {
+                    "dump_dir": str(bridge_stage).replace("\\", "/"),
+                    "bin_path": str(bridge_stage / "main_ram.bin").replace("\\", "/"),
+                    "png_path": str(bridge_stage / "screen.png").replace("\\", "/"),
+                    "domain": "Main RAM",
+                    "size": MAIN_RAM_SIZE,
+                    "domains": domains_spec,
+                },
+            )
+            for _name, file_name, _expected_size in dump_domains:
+                staged_file = bridge_stage / file_name
+                if staged_file.exists() and staged_file.is_file():
+                    shutil.move(str(staged_file), str(target_folder / file_name))
+            staged_screen = bridge_stage / "screen.png"
+            if staged_screen.exists() and staged_screen.is_file():
+                shutil.move(str(staged_screen), str(png_path))
+        finally:
+            shutil.rmtree(bridge_stage, ignore_errors=True)
         physical_frame = int(bridge_res.get("frame") or semantic_frame or 0)
         raw_regs = bridge_res.get("registers", {}) or {}
 
-        actual_ram_bytes = bin_path.stat().st_size if bin_path.exists() else 0
-        bridge_written_bytes = int(bridge_res.get("written_bytes", 0) or 0)
-        ram_ok = actual_ram_bytes == MAIN_RAM_SIZE and bridge_written_bytes == MAIN_RAM_SIZE
+        domains_payload = bridge_res.get("domains", {})
+        domain_inventory["physical_dump_frame"] = physical_frame
+        domain_inventory["exported_domains"] = [
+            {"name": name, "file": file_name, "expected_size": expected_size}
+            for name, file_name, expected_size in dump_domains
+        ]
+        memory_domains = _domain_evidence(target_folder, domains_payload, physical_frame, dump_domains)
+        main_domain = next(item for item in memory_domains["domains"] if item["name"] == "Main RAM")
+        actual_ram_bytes = int(main_domain["actual_size"])
+        bridge_written_bytes = int(main_domain["bridge_size"] or 0)
+        ram_ok = bool(main_domain["complete"])
         screen_ok = (
             bool(bridge_res.get("screenshot_saved", False))
             and png_path.exists()
             and png_path.stat().st_size > 0
         )
 
-        if not ram_ok:
-            capture_errors.append(
-                f"main_ram.bin incomplete: bridge={bridge_written_bytes}, file={actual_ram_bytes}, expected={MAIN_RAM_SIZE}"
-            )
+        for domain in memory_domains["domains"]:
+            if not domain["complete"]:
+                capture_errors.append(
+                    f"{domain['file']} incomplete: bridge={domain['bridge_size']}, file={domain['actual_size']}, expected={domain['expected_size']}"
+                )
         if not screen_ok:
             capture_errors.append("screen.png was not confirmed by the BizHawk bridge")
 
@@ -337,6 +614,9 @@ class UniversalSnapshotManager:
         registers_path = target_folder / "registers.json"
         critical_path = target_folder / "critical_ranges.json"
         heap_path = target_folder / "heap_candidates.json"
+        domains_path = target_folder / "memory_domains.json"
+        inventory_path = target_folder / "memory_domain_inventory.json"
+        runtime_world_path = target_folder / "runtime_world.json"
         metadata_path = target_folder / "metadata.json"
         manifest_path = target_folder / "manifest.json"
         integrity_path = target_folder / "integrity.json"
@@ -358,6 +638,7 @@ class UniversalSnapshotManager:
             ram = bin_path.read_bytes()
             _write_json(critical_path, _extract_forensic_ranges(ram, physical_frame))
             _write_json(heap_path, _scan_gfl_heap_candidates(ram, physical_frame))
+            _write_json(runtime_world_path, _runtime_world_index(ram, physical_frame, curr_state, semantic_frame))
         else:
             _write_json(
                 critical_path,
@@ -380,6 +661,18 @@ class UniversalSnapshotManager:
                     "all_candidates": [],
                 },
             )
+            _write_json(
+                runtime_world_path,
+                {
+                    "schema": "pokemon_black2_runtime_world_export/v1",
+                    "physical_dump_frame": physical_frame,
+                    "semantic_state_frame": semantic_frame,
+                    "error": "main_ram.bin is missing or incomplete; runtime index was not derived",
+                },
+            )
+
+        _write_json(domains_path, memory_domains)
+        _write_json(inventory_path, domain_inventory)
 
         _write_json(
             metadata_path,
@@ -393,7 +686,7 @@ class UniversalSnapshotManager:
             },
         )
 
-        capture_complete = ram_ok and screen_ok
+        capture_complete = bool(memory_domains["complete"]) and screen_ok
         files: Dict[str, str] = {}
         for key, path in (
             ("main_ram_bin", bin_path),
@@ -402,18 +695,28 @@ class UniversalSnapshotManager:
             ("registers_json", registers_path),
             ("critical_ranges_json", critical_path),
             ("heap_candidates_json", heap_path),
+            ("memory_domains_json", domains_path),
+            ("memory_domain_inventory_json", inventory_path),
+            ("runtime_world_json", runtime_world_path),
             ("metadata_json", metadata_path),
         ):
             if path.exists():
                 files[key] = path.name
+        for domain_name, file_name, _expected_size in dump_domains:
+            domain_file = target_folder / file_name
+            if domain_file.exists():
+                files[f"memory_domain_{_domain_file_name(domain_name).removesuffix('.bin')}"] = file_name
 
         artifact_paths = [
-            bin_path,
+            *(target_folder / file_name for _name, file_name, _size in dump_domains),
             png_path,
             semantic_path,
             registers_path,
             critical_path,
             heap_path,
+            domains_path,
+            inventory_path,
+            runtime_world_path,
             metadata_path,
         ]
         artifact_summary = {path.name: _artifact_meta(path) for path in artifact_paths}
@@ -433,7 +736,7 @@ class UniversalSnapshotManager:
             artifacts=artifact_summary,
             registers=raw_regs,
             player=p_ctx,
-            actors=[],
+            actors=[],  # Runtime ActorHeap has not been validated; see runtime_world.json.
             map=m_ctx,
             dialogue=d_ctx,
             raw_state_dump=curr_state.model_dump(),
@@ -441,7 +744,7 @@ class UniversalSnapshotManager:
         _write_json(manifest_path, asdict(manifest))
 
         pre_bundle_files = [
-            "main_ram.bin",
+            *(file_name for _name, file_name, _size in dump_domains),
             "screen.png",
             "manifest.json",
             "metadata.json",
@@ -449,6 +752,9 @@ class UniversalSnapshotManager:
             "registers.json",
             "critical_ranges.json",
             "heap_candidates.json",
+            "memory_domains.json",
+            "memory_domain_inventory.json",
+            "runtime_world.json",
         ]
         integrity_payload = {
             "schema": "snapshot_integrity/v1",
@@ -457,6 +763,8 @@ class UniversalSnapshotManager:
             "expected_main_ram_bytes": MAIN_RAM_SIZE,
             "capture_complete": capture_complete,
             "capture_errors": capture_errors,
+            "memory_domains": memory_domains["domains"],
+            "memory_domain_inventory": domain_inventory,
             "artifacts": {
                 file_name: _artifact_meta(target_folder / file_name)
                 for file_name in pre_bundle_files
@@ -467,6 +775,7 @@ class UniversalSnapshotManager:
         bundle_files = pre_bundle_files + ["integrity.json"]
         bundle_path = _build_bundle(target_folder, folder_name, bundle_files)
         bundle_meta = _artifact_meta(bundle_path)
+        bundle_verification = _verify_bundle(bundle_path, integrity_path)
 
         return {
             "ok": True,
@@ -483,12 +792,15 @@ class UniversalSnapshotManager:
             "bridge_written_bytes": bridge_written_bytes,
             "screenshot_saved": screen_ok,
             "registers_count": len(raw_regs),
+            "exported_domain_count": len(dump_domains),
             "capture_errors": capture_errors,
+            "memory_domains": memory_domains["domains"],
             "artifacts": integrity_payload["artifacts"],
             "bundle": {
                 **bundle_meta,
                 "file_name": bundle_path.name,
-                "url": f"/dumps/{folder_name}/{bundle_path.name}",
+                "url": f"/api/dev/dumps/{folder_name}/download",
+                "verification": bundle_verification,
             },
             "dialogue_text": d_ctx.visible_lines,
         }
@@ -516,12 +828,29 @@ class UniversalSnapshotManager:
                 bin_path = directory / "main_ram.bin"
                 png_path = directory / "screen.png"
                 integrity_path = directory / "integrity.json"
+                runtime_world_path = directory / "runtime_world.json"
                 bundle_candidates = list(directory.glob("*.zip"))
                 bundle_path = bundle_candidates[0] if bundle_candidates else None
+                bundle_verification = (
+                    _verify_bundle(bundle_path, integrity_path)
+                    if bundle_path and integrity_path.exists()
+                    else {"ok": False, "reason": "ZIP or integrity manifest is missing"}
+                )
 
                 ram_size = bin_path.stat().st_size if bin_path.exists() else 0
                 png_size = png_path.stat().st_size if png_path.exists() else 0
-                actual_complete = ram_size == MAIN_RAM_SIZE and png_size > 0
+                domain_records = []
+                if integrity_path.exists():
+                    try:
+                        domain_records = json.loads(integrity_path.read_text(encoding="utf-8")).get("memory_domains", [])
+                    except (OSError, json.JSONDecodeError):
+                        domain_records = []
+                actual_complete = (
+                    ram_size == MAIN_RAM_SIZE
+                    and png_size > 0
+                    and bool(domain_records)
+                    and all(bool(record.get("complete")) for record in domain_records)
+                )
                 dialogue = data.get("dialogue", {})
                 registers = data.get("registers", {})
 
@@ -542,21 +871,58 @@ class UniversalSnapshotManager:
                         "png_size": png_size,
                         "has_integrity": integrity_path.exists(),
                         "has_bundle": bool(bundle_path and bundle_path.exists()),
+                        "bundle_verified": bool(bundle_verification.get("ok")),
+                        "bundle_verification": bundle_verification,
                         "bin_url": f"/dumps/{directory.name}/main_ram.bin" if bin_path.exists() else None,
                         "png_url": f"/dumps/{directory.name}/screen.png" if png_path.exists() else None,
                         "manifest_url": f"/dumps/{directory.name}/manifest.json" if manifest_path.exists() else None,
                         "integrity_url": f"/dumps/{directory.name}/integrity.json" if integrity_path.exists() else None,
-                        "bundle_url": f"/dumps/{directory.name}/{bundle_path.name}" if bundle_path else None,
+                        "world_url": f"/dumps/{directory.name}/runtime_world.json" if runtime_world_path.exists() else None,
+                        "bundle_url": f"/api/dev/dumps/{directory.name}/download" if bundle_verification.get("ok") else None,
                         "player": data.get("player", {}),
                         "map": data.get("map", {}),
                         "dialogue": dialogue,
                         "registers_count": len(registers),
+                        "memory_domains": domain_records,
                     }
                 )
             except (OSError, json.JSONDecodeError):
                 continue
 
         return entries[:limit]
+
+    def verified_bundle_path(self, snapshot_id: str) -> tuple[Path | None, Dict[str, Any]]:
+        """Return a ZIP only after validating its members and hashes."""
+        if not re.fullmatch(r"dump_[A-Za-z0-9_\-]+", snapshot_id):
+            return None, {"ok": False, "reason": "invalid snapshot id"}
+        directory = (self.base_dir / snapshot_id).resolve()
+        try:
+            directory.relative_to(self.base_dir.resolve())
+        except ValueError:
+            return None, {"ok": False, "reason": "snapshot path escapes dump directory"}
+        candidates = sorted(directory.glob("*.zip")) if directory.is_dir() else []
+        integrity_path = directory / "integrity.json"
+        if not candidates:
+            return None, {"ok": False, "reason": "ZIP file is missing"}
+        verification = _verify_bundle(candidates[0], integrity_path)
+        return (candidates[0] if verification.get("ok") else None), verification
+
+    def clear_snapshots(self) -> Dict[str, Any]:
+        """Delete only generated snapshot folders and the legacy root bundle."""
+        deleted, deleted_bytes = [], 0
+        base = self.base_dir.resolve()
+        if not base.exists():
+            return {"ok": True, "deleted": deleted, "deleted_bytes": deleted_bytes}
+        for path in base.iterdir():
+            if path.is_dir() and path.name.startswith("dump_"):
+                deleted_bytes += sum(item.stat().st_size for item in path.rglob("*") if item.is_file())
+                shutil.rmtree(path)
+                deleted.append(path.name)
+            elif path.is_file() and path.name == "dumps.zip":
+                deleted_bytes += path.stat().st_size
+                path.unlink()
+                deleted.append(path.name)
+        return {"ok": True, "deleted": deleted, "deleted_count": len(deleted), "deleted_bytes": deleted_bytes}
 
 
 universal_snapshot_manager = UniversalSnapshotManager()
