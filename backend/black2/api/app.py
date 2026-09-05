@@ -25,7 +25,7 @@ from ..state.universal_snapshot_manager import universal_snapshot_manager
 from ..runtime.config import runtime_config
 from ..runtime.control_log import runtime_control_log
 from ..runtime.hub import RuntimeHub
-from ..runtime.versions import RUNTIME_RELEASE_VERSION
+from ..runtime.versions import BIZHAWK_BRIDGE_VERSION, RUNTIME_RELEASE_VERSION
 from ..actions.input_engine import ActionEngine
 from ..actions.onboarding import OnboardingFlow
 from ..observer.presentation import build_observer_presentation
@@ -479,9 +479,13 @@ async def get_dev_debug_dialogue():
 
 
 def _require_universal_dump_bridge() -> None:
-    """Fail before capture when BizHawk still runs a stale Lua bridge."""
+    """Fail before capture when the connected Lua bridge is not the current contract."""
     capabilities = transport.hello_data.get("capabilities") or {}
-    required_version = "1.5.1-universal-dump"
+    # The universal-dump handler shipped in bridge v1.8.0-world-lab.  This
+    # check used to require the bridge's old source-file label
+    # (1.5.1-universal-dump), so a healthy current bridge advertised
+    # universal_dump=true but every dump request was rejected with HTTP 409.
+    required_version = BIZHAWK_BRIDGE_VERSION
     if (
         capabilities.get("universal_dump") is True
         and transport.bridge_version == required_version
@@ -495,10 +499,11 @@ def _require_universal_dump_bridge() -> None:
             "bridge_version": transport.bridge_version,
             "required_bridge_version": required_version,
             "required_capability": "universal_dump",
+            "capabilities": capabilities,
             "action": (
                 "在 BizHawk 的 Lua Console 停止当前脚本，然后重新打开并运行 "
                 "bridge/bizhawk/black2_bridge.lua；连接恢复后确认 /api/bizhawk/status "
-                "显示 bridge_version 为 1.5.1-universal-dump 且 capabilities.universal_dump 为 true。"
+                f"显示 bridge_version 为 {required_version} 且 capabilities.universal_dump 为 true。"
             ),
         },
     )

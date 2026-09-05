@@ -1,5 +1,5 @@
 -- ============================================================================
--- Pokémon Black 2 - BizHawk Greenfield Bridge v1.5.1
+-- Pokémon Black 2 - BizHawk Greenfield Bridge v1.8.0-world-lab
 -- 100% Background LuaSocket TCP Bridge (Zero Window Focus Needed)
 -- ============================================================================
 
