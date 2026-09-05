@@ -862,7 +862,24 @@ def resolve_runtime_field_from_ram(ram: bytes, *, frame: int | None = None) -> d
 
 
 async def read_main_ram(reader: MemoryReader, *, chunk_size: int = 0x20000) -> bytes:
-    """Read Main RAM in bounded pieces for an explicit reverse-engineering request."""
+    """Read Main RAM for an explicit reverse-engineering request.
+
+    Prefer the bridge's native binary snapshot when the concrete reader offers
+    it.  Keeping the bounded request path below preserves compatibility with
+    minimal test/read-only reader implementations and older bridge scripts.
+    """
+    snapshot = getattr(reader, "read_full_main_ram_snapshot", None)
+    if callable(snapshot):
+        try:
+            raw = await snapshot()
+            if len(raw) == MAIN_RAM_SIZE:
+                return bytes(raw)
+            raise RuntimeError(f"Main RAM snapshot truncated: expected {MAIN_RAM_SIZE}, got {len(raw)}")
+        except (ConnectionError, TimeoutError, OSError, RuntimeError):
+            # An older or manually reloaded Lua bridge may not advertise the
+            # binary dump handler.  The legacy reader remains a safe fallback.
+            pass
+
     blocks = []
     for offset in range(0, MAIN_RAM_SIZE, chunk_size):
         size = min(chunk_size, MAIN_RAM_SIZE - offset)
@@ -905,10 +922,12 @@ class RuntimeFieldLocator:
     last_discovery_attempt: float = 0.0
     last_failure_reason: str = ""
     min_discovery_interval: float = 5.0
+    last_discovery_result: dict[str, Any] | None = None
 
     def invalidate(self) -> None:
         self.addresses = None
         self.discovery_confidence = "unresolved"
+        self.last_discovery_result = None
 
     async def discover(self, reader: MemoryReader) -> dict[str, Any]:
         self.last_discovery_attempt = time.monotonic()
@@ -943,6 +962,11 @@ class RuntimeFieldLocator:
             }
         self.discovery_confidence = str(result.get("confidence", "candidate"))
         self.last_failure_reason = ""
+        # This exact-frame resolver result includes the runtime mapper's full
+        # chunk table.  Keep it beside the compact live pointer cache so the
+        # scene service can bind a ROM matrix without starting a second 4 MiB
+        # scan or trusting a ZoneHeader's default matrix.
+        self.last_discovery_result = result
         return result
 
     async def _sample_cached(self, reader: MemoryReader) -> dict[str, Any] | None:

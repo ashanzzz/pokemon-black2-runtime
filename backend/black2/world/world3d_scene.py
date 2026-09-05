@@ -178,13 +178,50 @@ class World3DSceneService:
             self._identity_time = now
             return result
 
-    def static_scene(self, zone_id: int, *, live_span: float | None = None) -> dict[str, Any]:
+    def static_scene(
+        self,
+        zone_id: int,
+        *,
+        live_span: float | None = None,
+        runtime_matrix_id: int | None = None,
+    ) -> dict[str, Any]:
         world = self.exported.zone(zone_id) if self.exported is not None else self.original.zone(zone_id)
         if isinstance(live_span, (int, float)) and live_span > 0:
             world = self.truth._apply_live_chunk_span(world, float(live_span))
         span = float((world.get("render_coordinate_system") or {}).get("chunk_span_world") or 512.0)
         terrains = []
-        for cell in world.get("cells", []):
+        matrix_meta = world.get("matrix") or {}
+        source_cells = world.get("cells", [])
+        runtime_matrix_bound = (
+            isinstance(runtime_matrix_id, int)
+            and runtime_matrix_id != matrix_meta.get("matrix_id")
+            and self.original is not None
+        )
+        if runtime_matrix_bound:
+            # Runtime FieldG3DMapper's exact ROM-matched matrix is stronger
+            # evidence than a ZoneHeader's static matrix field.  This matters
+            # for one-cell maps where the header's default matrix describes a
+            # different shared world.  The matching ROM chunk is still served
+            # through the normal lazy BMD0+BTX0 converter below.
+            matrix = self.original.rom.matrix(runtime_matrix_id)
+            source_cells = [
+                {
+                    "x": cell["x"], "y": cell["y"], "chunk_id": cell["chunk_id"],
+                    "present": cell["chunk_id"] != 0xFFFFFFFF,
+                    "belongs_to_zone": True,
+                    "runtime_matrix_bound": True,
+                }
+                for cell in matrix.cells()
+            ]
+            matrix_meta = {
+                "matrix_id": matrix.matrix_id,
+                "has_zones": matrix.has_zones,
+                "width": matrix.width,
+                "height": matrix.height,
+                "cell_count": matrix.cell_count,
+                "trailing_bytes": matrix.trailing_bytes,
+            }
+        for cell in source_cells:
             if not cell.get("present") or cell.get("belongs_to_zone") is False:
                 continue
             terrains.append({
@@ -196,6 +233,11 @@ class World3DSceneService:
                     "y": 0.0,
                     "z": (float(cell["y"]) + 0.5) * span,
                 },
+                # The runtime mapper has already been matched to the ROM
+                # matrix.  Keep the original ROM converter URL available even
+                # before the optional ARM9 visual probe completes; returning
+                # null here used to make the browser render only a coordinate
+                # grid, so a valid map looked empty.
                 "asset_url": f"/api/v1/map/v5/terrain/{zone_id}/{cell['x']}/{cell['y']}/model.glb",
             })
         buildings = []
@@ -222,14 +264,22 @@ class World3DSceneService:
             "chunk_span_world": span,
             "zone": world.get("zone"),
             "area": world.get("area"),
-            "matrix": world.get("matrix"),
+            "matrix": matrix_meta,
             "terrains": terrains,
             "buildings": buildings,
             "entities": world.get("entities"),
             "source_policy": {
-                "terrain": "ROM only / cached",
+                "terrain": "ROM matrix coordinates + original BMD0/BTX0 conversion (cached)",
                 "buildings": "ROM only / cached",
                 "player": "not embedded in static scene",
+            },
+            "runtime_matrix_binding": {
+                "status": "probable" if runtime_matrix_bound else "not_needed",
+                "matrix_id": runtime_matrix_id if runtime_matrix_bound else matrix_meta.get("matrix_id"),
+                "reason": (
+                    "exact runtime mapper chunk table matched this ROM matrix"
+                    if runtime_matrix_bound else "ZoneHeader matrix agrees with static world"
+                ),
             },
         }
 
@@ -339,12 +389,23 @@ class World3DSceneService:
         # Full identity validation remains available only to an explicit
         # caller.  Normal UI polling consumes the latest RAM-derived Player
         # cache and any already-completed identity result.
-        identity = await self._refresh_identity(reader, force=True) if force_identity else cached_identity
+        identity = cached_identity
+        if force_identity or identity is None:
+            # A successful PlayerRuntime discovery already contains the full
+            # mapper chunk table.  Reuse it before considering a new RAM scan.
+            discovered = player_runtime_service.locator.last_discovery_result
+            if discovered and discovered.get("status") in {"resolved", "candidate"}:
+                identity = self.truth.from_runtime(discovered, include_world=False)
+                self._identity_cache = identity
+                self._identity_time = time.monotonic()
+            elif force_identity:
+                identity = await self._refresh_identity(reader, force=True)
         span = None
         runtime_mapper = (identity.get("runtime") or {}).get("mapper") if identity else None
         if runtime_mapper:
             span = runtime_mapper.get("chunk_span_world")
-        static = self.static_scene(zone_id, live_span=span)
+        runtime_matrix_id = ((identity.get("matrix_match") or {}).get("selected_matrix_id") if identity else None)
+        static = self.static_scene(zone_id, live_span=span, runtime_matrix_id=runtime_matrix_id)
         static_matrix = (static.get("matrix") or {}).get("matrix_id")
         if loaded_visual is not None:
             self._loaded_visual_cache = {

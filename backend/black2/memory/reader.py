@@ -1,6 +1,9 @@
 """Memory Reader & Batch Sampling engine."""
 
 import asyncio
+import shutil
+import tempfile
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 from ..bizhawk.bridge_client import BridgeClient
 from .domains import MAIN_RAM, arm9_to_main_ram_offset
@@ -26,6 +29,44 @@ class MemoryReader:
     async def read_bytes(self, addr: int, length: int, domain: str = MAIN_RAM) -> List[int]:
         offset = arm9_to_main_ram_offset(addr) if domain == MAIN_RAM else addr
         return await self.client.read_bytes(offset, length, domain)
+
+    async def read_full_main_ram_snapshot(self, *, timeout: float = 12.0) -> bytes:
+        """Read the 4 MiB Main RAM image through the bridge's binary dump path.
+
+        This is intentionally an explicit, infrequent operation used only by
+        runtime structure discovery.  The ordinary ``memory.read`` RPC is
+        byte-at-a-time in the Lua bridge, so splitting a whole-RAM scan into
+        small requests can starve the emulator request loop for tens of
+        seconds.  ``memory.dump_universal`` asks BizHawk for one native binary
+        read and writes it to a temporary, ASCII-only directory shared by the
+        local backend and emulator process.
+        """
+        transport = getattr(self.client, "transport", None)
+        if transport is None or not hasattr(transport, "request"):
+            raise RuntimeError("bridge transport does not support a binary Main RAM snapshot")
+
+        stage = Path(tempfile.mkdtemp(prefix="black2_runtime_ram_"))
+        ram_path = stage / "main_ram.bin"
+        screen_path = stage / "screen.png"
+        try:
+            result = await transport.request(
+                "memory.dump_universal",
+                {
+                    "dump_dir": str(stage).replace("\\", "/"),
+                    "png_path": str(screen_path).replace("\\", "/"),
+                    "domains": [{"name": MAIN_RAM, "file": ram_path.name, "size": 0x400000}],
+                },
+                timeout=timeout,
+            )
+            domain = (result.get("domains") or {}).get(MAIN_RAM) or {}
+            if not result.get("domains_complete") or not domain.get("success"):
+                raise RuntimeError(f"bridge binary Main RAM snapshot failed: {domain.get('error', 'unknown error')}")
+            raw = ram_path.read_bytes()
+            if len(raw) != 0x400000:
+                raise RuntimeError(f"Main RAM snapshot truncated: expected 4194304, got {len(raw)}")
+            return raw
+        finally:
+            shutil.rmtree(stage, ignore_errors=True)
 
     async def read_batch_ranges(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Perform batch atomic read across multiple memory addresses."""

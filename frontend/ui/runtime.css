@@ -21,7 +21,7 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--text); }
-body { min-height: 100vh; }
+body { min-height: 100vh; font-size: 15px; }
 a { color: inherit; text-decoration: none; }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
@@ -106,4 +106,7 @@ td { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; }
 .module-link strong { font-size:12px; display:block; }
 .module-link span { color:var(--muted); font-size:10px; display:block; margin-top:4px; line-height:1.45; }
 .stale { opacity:.66; }
+.brand-sub,.card-sub,.metric-label,.metric-note,.tag,.module-link span,.eyebrow { font-size: 12px; }
+.nav a,.status-pill,.btn,.card-title,.fact,table,.empty,.callout,.module-link strong { font-size: 13px; }
+pre.code { font-size: 12px; }
 @media (max-width:1050px){ .topbar{align-items:flex-start;flex-wrap:wrap}.brand,.status-strip{min-width:0}.nav{order:3;width:100%;justify-content:flex-start}.layout-main,.cols-3,.cols-4{grid-template-columns:1fr}.cols-2{grid-template-columns:1fr}.page{padding:16px}.page-head{align-items:flex-start;flex-direction:column}.status-strip{justify-content:flex-start}.fact{grid-template-columns:1fr}.fact-value{text-align:left} }

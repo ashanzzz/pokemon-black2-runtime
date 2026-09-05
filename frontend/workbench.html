@@ -50,6 +50,8 @@
         <div class="toolbar-grow"></div><span class="toolbar-note" data-i18n="world.selectHint">点击 3D 对象可在右侧查看证据</span>
       </div>
       <div id="world" class="world-canvas"></div>
+      <div class="world-coordinate world-coordinate-hover" id="worldPointer" aria-live="polite">鼠标 X/Z：等待地图…</div>
+      <div class="world-coordinate world-coordinate-picked" id="worldPickedPoint" aria-live="polite">点击 X/Z：—</div>
       <div class="viewport-overlay" id="worldOverlay" data-state="waiting"><strong data-i18n="world.statusWaiting">等待 PlayerRuntime…</strong><span id="worldOverlayDetail">HTTP → Bridge → Player → Scene</span></div>
     </section>
     <section class="editor-pane" data-editor="player"><div class="document-view" id="playerEditor"></div></section>

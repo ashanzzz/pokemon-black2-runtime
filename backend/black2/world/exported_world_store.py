@@ -26,7 +26,15 @@ class ExportedWorldStore:
         if path.is_file():
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                if isinstance(data, dict) and int(data.get("zone_id", -1)) == int(zone_id):
+                # Exports from the old reader include the NARC container header
+                # in the ZoneData table.  Validate against this ROM before reuse.
+                expected = self.fallback.rom.zone(int(zone_id))
+                if (
+                    isinstance(data, dict)
+                    and int(data.get("zone_id", -1)) == int(zone_id)
+                    and (data.get("zone") or {}).get("raw_hex") == expected.raw_hex
+                    and (data.get("matrix") or {}).get("matrix_id") == expected.matrix_id
+                ):
                     data = dict(data)
                     data.setdefault("static_load", {})
                     data["static_load"] = {

@@ -117,7 +117,11 @@ class OriginalActorAssetService:
         if not 0 <= res_id < len(files):
             raise ActorAssetError(f"actor resource {res_id} outside {MMODEL_RES_PATH}")
         payload = files[res_id]
-        kind = "nsbmd_3d" if res_id < 7 else "nsbtx_billboard"
+        magic = payload[:4]
+        # Resource IDs are contiguous by convention, but the ROM format is
+        # authoritative: BTX0/NSBTX payloads are billboard textures while
+        # BMD0/NSBMD payloads are true 3-D models.
+        kind = "nsbtx_billboard" if magic in {b"BTX0", b"NSBT"} else "nsbmd_3d"
         return {
             "format": "black2-original-actor/v6",
             "obj_code": obj_code,
@@ -125,7 +129,7 @@ class OriginalActorAssetService:
             "registry": asdict(entry),
             "resource_id": res_id,
             "resource_kind": kind,
-            "resource_magic": payload[:4].decode("ascii", "replace"),
+            "resource_magic": magic.decode("ascii", "replace"),
             "source": {
                 "registry": f"rom:/{MMODEL_INDEX_PATH}[0]",
                 "resource": f"rom:/{MMODEL_RES_PATH}[{res_id}]",
@@ -181,7 +185,18 @@ class OriginalActorAssetService:
         key = hashlib.sha256(payload).hexdigest()[:20]
         out = self.cache / "sprites" / key
         out.mkdir(parents=True, exist_ok=True)
-        ready = sorted(out.glob("*.png"))
+        def ordered_pngs(root: Path) -> list[Path]:
+            # Apicula names frames like t4x4x24_0.png ... _23.png.  A plain
+            # lexical sort places _10 before _2 and makes facing directions
+            # appear scrambled in the viewer.
+            def frame_key(path: Path) -> tuple[int, str]:
+                try:
+                    return (int(path.stem.rsplit("_", 1)[1]), path.name)
+                except (IndexError, ValueError):
+                    return (10**9, path.name)
+            return sorted(root.rglob("*.png"), key=frame_key)
+
+        ready = ordered_pngs(out)
         if ready:
             return ready, meta
         source = out / "actor.btx"
@@ -189,14 +204,17 @@ class OriginalActorAssetService:
         async with self._lock:
             result = await asyncio.to_thread(
                 subprocess.run,
-                [str(self.apicula), "extract", str(source), "-o", str(out / "extract")],
+                [
+                    str(self.apicula), "convert", "-f", "gltf", "--more-textures",
+                    "--overwrite", str(source), "-o", str(out / "extract"),
+                ],
                 cwd=self.cache,
                 capture_output=True,
                 text=True,
                 timeout=60,
                 check=False,
             )
-        ready = sorted((out / "extract").rglob("*.png"))
+        ready = ordered_pngs(out / "extract")
         if result.returncode != 0 or not ready:
             raise ActorAssetError(
                 "original BTX0 is available, but the installed Apicula build did not emit PNG textures; "

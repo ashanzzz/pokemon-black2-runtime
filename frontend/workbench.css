@@ -19,3 +19,16 @@
 .tag{display:inline-block;border:1px solid var(--line);padding:2px 5px;border-radius:3px;font-size:8px;color:var(--muted)}.tag.good{color:var(--verified);border-color:#345b45}.tag.warn{color:var(--candidate);border-color:#65532d}.tag.bad{color:var(--error);border-color:#63383d}.callout{border:1px solid var(--line);background:#171b20;padding:8px;color:var(--muted);font-size:10px;line-height:1.5}.callout.good{border-color:#315742;background:#17231d;color:#bfe5cf}.callout.warn{border-color:#5f4c2a;background:#282116;color:#e6d1a2}.link-card{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid var(--line);background:#191d22;padding:9px;margin-bottom:6px}.link-card strong{font-size:10px}.link-card span{color:var(--quiet);font-size:9px}.link-card:hover{border-color:#4a5664;background:#22272d}
 @media(max-width:1180px){:root{--explorer:230px;--inspector:300px}.toolbar-note{display:none}.top-health .health-chip:nth-child(n+4){display:none}}
 @media(max-width:900px){:root{--explorer:210px;--inspector:0px}.inspector{display:none}.wb{grid-template-columns:var(--rail) var(--explorer) minmax(0,1fr);grid-template-areas:"command command command" "activity explorer editor" "activity explorer dock" "status status status"}.wb-brand small,.breadcrumb{display:none}}
+
+/* Readability scale: the dense workbench previously used 8–10px text. */
+html,body{font-size:15px}
+.wb .wb-brand strong{font-size:14px}.wb .wb-brand small,.wb .breadcrumb,.wb .command-button,.wb .locale-select{font-size:12px}
+.wb .command-button kbd,.wb .health-chip,.wb .activity button,.wb .tree-note,.wb .toolbar-note,.wb .doc-kicker,.wb .confidence-badge,.wb .dock-tabs button,.wb .dock-table,.wb .dock-form input,.wb .dock-form select,.wb .dock-note,.wb .statusbar,.wb .tag,.wb .link-card span{font-size:11px}
+.wb .panel-title,.wb .explorer-search input,.wb .tree-head,.wb .tree-row,.wb .tool,.wb .toggle-tool,.wb .doc-card-head,.wb .fact-table,.wb .inspector-heading,.wb .small-button,.wb .palette-result,.wb .callout,.wb .link-card strong{font-size:12px}
+.wb .empty-state,.wb .doc-desc{font-size:13px}.wb .code-block{font-size:11px}.wb .viewport-overlay span{font-size:12px}
+
+/* Map-picking telemetry stays visible without intercepting the canvas pointer. */
+.world-canvas canvas{cursor:crosshair}
+.world-coordinate{position:absolute;z-index:9;max-width:calc(100% - 20px);pointer-events:none;border:1px solid #3c5267;background:#101820e8;color:#d8efff;padding:6px 8px;border-radius:4px;font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace;box-shadow:0 2px 10px #0008}
+.world-coordinate-hover{top:42px;left:8px}
+.world-coordinate-picked{left:8px;bottom:8px;color:#b9e7c8;border-color:#365d48;background:#101b16e8}

@@ -114,3 +114,43 @@ class TestWorld3DSceneV6(unittest.TestCase):
             "player_alignment": {"verified": True},
         })
         self.assertEqual(result["visual_binding"]["status"], "rejected")
+
+    def test_runtime_matched_matrix_replaces_wrong_zone_header_matrix(self):
+        class Matrix:
+            matrix_id = 257
+            has_zones = True
+            width = height = 1
+            cell_count = 1
+            trailing_bytes = 0
+
+            @staticmethod
+            def cells():
+                return iter([{"x": 0, "y": 0, "chunk_id": 77}])
+
+        class Original:
+            class rom:
+                @staticmethod
+                def matrix(matrix_id):
+                    assert matrix_id == 257
+                    return Matrix()
+
+        class Exported:
+            @staticmethod
+            def zone(_zone_id):
+                return {
+                    "matrix": {"matrix_id": 0},
+                    "render_coordinate_system": {"chunk_span_world": 512},
+                    "cells": [], "buildings": [], "entities": {}, "zone": {}, "area": {},
+                }
+
+        static = World3DSceneService(original=Original(), truth=None, exported=Exported()).static_scene(
+            428, runtime_matrix_id=257,
+        )
+
+        self.assertEqual(static["matrix"]["matrix_id"], 257)
+        self.assertEqual(static["terrains"][0]["chunk_id"], 77)
+        # A runtime-matched matrix is now allowed to use the lazy original
+        # ROM converter immediately; the previous null URL caused an empty
+        # coordinate grid even when the BMD0/BTX0 pair was valid.
+        self.assertEqual(static["terrains"][0]["asset_url"], "/api/v1/map/v5/terrain/428/0/0/model.glb")
+        self.assertEqual(static["runtime_matrix_binding"]["status"], "probable")
