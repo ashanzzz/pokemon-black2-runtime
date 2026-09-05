@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pokémon Black 2 逆向工作台</title>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/"}}</script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/","/frontend/world3d-runtime.js":"/frontend/world3d-runtime-fixed.js"}}</script>
 <link rel="stylesheet" href="/frontend/workbench.css">
 <script src="/frontend/ui/i18n.js"></script>
 <script src="/frontend/ui/runtime-client.js"></script>
@@ -18,7 +18,6 @@
     <div class="top-health"><span class="health-chip" data-health="http">HTTP</span><span class="health-chip" data-health="bridge">Bridge</span><span class="health-chip" data-health="player">Player</span><span class="health-chip" data-health="scene">Scene</span></div>
     <select class="locale-select" id="localeSelect" aria-label="Language"><option value="zh-CN">中文</option><option value="en">English</option></select>
   </header>
-
   <aside class="activity" id="activityRail" aria-label="Workspaces">
     <button data-workspace="world" class="active" title="World"><span class="rail-icon">◫</span><span data-i18n="workspace.world">世界</span></button>
     <button data-workspace="player" title="Player"><span class="rail-icon">●</span><span data-i18n="workspace.player">主角</span></button>
@@ -29,13 +28,11 @@
     <div class="activity-grow"></div>
     <button data-workspace="tools" title="Tools"><span class="rail-icon">⚙</span><span data-i18n="workspace.tools">工具</span></button>
   </aside>
-
   <aside class="explorer panel" id="explorer">
     <div class="panel-title"><span data-i18n="explorer.title">资源浏览器</span><span class="panel-meta" id="explorerMeta">—</span></div>
     <div class="explorer-search"><input id="explorerFilter" data-i18n-placeholder="explorer.filter" placeholder="筛选对象…"></div>
     <div class="panel-scroll" id="explorerBody"></div>
   </aside>
-
   <main class="editor" id="editor">
     <section class="editor-pane active" data-editor="world">
       <div class="editor-toolbar">
@@ -61,12 +58,10 @@
     <section class="editor-pane" data-editor="monitor"><div class="document-view" id="monitorEditor"></div></section>
     <section class="editor-pane" data-editor="tools"><div class="document-view" id="toolsEditor"></div></section>
   </main>
-
   <aside class="inspector panel" id="inspector">
     <div class="panel-title"><span data-i18n="inspector.title">属性检查器</span><span class="confidence-badge unresolved" id="selectionConfidence" data-i18n="confidence.unresolved">未解析</span></div>
     <div class="panel-scroll" id="inspectorBody"><div class="empty-state" data-i18n="inspector.nothing">选择场景中的主角、建筑、NPC 或资源以查看证据。</div></div>
   </aside>
-
   <section class="dock panel" id="bottomDock">
     <div class="dock-tabs" id="dockTabs">
       <button class="active" data-dock="events" data-i18n="dock.events">事件</button>
@@ -79,7 +74,6 @@
     </div>
     <div class="dock-body" id="dockBody"></div>
   </section>
-
   <footer class="statusbar">
     <span><i class="status-dot" data-dot="http"></i><span data-i18n="status.http">HTTP</span></span>
     <span><i class="status-dot" data-dot="bridge"></i><span data-i18n="status.bridge">Bridge</span></span>

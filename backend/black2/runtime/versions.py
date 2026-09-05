@@ -1,6 +1,6 @@
 """Single source of truth for deployable component and protocol versions.
 
-Component versions describe independently reloadable code.  Protocol/schema
+Component versions describe independently reloadable code. Protocol/schema
 versions describe data compatibility and therefore do not automatically change
 with every application release.
 """
@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 
-RUNTIME_RELEASE_VERSION = "9.0.0"
-WORLD3D_SCENE_VERSION = "9.0.0"
-ORIGINAL_MAP_UI_VERSION = "9.0.0"
+RUNTIME_RELEASE_VERSION = "10.1.0"
+WORLD3D_SCENE_VERSION = "10.1.0"
+ORIGINAL_MAP_UI_VERSION = "10.1.0"
 BIZHAWK_BRIDGE_VERSION = "1.8.0-world-lab"
 
 COMPONENT_VERSIONS: tuple[dict[str, Any], ...] = (

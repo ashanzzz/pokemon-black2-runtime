@@ -1,0 +1,165 @@
+{
+  "project": "pokemon-black2-runtime",
+  "repository": "https://github.com/ashanzzz/pokemon-black2-runtime",
+  "base_commit": "7bd1de29a8ead9fdbd5c8e565ae7ad9728f7cddc",
+  "delivery_kind": "deterministic exact-base repair + one-click physical full-repo builder",
+  "scope": [
+    "runtime launcher singleton",
+    "separate stop-backend / close-emulator ownership",
+    "stop all checkout-owned run_runtime replacements",
+    "runtime-bound dialogue object discovery",
+    "visible-vs-loaded dialogue separation",
+    "Player GPos/WPos semantic correction",
+    "runtime actor current-scene candidate membership",
+    "World Lab exact WPos markers",
+    "restore original glTF material sidedness"
+  ],
+  "confidence": {
+    "runtime_lifecycle_unit_contract": "VERIFIED",
+    "runtime_lifecycle_live_windows_bizhawk": "UNRESOLVED",
+    "dialogue_chain_on_supplied_RAM": "VERIFIED",
+    "visible_two_line_page_on_supplied_RAM": "VERIFIED",
+    "player_position_on_supplied_RAM": "VERIFIED",
+    "girl_actor_position_on_supplied_RAM": "VERIFIED",
+    "slot2_position_on_supplied_RAM": "VERIFIED",
+    "slot2_current_scene_membership": "CANDIDATE",
+    "glTF_sidedness_UI_fix": "CANDIDATE until live browser validation"
+  },
+  "files": [
+    {
+      "path": "APPLY_TO_EXISTING_REPO.ps1",
+      "size": 1603,
+      "sha256": "9c2570c103b885c3a01c8d62ce29dd9d63dc196b6165e67e4af5552d6900d0ec"
+    },
+    {
+      "path": "BASE_GITHUB_COMMIT.txt",
+      "size": 230,
+      "sha256": "5ca88a862eb78b2fdb1fa69c6567aa5f38803f41b5fe9b1c8af4f460a0478116"
+    },
+    {
+      "path": "BLACK2_LAUNCHER.cmd",
+      "size": 278,
+      "sha256": "174e2de4b96a196d4fb7b35411d1273d49884caf92adb4c4b0daa73a4dcf1dfc"
+    },
+    {
+      "path": "BUILD_FULL_FIXED_ZIP.cmd",
+      "size": 416,
+      "sha256": "5eeba03f5c16c59899c24c6b4467c77e5c859d9d9930d48e2bd9601b9b090d8f"
+    },
+    {
+      "path": "CLOSE_EMUHAWK.cmd",
+      "size": 355,
+      "sha256": "3f25fb77a04ddfdc9ae30faa20ed4a38b12be2960f2482795606e83764157f60"
+    },
+    {
+      "path": "FILE_SHA256SUMS.txt",
+      "size": 1669,
+      "sha256": "4b6fb2a7387e27e24788e590b07056287ec5a0cb4cfd7675bbe24010c38d3af9"
+    },
+    {
+      "path": "MATERIALIZE_FULL_REPO.ps1",
+      "size": 503,
+      "sha256": "fe2863544bb06082795d20394495a7f58fb1dbf8be3884f491d5144f90b36c13"
+    },
+    {
+      "path": "MATERIALIZE_FULL_ZIP.ps1",
+      "size": 1536,
+      "sha256": "666cd210d0ab4988f7d8739576b208b52edc7f55fec6134f092ee15a1451910e"
+    },
+    {
+      "path": "PATCH_MANIFEST_V10_1.json",
+      "size": 3623,
+      "sha256": "d2bf9005b8192918c092f0ce66aff1602ed409fd3d3ad1b6c712e1de39c2ff44"
+    },
+    {
+      "path": "README_FIX_20260905_CN.md",
+      "size": 5274,
+      "sha256": "227f4cf40a5e506acc558427e01e8397f96b2a8069b61991c7438f3b66287d19"
+    },
+    {
+      "path": "START_BLACK2.cmd",
+      "size": 215,
+      "sha256": "7943c796a2a407d6959e72b9c62d3da8c4ee28be87e3b2afbc35bdbc81253448"
+    },
+    {
+      "path": "STOP_BLACK2.cmd",
+      "size": 341,
+      "sha256": "0683a56a52f37445b4ae745545d66cbbeb25ae741d58e1a257e7497335c06895"
+    },
+    {
+      "path": "backend/black2/api/runtime_routes.py",
+      "size": 10623,
+      "sha256": "74a57f4227b0642acc58c01d7238bc8883f390bd0feb042f4d4e986e524446bd"
+    },
+    {
+      "path": "backend/black2/decoders/dialogue_object_resolver.py",
+      "size": 22666,
+      "sha256": "ab7c9befc83cd4c0d9ffd83c9daad9e9c9551e89ad6f0c145e7bc4cfb055fbf8"
+    },
+    {
+      "path": "backend/black2/decoders/dialogue_runtime_decoder.py",
+      "size": 8720,
+      "sha256": "cf71df8ef5036ea28fddee814f2457de8f46a1e0f1c50d1d0633f87e40d651c0"
+    },
+    {
+      "path": "backend/black2/runtime/versions.py",
+      "size": 3812,
+      "sha256": "3b6f4adfca9c1d076373191a838ff0a4ded3eb2ceb0a900502f7089a029b6158"
+    },
+    {
+      "path": "backend/black2/state/engine.py",
+      "size": 16083,
+      "sha256": "6e950778623e444a3513adb93ce0f1c373dae9e83183b726b1900de811201d61"
+    },
+    {
+      "path": "backend/black2/world/runtime_actor_overlay.py",
+      "size": 8724,
+      "sha256": "17d7634d5f6197797b85227d82d7060a12e6bdfe222e52b2a01fb2cf7d92a9a4"
+    },
+    {
+      "path": "frontend/workbench.html",
+      "size": 7769,
+      "sha256": "20a855be3f753bf5a1231b3c186f24b9c87351cd23d85dd2828df724f54546e8"
+    },
+    {
+      "path": "frontend/world3d-runtime-fixed.js",
+      "size": 3622,
+      "sha256": "48dcbc6065ab3be3b70527d3bcffe483d704859eb8654a6b5e8e54ed96c1c16b"
+    },
+    {
+      "path": "reverse_engineering/reports/TEST_REPORT_FIX_20260905.md",
+      "size": 2987,
+      "sha256": "945e752029f806114365c76d431b7ce3c9208e6e5d89e6d88d22a25be59460a0"
+    },
+    {
+      "path": "reverse_engineering/reports/TEST_REPORT_RUNTIME_LIFECYCLE_V10_1_20260905.md",
+      "size": 1749,
+      "sha256": "60193e456d1986afd86a2158162c0e19a6db68d0c577681ce0703597e2692bee"
+    },
+    {
+      "path": "reverse_engineering/reports/USER_EVIDENCE_20260905_DIALOGUE_WORLD_REGRESSION.json",
+      "size": 1911,
+      "sha256": "8895a490039fbc39e48d2c96aab3fbaa0e4de80f859b2cf948f9d4b1cf66c615"
+    },
+    {
+      "path": "tests/test_dialogue_runtime_locator_v10.py",
+      "size": 2784,
+      "sha256": "ce20c8a85650b61c6ded01c9ef8d135adf44dd82d7939b3bac4da3394bbdca24"
+    },
+    {
+      "path": "tests/test_launcher_lifecycle_v10.py",
+      "size": 4655,
+      "sha256": "ad95007e82ba7c1e6c183fecf32db059d436df8976e7dc4bcf12cf6e8d901f59"
+    },
+    {
+      "path": "tests/test_runtime_actor_overlay_v10.py",
+      "size": 1644,
+      "sha256": "8295d05f24f692ebc986707f2e2610a81eb604cb65ccae571bc613441c4a0104"
+    },
+    {
+      "path": "tools/black2_launcher.py",
+      "size": 37023,
+      "sha256": "80ce2b8a00214cebf20f7756c155126acfd384016122e4ac54278653898130a6"
+    }
+  ]
+}

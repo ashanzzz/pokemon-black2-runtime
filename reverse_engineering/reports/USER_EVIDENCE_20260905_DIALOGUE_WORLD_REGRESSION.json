@@ -1,0 +1,88 @@
+{
+  "basis": {
+    "github_base_commit": "7bd1de29a8ead9fdbd5c8e565ae7ad9728f7cddc",
+    "evidence": "dump_20260905_085429_042301_f5257472_UNIVERSAL_EVIDENCE_进门前.zip",
+    "main_ram_sha256": "079d1db227abbdcced92f467eed5cb7a746ff0f7cb9a43169ec82619d1c2cf55"
+  },
+  "dialogue": {
+    "resolver": {
+      "valid": true,
+      "script_work_addr": "0x0224758C",
+      "talkmsgwin_addr": "0x02321DDC",
+      "tcbl_addr": "0x02324240",
+      "phase": 1,
+      "first_page_latch": 1,
+      "source_cursor": "0x022490D6",
+      "bmpwin_addr": "0x02323280",
+      "bitmap_addr": "0x023232BC",
+      "pixeldata_addr": "0x023232F4",
+      "strbuf_addr": "0x022490A4",
+      "parent_actor_addr": "0x0223DBE4",
+      "pixel_width": 240,
+      "pixel_height": 32,
+      "score": 195,
+      "disambiguation_reason": "coherent_ScriptWork_talkmsgwin_TCBL_score_195"
+    },
+    "visible_lines": [
+      "哎？你们两个很要好地",
+      "在找白露啊！"
+    ],
+    "visible_text": "哎？你们两个很要好地\n在找白露啊！",
+    "pixel_verified": true,
+    "next_page_not_leaked": true
+  },
+  "player": {
+    "zone_id": 428,
+    "grid": {
+      "x": 5,
+      "y": 0,
+      "z": 5
+    },
+    "world": {
+      "x": 88.0,
+      "y": 0.0,
+      "z": 88.0
+    },
+    "facing": "West"
+  },
+  "npc_samples": [
+    {
+      "slot": 0,
+      "raw_zone_id": 428,
+      "model_id": 251,
+      "grid": {
+        "x": 4,
+        "y": 0,
+        "z": 5
+      },
+      "world": {
+        "x": 72.0,
+        "y": 0.0,
+        "z": 88.0
+      },
+      "facing": "East"
+    },
+    {
+      "slot": 2,
+      "raw_zone_id": 0,
+      "model_id": 291,
+      "grid": {
+        "x": 5,
+        "y": 0,
+        "z": 6
+      },
+      "world": {
+        "x": 88.0,
+        "y": 0.0,
+        "z": 104.0
+      },
+      "facing": "North"
+    }
+  ],
+  "map": {
+    "selected_matrix_id": 257,
+    "chunk_dat_ids": [
+      973
+    ]
+  }
+}

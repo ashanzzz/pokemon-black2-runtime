@@ -1,0 +1,5 @@
+Repository: https://github.com/ashanzzz/pokemon-black2-runtime
+Branch: main
+Base commit: 7bd1de29a8ead9fdbd5c8e565ae7ad9728f7cddc
+Base commit message: fix(v10): align GLTF picks and tile grid
+Inspected: 2026-09-04 America/Chicago

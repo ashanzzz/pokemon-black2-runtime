@@ -3,6 +3,7 @@
 The expensive full-RAM Field discovery belongs to explicit diagnostics only.
 Once PlayerRuntime has a coherent locator, this service reads just the
 ActorSystem header plus the bounded actor heap and re-validates back pointers.
+Raw actor ZoneID is preserved. Scene membership is a separate evidence field.
 """
 from __future__ import annotations
 
@@ -27,6 +28,43 @@ class RuntimeActorOverlayService:
             return bytes.fromhex(str((result or {}).get("hex", "")))
         except ValueError:
             return b""
+
+    @staticmethod
+    def _scene_membership(raw_zone: int, grid: dict[str, int], latest: dict[str, Any]) -> dict[str, Any]:
+        current_zone = latest.get("zone_id")
+        mapper = latest.get("mapper") or {}
+        tile_size = mapper.get("chunk_tile_size")
+        width = mapper.get("matrix_width")
+        height = mapper.get("matrix_height")
+        inside_mapper = False
+        if all(isinstance(v, int) and v > 0 for v in (tile_size, width, height)):
+            inside_mapper = (
+                0 <= grid["x"] < width * tile_size
+                and 0 <= grid["z"] < height * tile_size
+            )
+        if isinstance(current_zone, int) and raw_zone == current_zone:
+            return {
+                "same_current_scene": True,
+                "effective_zone_id": current_zone,
+                "confidence": "probable",
+                "reason": "FieldActor.ZoneID agrees with PlayerState.ZoneID in the same coherent ActorSystem",
+            }
+        if isinstance(current_zone, int) and raw_zone == 0 and inside_mapper:
+            return {
+                "same_current_scene": True,
+                "effective_zone_id": current_zone,
+                "confidence": "candidate",
+                "reason": (
+                    "raw FieldActor.ZoneID is 0, but the actor is live in the current coherent ActorSystem "
+                    "and its GPos lies inside the current runtime mapper bounds; raw ZoneID is preserved"
+                ),
+            }
+        return {
+            "same_current_scene": False,
+            "effective_zone_id": None,
+            "confidence": "unresolved",
+            "reason": "no current-scene membership rule is satisfied",
+        }
 
     async def sample(self, reader: MemoryReader) -> dict[str, Any]:
         addresses = player_runtime_service.locator.addresses
@@ -89,23 +127,39 @@ class RuntimeActorOverlayService:
                 continue
             actor_addr = heap_addr + slot * stride
             face = ru16(ACTOR["face_dir"])
+            raw_zone = ru16(ACTOR["zone_id"])
+            grid = {
+                "x": ru16(ACTOR["gpos_x"]),
+                "y": rs16(ACTOR["gpos_y"]),
+                "z": ru16(ACTOR["gpos_z"]),
+            }
+            world = {
+                "x": rs32(ACTOR["wpos_x"]) / FX32_ONE,
+                "y": rs32(ACTOR["wpos_y"]) / FX32_ONE,
+                "z": rs32(ACTOR["wpos_z"]) / FX32_ONE,
+            }
+            expected_x = grid["x"] * 16 + 8
+            expected_z = grid["z"] * 16 + 8
+            membership = self._scene_membership(raw_zone, grid, latest)
             result.append({
                 "slot": slot,
+                "address": f"0x{actor_addr:08X}",
                 "actor_uid": ru16(ACTOR["uid"]),
                 "model_id": ru16(ACTOR["model_id"]),
                 "obj_code_candidate": ru16(ACTOR["model_id"]),
                 "obj_code_semantics": "candidate: runtime model_id is tested against the Gen5 MModel registry; do not promote until sprite/model identity is visually verified",
-                "zone_id": ru16(ACTOR["zone_id"]),
+                # Backward compatible name remains raw; never silently rewrite it.
+                "zone_id": raw_zone,
+                "zone_id_raw": raw_zone,
+                "scene_membership": membership,
+                "same_current_scene": membership["same_current_scene"],
+                "effective_zone_id_candidate": membership["effective_zone_id"],
                 "is_player": actor_addr == player_actor_addr,
-                "world": {
-                    "x": rs32(ACTOR["wpos_x"]) / FX32_ONE,
-                    "y": rs32(ACTOR["wpos_y"]) / FX32_ONE,
-                    "z": rs32(ACTOR["wpos_z"]) / FX32_ONE,
-                },
-                "grid": {
-                    "x": ru16(ACTOR["gpos_x"]),
-                    "y": rs16(ACTOR["gpos_y"]),
-                    "z": ru16(ACTOR["gpos_z"]),
+                "world": world,
+                "grid": grid,
+                "validation": {
+                    "stationary_grid_centre": {"x": expected_x, "z": expected_z},
+                    "residual_world": {"x": abs(world["x"] - expected_x), "z": abs(world["z"] - expected_z)},
                 },
                 "facing": DIRECTIONS.get(face, str(face)),
                 "face_dir_raw": face,
@@ -117,6 +171,7 @@ class RuntimeActorOverlayService:
             "status": "resolved" if result else "candidate",
             "frame": frame,
             "refresh_policy": "bounded ActorSystem+heap read; never a 4 MiB discovery pass",
+            "scene_membership_policy": "preserve raw FieldActor.ZoneID; a zero ZoneID may be a candidate current-scene actor only when ActorSystem and mapper bounds agree",
             "bytes_requested": 0x50 + heap_length,
             "capacity": capacity,
             "declared_count": declared_count,

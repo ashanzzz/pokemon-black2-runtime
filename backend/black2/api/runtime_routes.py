@@ -1,6 +1,6 @@
 """Stable browser-facing runtime API.
 
-Every UI module should prefer these endpoints.  They are cache reads and never
+Every UI module should prefer these endpoints. They are cache reads and never
 mistake a semantic decoder failure for a disconnected HTTP/Bridge transport.
 """
 from __future__ import annotations
@@ -19,14 +19,11 @@ from ..observer.logger import observer_logger
 from ..runtime.config import runtime_config
 from ..runtime.control_log import RUNTIME_MONITOR_VERSION, runtime_control_log
 from ..runtime.hub import RuntimeHub
-from ..runtime.versions import (
-    PROTOCOL_VERSIONS,
-    RUNTIME_RELEASE_VERSION,
-    component_version_report,
-)
+from ..runtime.versions import PROTOCOL_VERSIONS, RUNTIME_RELEASE_VERSION, component_version_report
 
 router = APIRouter(prefix="/api/v1/runtime", tags=["runtime-hub"])
 RUNTIME_CONTROL_VERSION = RUNTIME_RELEASE_VERSION
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
 _hub: RuntimeHub | None = None
 _restart_token = secrets.token_urlsafe(32)
 _restart_scheduled = False
@@ -48,8 +45,7 @@ def _is_loopback(request: Request) -> bool:
 
 
 def _restart_command() -> list[str]:
-    project_root = Path(__file__).resolve().parents[3]
-    launcher = project_root / "run_runtime.py"
+    launcher = _PROJECT_ROOT / "run_runtime.py"
     return [
         sys.executable,
         str(launcher),
@@ -84,9 +80,19 @@ async def control(request: Request) -> dict[str, Any]:
     return {
         "component": "runtime-control",
         "version": RUNTIME_CONTROL_VERSION,
-        "capabilities": {"restart_backend": True, "runtime_monitor": True},
+        "capabilities": {
+            "restart_backend": True,
+            "runtime_monitor": True,
+            "external_supervisor_stop": True,
+            "separate_emulator_close": True,
+        },
         "restart_token": _restart_token,
         "restart_after_seconds": 2.0,
+        "project_root": str(_PROJECT_ROOT),
+        "lifecycle_policy": {
+            "stop_backend": "BLACK2 launcher/STOP_BLACK2.cmd; all project-owned run_runtime.py processes",
+            "close_emulator": "BLACK2 launcher/CLOSE_EMUHAWK.cmd; WM_CLOSE only for project-owned EmuHawk",
+        },
     }
 
 
@@ -95,21 +101,27 @@ async def control_status(request: Request, hub: RuntimeHub = Depends(_runtime_hu
     """Return only locally observable service health and lifecycle metadata."""
     if not _is_loopback(request):
         raise HTTPException(status_code=403, detail="runtime control is available only from localhost")
-    health = hub.health()
+    current_health = hub.health()
     rom_value = os.getenv("BLACK2_ROM_PATH")
     rom_path = Path(rom_value) if rom_value else None
     return {
         "component": "runtime-monitor",
         "version": RUNTIME_MONITOR_VERSION,
         "pid": os.getpid(),
+        "project_root": str(_PROJECT_ROOT),
         "restart_scheduled": _restart_scheduled,
         "restart_parent_pid": os.getenv("BLACK2_RESTART_PARENT_PID"),
         "ports": runtime_config.public_schema(),
-        "health": health,
+        "health": current_health,
         "rom": {
             "configured": bool(rom_path),
             "available": bool(rom_path and rom_path.is_file()),
             "file_name": rom_path.name if rom_path else None,
+        },
+        "lifecycle": {
+            "backend_owner": "project launcher / run_runtime.py",
+            "backend_stop_scope": "all project-owned run_runtime.py processes",
+            "emulator_stop_scope": "separate; project-owned EmuHawk via WM_CLOSE",
         },
         "log_file": "logs/runtime_control.jsonl",
     }
@@ -135,10 +147,7 @@ async def versions(request: Request, hub: RuntimeHub = Depends(_runtime_hub)) ->
         raise HTTPException(status_code=403, detail="runtime versions are available only from localhost")
     bridge_connected = bool(hub.client.is_connected)
     bridge_version = getattr(hub.transport, "bridge_version", None)
-    components = component_version_report(
-        bridge_version=bridge_version,
-        bridge_connected=bridge_connected,
-    )
+    components = component_version_report(bridge_version=bridge_version, bridge_connected=bridge_connected)
     return {
         "format": "black2-component-version-report/v1",
         "release": RUNTIME_RELEASE_VERSION,
@@ -159,7 +168,13 @@ async def restart(
     request: Request,
     x_runtime_restart_token: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    """Start a replacement ``run_runtime.py`` then retire this local process."""
+    """Start a replacement ``run_runtime.py`` then retire this local process.
+
+    The project launcher does not trust a single stored PID when stopping the
+    backend: it enumerates every process whose command line belongs to this
+    checkout. Therefore a replacement spawned here is still part of the same
+    backend lifecycle and cannot survive STOP_BLACK2 as an orphan.
+    """
     global _restart_scheduled
     if not _is_loopback(request):
         raise HTTPException(status_code=403, detail="runtime control is available only from localhost")
@@ -172,9 +187,10 @@ async def restart(
         flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
         replacement_env = os.environ.copy()
         replacement_env["BLACK2_RESTART_PARENT_PID"] = str(os.getpid())
+        replacement_env["BLACK2_PROJECT_ROOT"] = str(_PROJECT_ROOT)
         subprocess.Popen(
             _restart_command(),
-            cwd=str(Path(__file__).resolve().parents[3]),
+            cwd=str(_PROJECT_ROOT),
             env=replacement_env,
             creationflags=flags,
         )
@@ -195,8 +211,6 @@ async def restart(
 
     async def retire_current_process() -> None:
         await asyncio.sleep(0.5)
-        # The replacement waits before binding; this exits only after its
-        # accepted response is sent and lets BizHawk reconnect automatically.
         runtime_control_log.record("backend_restart_retiring", "process_exit")
         os._exit(0)
 
@@ -233,11 +247,23 @@ async def schema() -> dict[str, Any]:
         "components": {
             "runtime_control": {
                 "version": RUNTIME_CONTROL_VERSION,
-                "capabilities": {"restart_backend": True, "runtime_monitor": True},
+                "capabilities": {
+                    "restart_backend": True,
+                    "runtime_monitor": True,
+                    "external_supervisor_stop": True,
+                    "separate_emulator_close": True,
+                },
             },
-            "runtime_monitor": {"version": RUNTIME_MONITOR_VERSION, "capabilities": {"persistent_lifecycle_log": True}},
-            "version_registry": {"version": RUNTIME_RELEASE_VERSION, "capabilities": {"expected_observed_comparison": True}},
+            "runtime_monitor": {
+                "version": RUNTIME_MONITOR_VERSION,
+                "capabilities": {"persistent_lifecycle_log": True},
+            },
+            "version_registry": {
+                "version": RUNTIME_RELEASE_VERSION,
+                "capabilities": {"expected_observed_comparison": True},
+            },
         },
         "frontend_rule": "Never infer Backend/Bridge offline from a semantic/map/player request failure.",
         "workbench_rule": "Workbench aggregation is cache-first; heavy RAM discovery stays explicit and operator initiated.",
+        "lifecycle_rule": "STOP_BLACK2 stops backend services only; CLOSE_EMUHAWK closes only the project-owned emulator.",
     }

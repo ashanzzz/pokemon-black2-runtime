@@ -14,9 +14,9 @@ class TestRuntimeVersions(unittest.TestCase):
             bridge_connected=True,
         )
         by_id = {item["id"]: item for item in report}
-        self.assertEqual(RUNTIME_RELEASE_VERSION, "9.0.0")
+        self.assertEqual(RUNTIME_RELEASE_VERSION, "10.1.0")
         self.assertEqual(by_id["bizhawk_bridge"]["status"], "compatible")
-        self.assertEqual(by_id["fastapi_backend"]["observed_version"], "9.0.0")
+        self.assertEqual(by_id["fastapi_backend"]["observed_version"], "10.1.0")
 
     def test_disconnected_bridge_is_unavailable_not_compatible(self):
         report = component_version_report(
