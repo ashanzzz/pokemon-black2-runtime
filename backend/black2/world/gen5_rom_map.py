@@ -331,13 +331,12 @@ class ChunkBuilding:
         cursor = 4
         for index in range(count):
             x, y, z = struct.unpack_from("<iii", raw, cursor)
-            # CTRMapV reads both fields as big-endian 16-bit values from the
-            # on-disk record (its DataInput is little-endian, hence the
-            # explicit Short.reverseBytes call).  Treating model UID as a
-            # normal little-endian short turns valid IDs such as 2/8/11 into
-            # 512/2048/2816 and prevents every building resource from
-            # resolving.
-            rotation, model_uid = struct.unpack_from(">HH", raw, cursor + 12)
+            # The angle is a normal little-endian NTR angle16.  CTRMapV then
+            # explicitly reverses only the following model UID short; reading
+            # both fields with one endian mode turns valid 90/180/270-degree
+            # placements into tiny fractions of a degree (or invalid UIDs).
+            rotation = _u16(raw, cursor + 12)
+            model_uid = int.from_bytes(raw[cursor + 14:cursor + 16], "big")
             result.append(cls(
                 index=index,
                 local_x=x / FX32_ONE,

@@ -63,7 +63,9 @@ class TestGen5V5Formats(unittest.TestCase):
         self.assertEqual(m.cell(1, 1)["zone_id"], 41)
 
     def test_gf_container_and_chunk_buildings(self):
-        b = struct.pack("<IiiiHH", 1, 4096, -8192, 12288, 0x4000, 77)
+        # ChunkBuilding stores angle16 little-endian, followed by a model UID
+        # with the byte order reversed by the original CTRMap parser.
+        b = struct.pack("<IiiiH", 1, 4096, -8192, 12288, 0x4000) + (77).to_bytes(2, "big")
         raw = gf_container(b"WB", [b"BMD0fake", b"perm", b])
         c = GFContainer.parse(raw, expected_magic="WB")
         self.assertEqual(c.file_count, 3)
