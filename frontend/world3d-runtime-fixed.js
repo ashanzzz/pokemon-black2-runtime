@@ -39,6 +39,50 @@ export class Black2World3D extends BaseWorld3D{
     this.playerPositionMarker=marker(6.4);
     this.playerPositionMarker.name='player-runtime-wpos-marker';
     this.playerAnchor.add(this.playerPositionMarker);
+    this.encounterRoot=new THREE.Group();
+    this.encounterRoot.name='encounter-regions';
+    this.encounterRoot.visible=false;
+    this.encounterPayload=null;
+    this.encounterSelectedId=null;
+    this.worldRoot.add(this.encounterRoot);
+  }
+
+
+  _encounterColor(method,evidence,selected=false){
+    if(selected)return 0xe8f6ff;
+    if(method==='walk_regular')return 0x579562;
+    if(method==='walk_double_grass')return 0x7b8447;
+    if(method==='surf_candidate')return evidence==='verified'?0x4f8fb5:0x55758d;
+    return 0x7b8794;
+  }
+
+  clearEncounterRegions(){
+    this._disposeRoot(this.encounterRoot);
+    this.encounterRoot.clear();
+    this.encounterPayload=null;
+    this.encounterSelectedId=null;
+  }
+
+  setEncounterRegionsVisible(value){this.encounterRoot.visible=!!value}
+
+  setEncounterRegions(payload,{selectedRegionId=null,visible=true}={}){
+    this._disposeRoot(this.encounterRoot);this.encounterRoot.clear();
+    this.encounterPayload=payload||null;this.encounterSelectedId=selectedRegionId||null;
+    const regions=Array.isArray(payload?.regions)?payload.regions:[];
+    const fallbackY=(Number(this.player?.world?.y)||0)-this.origin.y;
+    for(const region of regions){
+      const tiles=Array.isArray(region?.tiles)?region.tiles:[];if(!tiles.length)continue;
+      const selected=String(region.region_id)===String(selectedRegionId||'');
+      const material=new THREE.MeshBasicMaterial({color:this._encounterColor(region.encounter_method,region.evidence,selected),transparent:true,opacity:selected?.48:(region.evidence==='verified'?.25:.16),side:THREE.DoubleSide,depthWrite:false,depthTest:true,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+      const geometry=new THREE.PlaneGeometry(13.4,13.4);geometry.rotateX(-Math.PI/2);
+      const mesh=new THREE.InstancedMesh(geometry,material,tiles.length),matrix=new THREE.Matrix4();
+      tiles.forEach((tile,index)=>{const x=Number(tile.x)*16+8-this.origin.x,z=Number(tile.z)*16+8-this.origin.z,surface=this._terrainSurfaceY?this._terrainSurfaceY(x,z,fallbackY):fallbackY,y=(Number.isFinite(surface)?surface:fallbackY)+.42;matrix.makeTranslation(x,y,z);mesh.setMatrixAt(index,matrix)});
+      mesh.instanceMatrix.needsUpdate=true;mesh.renderOrder=1180;mesh.name=`encounter-region-${region.region_id}`;mesh.userData={kind:'encounter_region',region_id:region.region_id,presentation_only:true};this.encounterRoot.add(mesh);
+      const rawSegments=Array.isArray(region.outline_segments)?region.outline_segments:[],positions=[];
+      for(const seg of rawSegments){const x1=Number(seg.x1)*16-this.origin.x,z1=Number(seg.z1)*16-this.origin.z,x2=Number(seg.x2)*16-this.origin.x,z2=Number(seg.z2)*16-this.origin.z,mx=(x1+x2)/2,mz=(z1+z2)/2,surface=this._terrainSurfaceY?this._terrainSurfaceY(mx,mz,fallbackY):fallbackY,y=(Number.isFinite(surface)?surface:fallbackY)+.7;positions.push(x1,y,z1,x2,y,z2)}
+      if(positions.length){const lineGeometry=new THREE.BufferGeometry();lineGeometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));const lineMaterial=new THREE.LineBasicMaterial({color:this._encounterColor(region.encounter_method,region.evidence,selected),transparent:true,opacity:selected?1:.75,depthWrite:false,depthTest:true});const lines=new THREE.LineSegments(lineGeometry,lineMaterial);lines.renderOrder=1182;lines.userData={kind:'encounter_outline',region_id:region.region_id,presentation_only:true};this.encounterRoot.add(lines)}
+    }
+    this.encounterRoot.visible=!!visible;
   }
 
   _restoreOriginalMaterialSides(){

@@ -935,3 +935,23 @@ async def cancel_navigation_task(task_id: str, request: Request):
         return await _task_service().cancel(task_id)
     except NavigationPlanningError as exc:
         return _task_error(exc, request)
+
+
+def navigation_planner_service() -> NavigationPlanService:
+    """Internal integration hook for higher-level task orchestrators."""
+    return _planner
+
+
+def navigation_task_service() -> NavigationTaskService:
+    """Internal integration hook; preserves the navigation input lease."""
+    return _task_service()
+
+
+def navigation_static_provider() -> Any | None:
+    """Return the same ROM-backed provider used by public navigation plans."""
+    return _planner._resolve_static_provider()
+
+
+async def navigation_occupancy_snapshot(zone_id: int, y: int, supplied: Any = ()) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    """Internal bounded ActorSystem occupancy snapshot for higher-level tasks."""
+    return await _navigation_occupancy(int(zone_id), int(y), supplied)

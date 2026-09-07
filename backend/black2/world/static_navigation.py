@@ -454,6 +454,7 @@ class RomStaticNavigationGraph:
         cells: dict[tuple[int, int], StaticNavigationCell],
         current: StaticNavigationCell,
         occupied: set[tuple[int, int]],
+        allowed: set[tuple[int, int]] | None = None,
     ) -> Iterable[StaticNavigationCell]:
         # Stable order makes plans reproducible and is convenient for UI tests.
         for dx, dz in ((0, -1), (-1, 0), (1, 0), (0, 1)):
@@ -464,6 +465,8 @@ class RomStaticNavigationGraph:
                 continue
             candidate = cells.get((current.node.x + dx, current.node.z + dz))
             if candidate is None or (candidate.node.x, candidate.node.z) in occupied:
+                continue
+            if allowed is not None and (candidate.node.x, candidate.node.z) not in allowed:
                 continue
             if _opposite(direction) in candidate.blocked_directions:
                 continue
@@ -476,6 +479,7 @@ class RomStaticNavigationGraph:
         *,
         player_sample: dict[str, Any] | None = None,
         occupied: Iterable[NavNode | dict[str, Any] | tuple[int, int]] = (),
+        allowed: Iterable[NavNode | dict[str, Any] | tuple[int, int]] = (),
     ) -> dict[str, Any]:
         if start.zone_id != goal.zone_id:
             return {"reachable": False, "reason": "static candidate graph is same-Zone only", "path": [], "confidence": "candidate_static"}
@@ -491,6 +495,15 @@ class RomStaticNavigationGraph:
         occupied_xy.discard((start.x, start.z))
         if (goal.x, goal.z) in occupied_xy:
             return {"reachable": False, "reason": "goal is occupied by a runtime actor", "path": [], "confidence": "candidate_static"}
+        allowed_xy = _occupied_xy(allowed, zone_id=start.zone_id, y=start.y) if allowed else None
+        if allowed_xy is not None:
+            if (start.x, start.z) not in allowed_xy or (goal.x, goal.z) not in allowed_xy:
+                return {
+                    "reachable": False,
+                    "reason": "start or goal is outside the allowed navigation subgraph",
+                    "path": [],
+                    "confidence": "candidate_static",
+                }
 
         start_key, goal_key = (start.x, start.z), (goal.x, goal.z)
         # Lexicographic A*: minimize tile count first, then turns among all
@@ -516,7 +529,7 @@ class RomStaticNavigationGraph:
                 goal_state = state
                 break
             current = cells[(x, z)]
-            for neighbor in self._neighbors(cells, current, occupied_xy):
+            for neighbor in self._neighbors(cells, current, occupied_xy, allowed_xy):
                 ndx = neighbor.node.x - x
                 ndz = neighbor.node.z - z
                 nsteps = steps + 1

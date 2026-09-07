@@ -9,9 +9,9 @@ from __future__ import annotations
 from typing import Any
 
 
-RUNTIME_RELEASE_VERSION = "11.0.0"
-WORLD3D_SCENE_VERSION = "11.0.0"
-ORIGINAL_MAP_UI_VERSION = "11.0.0"
+RUNTIME_RELEASE_VERSION = "12.0.0"
+WORLD3D_SCENE_VERSION = "12.0.0"
+ORIGINAL_MAP_UI_VERSION = "12.0.0"
 BIZHAWK_BRIDGE_VERSION = "1.9.0-savestate-safe"
 
 COMPONENT_VERSIONS: tuple[dict[str, Any], ...] = (
@@ -72,6 +72,8 @@ PROTOCOL_VERSIONS: tuple[dict[str, str], ...] = (
     {"id": "world_lab", "name": "World Lab Diagnostics", "version": "black2-world-lab/v1"},
     {"id": "workbench_ui", "name": "Workbench UI Contract", "version": "black2-workbench-ui-contract/v1"},
     {"id": "observed_navigation", "name": "Observed Layered Navigation", "version": "black2-observed-navigation/v1"},
+    {"id": "encounter_regions", "name": "Encounter Region API", "version": "black2-encounter-regions/v1"},
+    {"id": "encounter_tasks", "name": "Encounter Patrol Task API", "version": "black2-encounter-task/v1"},
     {"id": "universal_snapshot", "name": "Universal Snapshot", "version": "universal_snapshot/v2"},
     {"id": "runtime_world_export", "name": "Runtime World Export", "version": "pokemon_black2_runtime_world_export/v1"},
 )

@@ -51,6 +51,7 @@ from .status_routes import configure_status_routes, router as status_router
 from .battle_routes import configure_battle_routes, router as battle_router
 from .dex_routes import router as dex_router
 from .catalog_routes import router as catalog_router
+from .encounter_routes import router as encounter_router
 from .map_routes import (
     configure_map_routes,
     router as map_router,
@@ -159,6 +160,7 @@ app.include_router(status_router)
 app.include_router(battle_router)
 app.include_router(dex_router)
 app.include_router(catalog_router)
+app.include_router(encounter_router)
 
 
 class PressButtonRequest(BaseModel):

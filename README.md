@@ -155,3 +155,32 @@ Workbench 统一使用：
 - `docs/API_WORKBENCH_V9.md`
 - `docs/CALIBRATION_PROTOCOL_CN.md`
 - `docs/UNIFIED_RUNTIME_ARCHITECTURE_CN.md`
+
+
+## Encounter Region Workbench v12
+
+在 v11 的纯移动/互动分离与同 Matrix 室外拼接基础上，本版本增加可供 UI 与 AI 共用的 Encounter Region 层：
+
+- 草地/深草按 **同 Zone + 同 Y + 同语义 + 四方向连通** 聚合；
+- Region 真值是完整 `tiles[]`，不是 Bounding Box；
+- 输出 boundary / interior / entry / outline / 推荐 patrol；
+- Navigation 增加 `allowed_nodes`，Region 巡逻路径不得离开 exact Tile Set；
+- Workbench 新增“遇敌区域”叠层与 Encounter Dock；
+- 同 Matrix 拼接场景可一次查看相邻 Zone Region，但跨 Zone 执行继续关闭；
+- Wild Encounter Profile / Pokémon location / Battle identity 没有验证前保持 `research`，不伪造概率或战斗确认。
+
+API：
+
+```text
+GET  /api/v1/encounters/capabilities
+GET  /api/v1/encounters/regions
+GET  /api/v1/encounters/regions/current
+GET  /api/v1/encounters/regions/{region_id}
+GET  /api/v1/encounters/profiles
+GET  /api/v1/encounters/search
+POST /api/v1/encounters/tasks
+GET  /api/v1/encounters/tasks/{task_id}
+POST /api/v1/encounters/tasks/{task_id}/cancel
+```
+
+详见 `docs/ENCOUNTER_REGION_WORKBENCH_V12_CN.md` 与 `LIVE_TEST_ENCOUNTER_V12_CN.md`。

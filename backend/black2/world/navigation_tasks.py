@@ -82,6 +82,7 @@ class NavigationTaskService:
         interaction: dict[str, Any] | None = None,
         movement_mode: str = "auto",
         navigation_intent: str = "walk_to_tile",
+        allowed_nodes: Any = (),
     ) -> dict[str, Any]:
         # Terminal status is published after input clear, so active status also
         # covers the preceding owner's cleanup interval.
@@ -94,10 +95,12 @@ class NavigationTaskService:
                 "NAV_BRIDGE_OFFLINE", "The BizHawk bridge is offline.", status_code=503, retryable=True
             )
         occupied_snapshot = tuple(occupied or ())
+        allowed_snapshot = tuple(allowed_nodes or ())
         try:
             plan = self.planner.create_plan(
                 destination, occupied=occupied_snapshot, interaction=interaction,
                 movement_mode=movement_mode, navigation_intent=navigation_intent,
+                allowed_nodes=allowed_snapshot,
             )
         except NavigationPlanningError as exc:
             navigation_audit_log.record(
@@ -120,7 +123,8 @@ class NavigationTaskService:
             "plan", "plan_ready", source="task_start", plan_id=plan["plan_id"],
             request={"destination": destination, "movement_mode": movement_mode,
                      "interaction": interaction, "navigation_intent": navigation_intent,
-                     "occupied_count": len(occupied_snapshot)},
+                     "occupied_count": len(occupied_snapshot),
+                     "allowed_tile_count": len(allowed_snapshot)},
             resolved_start=plan.get("resolved_start"), resolved_goal=plan.get("resolved_goal"),
             route_source=plan.get("route_source"), confidence=plan.get("confidence"),
             movement=plan.get("movement"), segments=plan.get("segments"),
@@ -139,6 +143,7 @@ class NavigationTaskService:
             "stop_reason": None, "arrival": None, "_cleanup_done": False,
             "_dynamic_replan_count": 0,
             "_occupied": occupied_snapshot,
+            "_allowed_nodes": allowed_snapshot,
         }
         self._tasks[task_id] = record
         navigation_audit_log.record(

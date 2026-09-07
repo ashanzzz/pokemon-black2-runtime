@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pokémon Black 2 逆向工作台</title>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/","/frontend/world3d-runtime.js":"/frontend/world3d-runtime-fixed.js?clip=6&warp=6&npc=10&player=5&static-preview=2&cell-grid=1&connected-map=1"}}</script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/","/frontend/world3d-runtime.js":"/frontend/world3d-runtime-fixed.js?clip=6&warp=6&npc=10&player=5&static-preview=2&cell-grid=1&encounters=1&connected-map=1"}}</script>
 <link rel="stylesheet" href="/frontend/workbench.css">
 <script src="/frontend/ui/i18n.js?v=10"></script>
 <script src="/frontend/ui/runtime-client.js"></script>
@@ -50,6 +50,7 @@
         <button class="tool" id="routePickButton" data-i18n="nav.pickOnMap" aria-pressed="false">点击寻路</button>
         <span class="toolbar-sep"></span>
         <label class="toggle-tool"><input type="checkbox" id="connectedMapToggle"><span data-i18n="world.connectedMap">拼接相邻室外</span></label>
+        <label class="toggle-tool encounter-toggle"><input type="checkbox" id="encounterRegionToggle"><span>遇敌区域</span><span class="toolbar-count" id="encounterRegionCount">0</span></label>
         <label class="toggle-tool"><input type="checkbox" id="terrainToggle" checked><span data-i18n="world.terrain">地形</span></label>
         <label class="toggle-tool"><input type="checkbox" id="buildingToggle" checked><span data-i18n="world.buildings">建筑</span></label>
         <label class="toggle-tool"><input type="checkbox" id="npcToggle" checked><span data-i18n="world.npc">显示 NPC</span></label>
@@ -78,6 +79,7 @@
       <button class="active" data-dock="events" data-i18n="dock.events">事件</button>
       <button data-dock="assets" data-i18n="dock.assets">资源错误</button>
       <button data-dock="navigation" data-i18n="dock.navigation">导航</button>
+      <button data-dock="encounters">遇敌区域</button>
       <button data-dock="calibration" data-i18n="dock.calibration">校准</button>
       <button data-dock="performance" data-i18n="dock.performance">性能</button>
       <button data-dock="memory" data-i18n="dock.memory">原始/结构</button>
@@ -96,6 +98,6 @@
   </footer>
 </div>
 <div class="palette" id="palette" hidden><div class="palette-box"><input id="paletteInput" placeholder="Command…"><div id="paletteResults"></div></div></div>
-<script type="module" src="/frontend/workbench.js?world=10&npc=5&height=3&navigation=5&static-preview=2&cell-grid=2&connected-map=1&nav-intent=2"></script>
+<script type="module" src="/frontend/workbench.js?world=10&npc=5&height=3&navigation=5&static-preview=2&cell-grid=2&encounters=1&connected-map=1&nav-intent=2"></script>
 </body>
 </html>

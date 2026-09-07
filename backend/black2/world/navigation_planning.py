@@ -481,6 +481,7 @@ class NavigationPlanService:
         interaction: dict[str, Any] | None = None,
         movement_mode: str = "auto",
         navigation_intent: str = "walk_to_tile",
+        allowed_nodes: Iterable[Any] = (),
     ) -> dict[str, Any]:
         start_source = "player_runtime"
         if start_position is None:
@@ -566,6 +567,19 @@ class NavigationPlanService:
         normalized_occupied = normalize_occupancy(
             occupied, default_zone=start.zone_id, default_y=start.y,
         )
+        normalized_allowed = normalize_occupancy(
+            allowed_nodes, default_zone=start.zone_id, default_y=start.y,
+        )
+        allowed_xy = self._occupied_nodes(
+            normalized_allowed, zone_id=start.zone_id, y=start.y,
+        ) if normalized_allowed else None
+        if allowed_xy is not None and ((start.x, start.z) not in allowed_xy or (goal.x, goal.z) not in allowed_xy):
+            raise NavigationPlanningError(
+                "NAV_ALLOWED_SUBGRAPH_MISMATCH",
+                "Start and goal must both belong to the allowed navigation subgraph.",
+                status_code=409,
+                details={"start": start.public(), "goal": goal.public(), "allowed_tile_count": len(allowed_xy)},
+            )
         if navigation_intent in {"route", "walk_to_tile"} and (goal.x, goal.z) in occupied_nodes:
             raise NavigationPlanningError(
                 "NAV_DESTINATION_OCCUPIED",
@@ -573,9 +587,9 @@ class NavigationPlanService:
                 details={"destination": goal.public(), "occupied": sorted(occupied_nodes)},
             )
         result = self.graph.find_path(start, goal, require_direct_observation=True)
-        if result.get("reachable") and occupied_nodes:
+        if result.get("reachable"):
             observed_path = result.get("path") or []
-            if any(
+            if occupied_nodes and any(
                 (int(point.get("x")), int(point.get("z"))) in occupied_nodes
                 for point in observed_path
                 if isinstance(point, dict)
@@ -583,6 +597,16 @@ class NavigationPlanService:
                 result = {
                     "reachable": False,
                     "reason": "observed route intersects current runtime actor occupancy",
+                    "path": [],
+                }
+            elif allowed_xy is not None and any(
+                (int(point.get("x")), int(point.get("z"))) not in allowed_xy
+                for point in observed_path
+                if isinstance(point, dict)
+            ):
+                result = {
+                    "reachable": False,
+                    "reason": "observed route leaves the allowed navigation subgraph",
                     "path": [],
                 }
         route_source = "verified_observed"
@@ -599,11 +623,20 @@ class NavigationPlanService:
                     try:
                         static_result = finder(
                             start, goal, player_sample=self.player_sample(), occupied=normalized_occupied,
+                            allowed=normalized_allowed,
                         )
                     except TypeError:
-                        # Compatibility for a minimal provider used by older
-                        # integrations; the built-in provider accepts it.
-                        static_result = finder(start, goal, player_sample=self.player_sample())
+                        # Compatibility for providers written before the
+                        # allowed-subgraph contract. Preserve dynamic actor
+                        # occupancy first; only drop the new constraint. The
+                        # final path invariant below still rejects any escape
+                        # from allowed_nodes.
+                        try:
+                            static_result = finder(
+                                start, goal, player_sample=self.player_sample(), occupied=normalized_occupied,
+                            )
+                        except TypeError:
+                            static_result = finder(start, goal, player_sample=self.player_sample())
                 except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError, TypeError) as exc:
                     static_result = {
                         "reachable": False,
@@ -639,6 +672,10 @@ class NavigationPlanService:
             point for point in path[1:]
             if (point["x"], point["z"]) in occupied_nodes
         ]
+        outside_allowed = [
+            point for point in path
+            if allowed_xy is not None and (point["x"], point["z"]) not in allowed_xy
+        ]
         if occupied_path:
             # This is an invariant check in addition to the graph/provider
             # filters.  It prevents a third-party provider or a malformed
@@ -647,6 +684,12 @@ class NavigationPlanService:
                 "NAV_OCCUPANCY_CONFLICT",
                 "The planned route intersects a current runtime actor occupancy.",
                 details={"occupied": occupied_path},
+            )
+        if outside_allowed:
+            raise NavigationPlanningError(
+                "NAV_ALLOWED_SUBGRAPH_ESCAPE",
+                "The planned route leaves the caller-supplied allowed navigation subgraph.",
+                details={"outside": outside_allowed, "allowed_tile_count": len(allowed_xy or ())},
             )
         if any(
             abs(path[index]["x"] - path[index - 1]["x"])
@@ -729,6 +772,10 @@ class NavigationPlanService:
             "movement": movement,
             "warnings": warnings,
             "blockers": [],
+            "constraints": {
+                "allowed_tile_count": len(allowed_xy) if allowed_xy is not None else None,
+                "path_within_allowed_tiles": True if allowed_xy is not None else None,
+            },
         }
         if normalized_interaction is not None:
             response["interaction"] = normalized_interaction

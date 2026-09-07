@@ -1,0 +1,15 @@
+Pokémon Black 2 Runtime - Encounter Region Workbench v12
+
+Base commit: 1396a25 fix(v11): separate navigation intents and stitch connected outdoor worlds
+Feature: Encounter Region + exact Tile Set + constrained patrol + Workbench overlay
+Runtime release constant remains 10.1.0 because no existing runtime/bridge protocol was broken.
+New protocol contracts:
+- black2-encounter-regions/v1
+- black2-encounter-task/v1
+
+Final validation:
+- python -m pytest -q -> 269 passed, 6 skipped
+- node --check frontend/workbench.js -> passed
+- node --check frontend/world3d-runtime-fixed.js -> passed
+- python -m compileall -q backend -> passed
+- git diff --check -> passed
