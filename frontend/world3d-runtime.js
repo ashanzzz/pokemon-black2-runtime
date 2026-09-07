@@ -335,7 +335,9 @@ export class Black2World3D{
       :linkedWarp?(linkedWarp.display_world_center||linkedWarp.semantic_entry_world||linkedWarp.world)
       :pickedKind==='player'?this.player?.world:null;
     const semanticPoint=authoritativeWorld&&finite(authoritativeWorld.x)!=null&&finite(authoritativeWorld.y)!=null&&finite(authoritativeWorld.z)!=null?this._display(authoritativeWorld):null;
-    const meshPoint=semanticPoint||pickHit?.point?.clone?.();if(meshPoint&&pickHit.object?.isSkinnedMesh&&!semanticPoint)meshPoint.applyMatrix4(pickHit.object.matrixWorld);
+    // THREE.Raycaster Intersection.point is already expressed in Three.js world space.
+    // Never apply object.matrixWorld again here, including for Apicula SkinnedMesh terrain.
+    const meshPoint=semanticPoint||pickHit?.point?.clone?.();
     // Empty canvas regions have no render mesh to intersect. Projecting onto
     // the player's elevation is useful only inside the loaded terrain bounds.
     const planePoint=new THREE.Vector3(),plane=new THREE.Plane(new THREE.Vector3(0,1,0),-this.playerDisplay.y),point=meshPoint||this.raycaster.ray.intersectPlane(plane,planePoint);
@@ -367,6 +369,21 @@ export class Black2World3D{
   _pick(event){
     const result=this._pointerContext(event);if(!result)return;const point=result.coordinate;
     const node=result.pickNode;
+    if(node?.userData?.kind==='terrain'&&point){
+      const item=node.userData.item||{},hit=result.pickHit,matrix=hit?.object?.matrixWorld?.elements||[];
+      console.info('[Terrain Click Debug]',{
+        'item.cell':item?.cell,
+        'item.world':item?.world,
+        'point':hit?.point?{x:hit.point.x,y:hit.point.y,z:hit.point.z}:null,
+        'scene_origin':{x:this.origin.x,y:this.origin.y,z:this.origin.z},
+        'worldX':point.world?.x,
+        'worldZ':point.world?.z,
+        'grid':point.grid,
+        'isSkinnedMesh':!!hit?.object?.isSkinnedMesh,
+        'matrixWorldTranslation':hit?.object?{x:finite(matrix[12]),y:finite(matrix[13]),z:finite(matrix[14])}:null,
+        'raycastPointSpace':'three_world'
+      });
+    }
     if(point){
       // A terrain mesh is only a visual surface. It becomes a locked map cell
       // only after the backend has proved a collision-valid standing tile.
