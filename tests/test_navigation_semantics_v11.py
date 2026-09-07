@@ -86,3 +86,57 @@ def test_static_astar_prefers_fewer_turns_without_adding_steps():
     assert result["steps"] == 4
     assert result["turns"] == 1
     assert result["optimization"] == "shortest_steps_then_fewest_turns"
+
+
+class _DisconnectedClickGrid(RomStaticNavigationGraph):
+    def __init__(self):
+        self.revision = "test-disconnected-click"
+        self._cells = {
+            (0, 0): StaticNavigationCell(
+                NavNode(441, 0, 0, 0), 0, 0, 0, False
+            ),
+            (1, 0): StaticNavigationCell(
+                NavNode(441, 1, 0, 0), 0, 0, 0, False
+            ),
+            (2, 0): StaticNavigationCell(
+                NavNode(441, 2, 0, 0), 0, 0, 0, False,
+                blocked_directions=("right",),
+            ),
+            (3, 0): StaticNavigationCell(
+                NavNode(441, 3, 0, 0), 0, 0, 0, False,
+                blocked_directions=("left",),
+            ),
+        }
+
+    def _anchor_from_sample(self, *_args, **_kwargs):
+        return None
+
+    def _cells_for_layer(self, *_args, **_kwargs):
+        return self._cells
+
+
+def test_snap_rejects_exact_static_tile_when_disconnected_from_live_player():
+    graph = _DisconnectedClickGrid()
+    player = {
+        "zone_id": 441,
+        "grid": {"x": 0, "y": 0, "z": 0},
+    }
+
+    result = graph.snap(
+        441,
+        3,
+        0,
+        0,
+        player_sample=player,
+        max_radius=4,
+    )
+
+    assert result["ok"] is True
+    assert result["snapped"] is True
+    assert result["target"] == {
+        "zone_id": 441,
+        "x": 2,
+        "y": 0,
+        "z": 0,
+    }
+

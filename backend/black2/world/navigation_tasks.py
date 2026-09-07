@@ -52,10 +52,12 @@ class NavigationTaskService:
         step_timeout_seconds: float = 2.0,
         poll_seconds: float = 0.03,
         continuous_segment_limit: int = 8,
+        live_player_sampler: Callable[[], Any] | None = None,
     ) -> None:
         self.planner = planner
         self.client = client
         self.player_sample = player_sample
+        self.live_player_sampler = live_player_sampler
         self.control_sample = control_sample or (lambda: None)
         self.actor_sample = actor_sample
         self.hold_frames = hold_frames
@@ -672,6 +674,9 @@ class NavigationTaskService:
                 if selected_mode == "walk" and step_count == 1 and turn_overhead == 0
                 else frames_per_tile * step_count + turn_overhead
             )
+            record.pop("_clear_task", None)
+            record["_cleanup_done"] = False
+
             navigation_audit_log.record(
                 "execution", "segment_started", task_id=record["task_id"], plan_id=record["plan_id"],
                 segment=segment_index, button=button, buttons=buttons,
@@ -684,7 +689,7 @@ class NavigationTaskService:
                 frames / 30.0 + 0.75 if step_count > 1 else self.step_timeout_seconds,
             )
             landed, landed_player = await self._wait_for_landing(
-                previous, expected, allowed_nodes=path[start_index - 1:end_index],
+                record, previous, expected, allowed_nodes=path[start_index - 1:end_index],
                 timeout_seconds=landing_timeout,
             )
             if not self._same_spatial_node(landed, expected):
@@ -725,7 +730,7 @@ class NavigationTaskService:
         interaction = plan.get("interaction")
         if interaction is not None:
             facing = str(interaction.get("facing") or "")
-            turn_result = await self._turn_to_facing(goal, facing)
+            turn_result = await self._turn_to_facing(record, goal, facing)
             if not turn_result.get("ok"):
                 return _stop(
                     "NAV_INTERACTION_FACING_FAILED",
@@ -743,6 +748,8 @@ class NavigationTaskService:
                 )
             arrival_player = turned_player
             if interaction.get("execute") is True:
+                record.pop("_clear_task", None)
+                record["_cleanup_done"] = False
                 await self.client.press_buttons(["A"], frames=1)
                 navigation_audit_log.record(
                     "execution", "interaction_pressed", task_id=record["task_id"],
@@ -757,7 +764,12 @@ class NavigationTaskService:
                 "interact_pressed": bool(interaction.get("execute"))} if interaction is not None else {}),
         }}
 
-    async def _turn_to_facing(self, stand: NavNode, expected_facing: str) -> dict[str, Any]:
+    async def _turn_to_facing(
+        self,
+        record: dict[str, Any],
+        stand: NavNode,
+        expected_facing: str,
+    ) -> dict[str, Any]:
         """Turn in place and prove the final facing without entering the NPC tile."""
         button = self._facing_button(expected_facing)
         if button is None:
@@ -774,6 +786,8 @@ class NavigationTaskService:
             control_error = self._not_controllable()
             if control_error:
                 return {"ok": False, "reason": "not_controllable", **control_error}
+            record.pop("_clear_task", None)
+            record["_cleanup_done"] = False
             await self.client.press_buttons([button], frames=self.turn_frames)
             attempts += 1
             deadline = asyncio.get_running_loop().time() + min(0.6, self.step_timeout_seconds)
@@ -818,7 +832,11 @@ class NavigationTaskService:
         record["status"] = outcome["status"]  # Must remain last: this gates the input lease.
 
     async def _wait_for_landing(
-        self, previous: NavNode, expected: NavNode, *,
+        self,
+        record: dict[str, Any],
+        previous: NavNode,
+        expected: NavNode,
+        *,
         allowed_nodes: list[NavNode] | None = None,
         timeout_seconds: float | None = None,
     ) -> tuple[NavNode | None, dict[str, Any]]:
@@ -834,6 +852,13 @@ class NavigationTaskService:
         input_stopped = False
         while loop.time() < deadline:
             await asyncio.sleep(self.poll_seconds)
+            if self.live_player_sampler is not None:
+                try:
+                    res = self.live_player_sampler()
+                    if inspect.isawaitable(res):
+                        await res
+                except Exception:
+                    pass
             node, player = self._current_node()
             samples += 1
             last_node, last_player = node, player
@@ -844,6 +869,38 @@ class NavigationTaskService:
                 last_key = current_key
                 last_change_at = loop.time()
             if self._same_spatial_node(node, expected):
+                # input.press only queues a bounded hold in the Lua bridge.
+                # Reaching the expected GPos does not prove the queued hold has
+                # expired. Stop the current queue before accepting the landing,
+                # otherwise Run can continue into the tile after the endpoint.
+                if not input_stopped:
+                    clear_task = record.get("_clear_task")
+                    if clear_task is None:
+                        clear_task = asyncio.create_task(self.client.clear_inputs())
+                        record["_clear_task"] = clear_task
+                    try:
+                        await asyncio.shield(clear_task)
+                    except asyncio.CancelledError:
+                        # Preserve the same clear operation for terminal cleanup
+                        # and cancellation; never launch a competing clear.
+                        try:
+                            await clear_task
+                        finally:
+                            raise
+                    except (ConnectionError, TimeoutError, OSError):
+                        self._last_landing_diagnostics = {
+                            "timeout_seconds": round(loop.time() - started_at, 3),
+                            "samples": samples,
+                            "last_gpos": node.public() if node else None,
+                            "last_wpos": player.get("world"),
+                            "expected_gpos": expected.public(),
+                            "locomotion": player.get("locomotion"),
+                            "control_error": control_error,
+                            "input_clear": "failed",
+                        }
+                        return None, player
+                    input_stopped = True
+
                 if control_error is None:
                     self._last_landing_diagnostics = {
                         "timeout_seconds": round(loop.time() - started_at, 3),
@@ -853,29 +910,15 @@ class NavigationTaskService:
                         "expected_gpos": expected.public(),
                         "locomotion": last_player.get("locomotion"),
                         "control_error": None,
+                        "input_clear": "cleared_at_expected",
                     }
                     return node, player
+
                 if control_error.get("reason") == "locomotion_not_idle":
-                    # A continuous hold can reach the expected tile while the
-                    # actor is still in its movement interpolation phase.  A
-                    # queued hold must be stopped immediately at that safe
-                    # endpoint, then we wait for the normal idle settle.  This
-                    # avoids both a false NAV_NOT_CONTROLLABLE failure and an
-                    # overshoot into the tile after the target.
-                    if not input_stopped:
-                        try:
-                            await self.client.clear_inputs()
-                        except (ConnectionError, TimeoutError, OSError):
-                            self._last_landing_diagnostics = {
-                                "timeout_seconds": round(loop.time() - started_at, 3),
-                                "samples": samples, "last_gpos": node.public() if node else None,
-                                "last_wpos": player.get("world"), "expected_gpos": expected.public(),
-                                "locomotion": player.get("locomotion"),
-                                "control_error": control_error, "input_clear": "failed",
-                            }
-                            return None, player
-                        input_stopped = True
+                    # The queue is already stopped. Wait only for normal
+                    # movement interpolation to settle to Idle.
                     continue
+
                 return None, player
             # In a continuous segment, intermediate nodes are expected and
             # must not be mistaken for divergence.  A node outside the

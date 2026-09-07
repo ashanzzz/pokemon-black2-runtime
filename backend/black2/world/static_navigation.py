@@ -835,16 +835,39 @@ class RomStaticNavigationGraph:
         occupied_xy = _occupied_xy(occupied, zone_id=int(zone_id), y=int(y))
         requested = (int(x), int(z))
         exact = cells.get(requested)
+
+        # Static walkability does not imply reachability. A flag-clear tile can
+        # still sit behind walls, trees, directional collision or another
+        # disconnected component. If a live same-layer player tile is known,
+        # require connectivity before accepting the exact clicked tile.
+        live_start = NavNode.from_player(player_sample)
+        if live_start is not None and (
+            live_start.zone_id != int(zone_id)
+            or live_start.y != int(y)
+        ):
+            live_start = None
+
         if exact is not None and requested not in occupied_xy and not force_adjacent:
-            return {
-                "ok": True,
-                "target": exact.node.public(),
-                "distance_tiles": 0,
-                "snapped": False,
-                "reason": "clicked surface is a flag-clear static terrain candidate",
-                "confidence": "candidate_static",
-                "cell": exact.public(),
-            }
+            exact_reachable = True
+            if live_start is not None:
+                exact_route = self.find_path(
+                    live_start,
+                    exact.node,
+                    player_sample=player_sample,
+                    occupied=occupied_xy,
+                )
+                exact_reachable = bool(exact_route.get("reachable"))
+
+            if exact_reachable:
+                return {
+                    "ok": True,
+                    "target": exact.node.public(),
+                    "distance_tiles": 0,
+                    "snapped": False,
+                    "reason": "clicked surface is a reachable flag-clear static terrain candidate",
+                    "confidence": "candidate_static",
+                    "cell": exact.public(),
+                }
 
         candidates = [
             cell for (cx, cz), cell in cells.items()
@@ -856,14 +879,6 @@ class RomStaticNavigationGraph:
         if not candidates:
             return {"ok": False, "reason": "no flag-clear static surface is within snap radius", "confidence": "unresolved"}
 
-        # If a live start exists, reject isolated/static candidates that the
-        # player could not reach.  This also makes a click on a wall select the
-        # nearest *useful* floor, not merely a disconnected decorative patch.
-        live = self._anchor_from_sample(player_sample, int(zone_id))
-        live_grid = (live or {}).get("grid") or {}
-        live_start = None
-        if all(_as_int(live_grid.get(k)) is not None for k in ("x", "y", "z")):
-            live_start = NavNode(int(zone_id), int(live_grid["x"]), int(live_grid["y"]), int(live_grid["z"]))
         for candidate in candidates:
             if live_start is not None:
                 route = self.find_path(live_start, candidate.node, player_sample=player_sample, occupied=occupied_xy)

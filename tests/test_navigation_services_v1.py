@@ -504,3 +504,35 @@ def test_control_predicate_accepts_string_enum_overworld():
             await tasks._runners[started["task_id"]]
             assert tasks.get(started["task_id"])["status"] == "succeeded"
     asyncio.run(scenario())
+
+
+def test_wait_for_landing_clears_queue_before_accepting_idle_expected_tile():
+    async def scenario():
+        with TemporaryDirectory() as td:
+            graph = ObservedNavigationGraph(project_root=Path(td))
+            latest = raw_player(1, 11, 0, 10)
+            bridge = FakeBridge(latest, move=False)
+            tasks = NavigationTaskService(
+                NavigationPlanService(graph, lambda: latest),
+                bridge,
+                lambda: latest,
+                control_sample=controllable_snapshot,
+                poll_seconds=0.001,
+                step_timeout_seconds=0.02,
+            )
+
+            record = {"_cleanup_done": False}
+            previous = tasks._current_node()[0]
+            landed, _player = await tasks._wait_for_landing(
+                record,
+                previous,
+                previous,
+            )
+
+            assert landed == previous
+            assert bridge.clear_count == 1
+            assert record.get("_clear_task") is not None
+            assert tasks._last_landing_diagnostics["input_clear"] == "cleared_at_expected"
+
+    asyncio.run(scenario())
+

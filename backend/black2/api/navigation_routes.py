@@ -187,6 +187,15 @@ _planner = NavigationPlanService(
 _tasks: NavigationTaskService | None = None
 
 
+async def _live_player_sample() -> dict[str, Any] | None:
+    if _runtime_reader is not None:
+        try:
+            await player_runtime_service.sample(_runtime_reader)
+        except Exception:
+            pass
+    return player_runtime_service.latest
+
+
 def configure_navigation_routes(
     planner: NavigationPlanService | None = None,
     *,
@@ -216,6 +225,7 @@ def configure_navigation_routes(
             _planner, client, lambda: player_runtime_service.latest,
             control_sample=_control_sample,
             actor_sample=_runtime_actor_sample if runtime_reader is not None else None,
+            live_player_sampler=_live_player_sample,
         )
 
 
