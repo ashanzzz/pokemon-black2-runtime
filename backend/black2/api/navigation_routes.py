@@ -127,6 +127,19 @@ class GridDestination(BaseModel):
     z: int
 
 
+class GlobalGridDestination(BaseModel):
+    """Matrix-global address. Zone is resolved internally from ROM ownership."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["global_grid"] = "global_grid"
+    space: Literal["gen5-matrix-grid-v1"] = "gen5-matrix-grid-v1"
+    matrix_id: int | None = None
+    x: int
+    y: int
+    z: int
+
+
 class NavigationInteraction(BaseModel):
     """An optional interaction goal layered on top of a walkable tile."""
 
@@ -158,8 +171,8 @@ class NavigationOccupancy(BaseModel):
 class PlanRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    destination: GridDestination
-    start: GridDestination | None = None
+    destination: GridDestination | GlobalGridDestination
+    start: GridDestination | GlobalGridDestination | None = None
     occupancy: list[NavigationOccupancy] = Field(default_factory=list)
     interaction: NavigationInteraction | None = None
     movement_mode: Literal["auto", "walk", "run", "bike", "surf"] = "auto"
@@ -209,8 +222,8 @@ def configure_navigation_routes(
 class TaskRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    destination: GridDestination
-    max_steps: int = Field(default=2000, ge=1, le=2000)
+    destination: GridDestination | GlobalGridDestination
+    max_steps: int = Field(default=10000, ge=1, le=10000)
     occupancy: list[NavigationOccupancy] = Field(default_factory=list)
     interaction: NavigationInteraction | None = None
     movement_mode: Literal["auto", "walk", "run", "bike", "surf"] = "auto"
@@ -333,6 +346,17 @@ class SnapOccupancyPoint(BaseModel):
     grid: SnapGridPoint | None = None
     position: dict[str, Any] | None = None
     world: dict[str, Any] | None = None
+
+
+class GlobalSnapRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    matrix_id: int | None = None
+    world: dict[str, Any] | None = None
+    grid: dict[str, Any] | None = None
+    picked: SnapPickedObject | None = None
+    occupancy: list[SnapOccupancyPoint] = Field(default_factory=list)
+    max_radius: int = Field(default=12, ge=0, le=32)
 
 
 class SnapRequest(BaseModel):
@@ -627,6 +651,89 @@ def _prepare_navigation_request(
     return destination, None
 
 
+@router.post("/global/snap")
+async def snap_global_navigation_target(body: GlobalSnapRequest, request: Request):
+    """Snap a clicked Matrix-global surface without requiring a Zone id."""
+    provider = _planner._resolve_static_provider()
+    resolver = getattr(provider, "resolve_zone_for_global", None) if provider is not None else None
+    if not callable(resolver):
+        return _error_response(503, "NAV_GLOBAL_UNAVAILABLE", "Matrix-global snapping requires the ROM static navigation provider.")
+    sample = canonical_grid_player(player_runtime_service.latest, require_resolved=False)
+    live_zone = sample.get("zone_id") if isinstance(sample, dict) else None
+    matrix_id = body.matrix_id
+    if matrix_id is None and isinstance(live_zone, int):
+        try:
+            matrix_id = int(provider.rom.zone(int(live_zone)).matrix_id)
+        except (AttributeError, IndexError, TypeError, ValueError):
+            matrix_id = None
+    if matrix_id is None:
+        return _error_response(422, "NAV_GLOBAL_MATRIX_UNRESOLVED", "matrix_id is required when PlayerRuntime cannot provide the current Matrix.")
+    gx = gz = gy = None
+    if isinstance(body.grid, dict):
+        gx, gz, gy = body.grid.get("x"), body.grid.get("z"), body.grid.get("y")
+    if (gx is None or gz is None) and isinstance(body.world, dict):
+        try:
+            gx = math.floor(float(body.world["x"]) / 16.0)
+            gz = math.floor(float(body.world["z"]) / 16.0)
+        except (KeyError, TypeError, ValueError):
+            gx = gz = None
+    if gx is None or gz is None:
+        return _error_response(422, "NAV_INVALID_SNAP_REQUEST", "global snap requires grid x/z or world x/z.")
+    if gy is None:
+        live_grid = ((sample.get("position") or {}).get("grid") if isinstance(sample, dict) else None) or (sample.get("grid") if isinstance(sample, dict) else None) or {}
+        gy = live_grid.get("y", 0) if isinstance(live_grid, dict) else 0
+    try:
+        gx, gy, gz = int(gx), int(gy), int(gz)
+    except (TypeError, ValueError):
+        return _error_response(422, "NAV_INVALID_SNAP_REQUEST", "global snap grid coordinates must be integers.")
+    try:
+        target_zone = resolver(int(matrix_id), gx, gz, preferred_zone=live_zone if isinstance(live_zone, int) else None)
+    except TypeError:
+        target_zone = resolver(int(matrix_id), gx, gz)
+    if target_zone is None:
+        return _error_response(404, "NAV_GLOBAL_DESTINATION_UNOWNED", "No ROM Zone owns the clicked Matrix-global tile.", details={"matrix_id": matrix_id, "x": gx, "y": gy, "z": gz})
+    target_sample = player_runtime_service.latest if int(target_zone) == live_zone else None
+    occupancy = [item.model_dump(exclude_none=True) for item in body.occupancy]
+    picked_kind = body.picked.kind if body.picked else None
+    force_adjacent = str(picked_kind or "").lower() in {"building", "terrain_object", "furniture", "door", "npc", "actor"}
+    try:
+        result = provider.snap(
+            int(target_zone), gx, gz, gy, player_sample=target_sample, occupied=occupancy,
+            force_adjacent=force_adjacent, max_radius=body.max_radius,
+        )
+    except (IndexError, KeyError, RuntimeError, ValueError, TypeError) as exc:
+        return _error_response(503, "NAV_STATIC_GRAPH_UNAVAILABLE", "Global snap could not decode the target Zone terrain.", details={"reason": f"{type(exc).__name__}: {exc}"})
+    if not result.get("ok"):
+        return _error_response(409, "NAV_SNAP_NO_SURFACE", "No static walk surface is available near the Matrix-global click.", details={"matrix_id": matrix_id, "resolved_zone_id": target_zone, "reason": result.get("reason")})
+    target = result["target"]
+    global_target = {
+        "type": "global_grid", "space": "gen5-matrix-grid-v1", "matrix_id": int(matrix_id),
+        "x": int(target["x"]), "y": int(target["y"]), "z": int(target["z"]),
+    }
+    route_preview = None
+    start = NavNode.from_player(sample) if isinstance(sample, dict) else None
+    if start is not None:
+        finder = getattr(provider, "find_global_path", None)
+        if callable(finder):
+            try:
+                route_preview = finder(start, matrix_id=int(matrix_id), x=global_target["x"], y=global_target["y"], z=global_target["z"], player_sample=player_runtime_service.latest, occupied=occupancy)
+            except (IndexError, KeyError, RuntimeError, ValueError, TypeError):
+                route_preview = None
+    return {
+        "format": "black2-navigation-global-snap/v1",
+        "status": "resolved",
+        "coordinate": global_target,
+        "resolved_zone_id": int(target_zone),
+        "legacy_grid": {"type": "grid", "space": "gen5-field-grid-v1", **{key: int(target[key]) for key in ("zone_id", "x", "y", "z")}},
+        "snapped": bool(result.get("snapped")),
+        "distance_tiles": result.get("distance_tiles"),
+        "reason": result.get("reason"),
+        "confidence": result.get("confidence"),
+        "route_preview": route_preview,
+        "semantic_policy": "Zone is resolved from Matrix ownership; pure movement does not require callers to supply Zone.",
+    }
+
+
 @router.post("/snap")
 async def snap_navigation_target(body: SnapRequest, request: Request):
     """Snap a 3D surface/object hit to a nearby static walk candidate."""
@@ -812,14 +919,69 @@ async def navigation_observations(
     return _planner.graph.preview_component(zone_id, anchor=anchor, limit=limit)
 
 
+@router.get("/global/resolve")
+async def resolve_global_coordinate(
+    x: int, y: int, z: int, matrix_id: int | None = None,
+):
+    """Resolve a Zone-less Matrix-global coordinate to ROM ownership metadata."""
+    provider = _planner._resolve_static_provider()
+    resolver = getattr(provider, "resolve_zone_for_global", None) if provider is not None else None
+    if not callable(resolver):
+        return _error_response(503, "NAV_GLOBAL_UNAVAILABLE", "Matrix-global resolution requires the ROM static navigation provider.")
+    player = canonical_grid_player(player_runtime_service.latest, require_resolved=False)
+    preferred_zone = player.get("zone_id") if isinstance(player, dict) and isinstance(player.get("zone_id"), int) else None
+    if matrix_id is None:
+        try:
+            matrix_id = int(provider.rom.zone(int(preferred_zone)).matrix_id)
+        except (AttributeError, TypeError, ValueError, IndexError):
+            return _error_response(409, "NAV_GLOBAL_MATRIX_UNRESOLVED", "matrix_id was omitted and the current player Matrix could not be resolved.")
+    try:
+        zone_id = resolver(int(matrix_id), int(x), int(z), preferred_zone=preferred_zone)
+    except TypeError:
+        zone_id = resolver(int(matrix_id), int(x), int(z))
+    if zone_id is None:
+        return _error_response(404, "NAV_GLOBAL_DESTINATION_UNOWNED", "No ROM Zone owns this Matrix-global tile.", details={"matrix_id": matrix_id, "x": x, "y": y, "z": z})
+    return {
+        "format": "black2-global-coordinate/v1",
+        "status": "resolved",
+        "coordinate": {"type": "global_grid", "space": "gen5-matrix-grid-v1", "matrix_id": int(matrix_id), "x": int(x), "y": int(y), "z": int(z)},
+        "resolved_zone_id": int(zone_id),
+        "legacy_grid": {"type": "grid", "space": "gen5-field-grid-v1", "zone_id": int(zone_id), "x": int(x), "y": int(y), "z": int(z)},
+    }
+
+
+def _request_occupancy_context(destination: GridDestination | GlobalGridDestination) -> tuple[int, int, dict[str, Any] | None]:
+    """Choose the live ActorSystem Zone independently from a global goal Zone."""
+    latest = canonical_grid_player(player_runtime_service.latest, require_resolved=False)
+    live_zone = latest.get("zone_id") if isinstance(latest, dict) else None
+    live_grid = ((latest.get("position") or {}).get("grid") if isinstance(latest, dict) else None) or (latest.get("grid") if isinstance(latest, dict) else None) or {}
+    if isinstance(live_zone, int):
+        live_y = live_grid.get("y") if isinstance(live_grid, dict) else None
+        return int(live_zone), int(live_y if isinstance(live_y, int) else destination.y), _snap_player_sample(int(live_zone))
+    if isinstance(destination, GridDestination):
+        return int(destination.zone_id), int(destination.y), _snap_player_sample(int(destination.zone_id))
+    provider = _planner._resolve_static_provider()
+    resolver = getattr(provider, "resolve_zone_for_global", None) if provider is not None else None
+    matrix_id = destination.matrix_id
+    if matrix_id is not None and callable(resolver):
+        zone_id = resolver(int(matrix_id), int(destination.x), int(destination.z))
+        if isinstance(zone_id, int):
+            return int(zone_id), int(destination.y), _snap_player_sample(int(zone_id))
+    raise NavigationPlanningError(
+        "NAV_GLOBAL_MATRIX_UNRESOLVED",
+        "A global request without live PlayerRuntime needs matrix_id so Zone ownership can be resolved.",
+        status_code=422,
+    )
+
+
 @router.post("/plans")
 async def create_navigation_plan(body: PlanRequest, request: Request):
     try:
+        occupancy_zone, occupancy_y, sample = _request_occupancy_context(body.destination)
         occupancy, _occupancy_meta = await _navigation_occupancy(
-            int(body.destination.zone_id), int(body.destination.y),
+            occupancy_zone, occupancy_y,
             [item.model_dump(exclude_none=True) for item in body.occupancy],
         )
-        sample = _snap_player_sample(int(body.destination.zone_id))
         destination, interaction = _prepare_navigation_request(
             body.destination.model_dump(),
             provider=_planner._resolve_static_provider(),
@@ -885,11 +1047,11 @@ def _task_service() -> NavigationTaskService:
 @router.post("/tasks", status_code=202)
 async def create_navigation_task(body: TaskRequest, request: Request):
     try:
+        occupancy_zone, occupancy_y, sample = _request_occupancy_context(body.destination)
         occupancy, _occupancy_meta = await _navigation_occupancy(
-            int(body.destination.zone_id), int(body.destination.y),
+            occupancy_zone, occupancy_y,
             [item.model_dump(exclude_none=True) for item in body.occupancy],
         )
-        sample = _snap_player_sample(int(body.destination.zone_id))
         destination, interaction = _prepare_navigation_request(
             body.destination.model_dump(),
             provider=_planner._resolve_static_provider(),

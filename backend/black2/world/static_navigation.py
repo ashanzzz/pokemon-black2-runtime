@@ -154,33 +154,263 @@ class RomStaticNavigationGraph:
             },
         }
 
+    def resolve_zone_for_global(
+        self, matrix_id: int, x: int, z: int, *, preferred_zone: int | None = None,
+    ) -> int | None:
+        """Resolve a Matrix-global grid coordinate to Zone metadata.
+
+        Matrix ownership is authoritative when present. Standalone matrices
+        without a Zone table may use the live/current Zone as a preferred
+        owner, but only when that Zone actually references the same Matrix.
+        This keeps Zone out of the public address without inventing a shared
+        origin between unrelated matrices.
+        """
+        matrix = self.rom.matrix(int(matrix_id))
+        cell_x, cell_z = int(x) // CHUNK_TILES, int(z) // CHUNK_TILES
+        if not (0 <= cell_x < matrix.width and 0 <= cell_z < matrix.height):
+            return None
+        cell = matrix.cell(cell_x, cell_z)
+        chunk_id = _as_int(cell.get("chunk_id"))
+        if chunk_id is None or chunk_id == MATRIX_NONE:
+            return None
+        owner = _as_int(cell.get("zone_id"))
+        if owner is not None:
+            try:
+                header = self.rom.zone(owner)
+            except (IndexError, ValueError):
+                return None
+            return owner if int(header.matrix_id) == int(matrix_id) else None
+        if preferred_zone is not None:
+            try:
+                header = self.rom.zone(int(preferred_zone))
+                if int(header.matrix_id) == int(matrix_id):
+                    return int(preferred_zone)
+            except (IndexError, ValueError):
+                pass
+        # Read-only fallback for a Matrix referenced by exactly one Zone.
+        zone_count = _as_int(getattr(self.rom, "zone_count", None))
+        if zone_count is not None:
+            matches = []
+            for zone_id in range(zone_count):
+                try:
+                    if int(self.rom.zone(zone_id).matrix_id) == int(matrix_id):
+                        matches.append(zone_id)
+                        if len(matches) > 1:
+                            break
+                except (IndexError, ValueError):
+                    continue
+            if len(matches) == 1:
+                return matches[0]
+        return None
+
+    def global_coordinate(self, zone_id: int, x: int, y: int, z: int) -> dict[str, Any]:
+        """Return the public Matrix-global address for a canonical Zone/GPos."""
+        zone = self.rom.zone(int(zone_id))
+        return {
+            "type": "global_grid",
+            "space": "gen5-matrix-grid-v1",
+            "matrix_id": int(zone.matrix_id),
+            "x": int(x), "y": int(y), "z": int(z),
+            "resolved_zone_id": int(zone_id),
+        }
+
+    def _matrix_cells_for_layer(
+        self, matrix_id: int, y: int, *, player_sample: dict[str, Any] | None = None,
+    ) -> dict[tuple[int, int], StaticNavigationCell]:
+        matrix = self.rom.matrix(int(matrix_id))
+        if not matrix.has_zones or matrix.zone_ids is None:
+            return {}
+        player_zone = _as_int((player_sample or {}).get("zone_id"))
+        result: dict[tuple[int, int], StaticNavigationCell] = {}
+        for owner in sorted({int(v) for v in matrix.zone_ids if isinstance(v, int)}):
+            try:
+                header = self.rom.zone(owner)
+            except (IndexError, ValueError):
+                continue
+            if int(header.matrix_id) != int(matrix_id):
+                continue
+            anchor = self._anchor_from_sample(player_sample, owner) if owner == player_zone else None
+            for key, cell in self._cells_for_layer(owner, int(y), anchor=anchor).items():
+                if self.resolve_zone_for_global(matrix_id, key[0], key[1]) != owner:
+                    continue
+                result.setdefault(key, cell)
+        return result
+
+    def find_global_path(
+        self,
+        start: NavNode,
+        *,
+        matrix_id: int,
+        x: int, y: int, z: int,
+        player_sample: dict[str, Any] | None = None,
+        occupied: Iterable[NavNode | dict[str, Any] | tuple[int, int]] = (),
+    ) -> dict[str, Any]:
+        """Lazy A* across Zone boundaries inside one spatial MapMatrix.
+
+        The graph is not materialized for the whole Matrix. Zone ownership is
+        resolved per explored coordinate, and each Zone layer is decoded only
+        when A* actually reaches it. This keeps long routes practical on the
+        large overworld Matrix.
+        """
+        start_header = self.rom.zone(int(start.zone_id))
+        if int(start_header.matrix_id) != int(matrix_id):
+            return {"reachable": False, "reason": "start and goal belong to different Matrix coordinate domains", "path": [], "confidence": "candidate_static"}
+        if int(start.y) != int(y):
+            return {"reachable": False, "reason": "global planner does not infer an elevation transition", "path": [], "confidence": "candidate_static"}
+        goal_zone = self.resolve_zone_for_global(int(matrix_id), int(x), int(z), preferred_zone=start.zone_id)
+        if goal_zone is None:
+            return {"reachable": False, "reason": "global destination has no ROM Zone ownership in this Matrix", "path": [], "confidence": "candidate_static"}
+        goal = NavNode(goal_zone, int(x), int(y), int(z))
+        live_zone = _as_int((player_sample or {}).get("zone_id"))
+        zone_cells: dict[int, dict[tuple[int, int], StaticNavigationCell]] = {}
+
+        def cell_at(cx: int, cz: int) -> StaticNavigationCell | None:
+            owner = self.resolve_zone_for_global(int(matrix_id), int(cx), int(cz), preferred_zone=start.zone_id)
+            if owner is None:
+                return None
+            cells = zone_cells.get(owner)
+            if cells is None:
+                anchor = self._anchor_from_sample(player_sample, owner) if owner == live_zone else None
+                cells = self._cells_for_layer(owner, int(y), anchor=anchor)
+                zone_cells[owner] = cells
+            return cells.get((int(cx), int(cz)))
+
+        start_cell, goal_cell = cell_at(start.x, start.z), cell_at(goal.x, goal.z)
+        if start_cell is None or goal_cell is None:
+            missing = "start" if start_cell is None else "goal"
+            return {"reachable": False, "reason": f"{missing} is not a flag-clear Matrix-global terrain candidate", "path": [], "confidence": "candidate_static"}
+
+        from .navigation_planning import normalize_occupancy
+        normalized = normalize_occupancy(occupied or (), default_zone=start.zone_id, default_y=start.y)
+        occupied_xy = {
+            (int((item.get("grid") or {}).get("x")), int((item.get("grid") or {}).get("z")))
+            for item in normalized
+            if (item.get("grid") or {}).get("y") in (None, int(y))
+            and (item.get("grid") or {}).get("x") is not None
+            and (item.get("grid") or {}).get("z") is not None
+        }
+        occupied_xy.discard((start.x, start.z))
+        if (goal.x, goal.z) in occupied_xy:
+            return {"reachable": False, "reason": "goal is occupied by a runtime actor", "path": [], "confidence": "candidate_static"}
+
+        def neighbors(current: StaticNavigationCell) -> Iterable[StaticNavigationCell]:
+            for dx, dz in ((0, -1), (-1, 0), (1, 0), (0, 1)):
+                direction = _direction(dx, dz)
+                if direction in current.blocked_directions:
+                    continue
+                if current.ledge_direction and direction != current.ledge_direction:
+                    continue
+                nx, nz = current.node.x + dx, current.node.z + dz
+                if (nx, nz) in occupied_xy:
+                    continue
+                candidate = cell_at(nx, nz)
+                if candidate is None:
+                    continue
+                if _opposite(direction) in candidate.blocked_directions:
+                    continue
+                yield candidate
+
+        start_state = (start.x, start.z, 0, 0)
+        queue: list[tuple[int, int, int, int, int, int]] = [
+            (abs(start.x - goal.x) + abs(start.z - goal.z), 0, 0, start.x, start.z, 0)
+        ]
+        costs: dict[tuple[int, int, int, int], tuple[int, int]] = {start_state: (0, 0)}
+        parent: dict[tuple[int, int, int, int], tuple[int, int, int, int]] = {}
+        goal_state: tuple[int, int, int, int] | None = None
+        while queue:
+            _f_steps, turns, steps, cx, cz, packed_dir = heapq.heappop(queue)
+            dx = ((packed_dir >> 8) & 0xFF) - 128 if packed_dir else 0
+            dz = (packed_dir & 0xFF) - 128 if packed_dir else 0
+            state = (cx, cz, dx, dz)
+            if (steps, turns) != costs.get(state):
+                continue
+            if (cx, cz) == (goal.x, goal.z):
+                goal_state = state
+                break
+            current = cell_at(cx, cz)
+            if current is None:
+                continue
+            for neighbor in neighbors(current):
+                ndx, ndz = neighbor.node.x - cx, neighbor.node.z - cz
+                nsteps = steps + 1
+                nturns = turns + (1 if (dx or dz) and (ndx, ndz) != (dx, dz) else 0)
+                nstate = (neighbor.node.x, neighbor.node.z, ndx, ndz)
+                if (nsteps, nturns) >= costs.get(nstate, (10**9, 10**9)):
+                    continue
+                costs[nstate] = (nsteps, nturns)
+                parent[nstate] = state
+                heuristic = abs(neighbor.node.x - goal.x) + abs(neighbor.node.z - goal.z)
+                packed = ((ndx + 128) << 8) | (ndz + 128)
+                heapq.heappush(queue, (nsteps + heuristic, nturns, nsteps, neighbor.node.x, neighbor.node.z, packed))
+        if goal_state is None:
+            return {"reachable": False, "reason": "no connected Matrix-global static path", "path": [], "confidence": "candidate_static"}
+        states = [goal_state]
+        while states[-1] != start_state:
+            states.append(parent[states[-1]])
+        states.reverse()
+        path = []
+        for state in states:
+            cell = cell_at(state[0], state[1])
+            if cell is None:
+                return {"reachable": False, "reason": "global path reconstruction lost a terrain cell", "path": [], "confidence": "candidate_static"}
+            path.append(cell.node.public())
+        zone_transitions = []
+        for a, b in zip(path, path[1:]):
+            if a["zone_id"] != b["zone_id"]:
+                zone_transitions.append({"from_zone_id": a["zone_id"], "to_zone_id": b["zone_id"], "at": {"x": b["x"], "y": b["y"], "z": b["z"]}})
+        return {
+            "reachable": True,
+            "path": path,
+            "steps": len(path) - 1,
+            "turns": costs[goal_state][1],
+            "cost": float(len(path) - 1),
+            "confidence": "candidate_static",
+            "source": "rom_matrix_global_collision_candidate",
+            "optimization": "shortest_steps_then_fewest_turns",
+            "matrix_id": int(matrix_id),
+            "zone_transitions": zone_transitions,
+            "decoded_zone_count": len(zone_cells),
+            "decoded_zone_ids": sorted(zone_cells),
+            "world_revision": self.revision,
+        }
+
     def movement_rules(
         self, zone_id: int, *, path: Iterable[NavNode] = (),
         player_sample: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Return ROM-backed transport restrictions for a planned corridor."""
-        zone = self.rom.zone(int(zone_id))
-        area = self.rom.area(int(zone.area_id))
-        anchor = self._anchor_from_sample(player_sample, int(zone_id))
-        bike_blockers: list[dict[str, Any]] = []
+        """Return transport restrictions across every Zone touched by a path."""
         path_nodes = list(path or ())
+        zone_ids = sorted({int(node.zone_id) for node in path_nodes} or {int(zone_id)})
+        headers = [self.rom.zone(zid) for zid in zone_ids]
+        areas = [self.rom.area(int(header.area_id)) for header in headers]
+        enable_running = all(bool(header.enable_running) for header in headers)
+        enable_cycling = all(bool(header.enable_cycling) for header in headers)
+        bike_blockers: list[dict[str, Any]] = []
         if path_nodes:
-            cells = self._cells_for_layer(path_nodes[0].zone_id, path_nodes[0].y, anchor=anchor)
+            by_zone: dict[int, list[NavNode]] = {}
             for node in path_nodes:
-                cell = cells.get((node.x, node.z))
-                material = (cell.material if cell else None) or {}
-                if material.get("blocks_cycling"):
-                    bike_blockers.append({
-                        "zone_id": node.zone_id, "x": node.x, "y": node.y, "z": node.z,
-                        "kind": material.get("kind"), "label": material.get("label"),
-                    })
+                by_zone.setdefault(int(node.zone_id), []).append(node)
+            live_zone = _as_int((player_sample or {}).get("zone_id"))
+            for zid, nodes in by_zone.items():
+                anchor = self._anchor_from_sample(player_sample, zid) if zid == live_zone else None
+                cells = self._cells_for_layer(zid, nodes[0].y, anchor=anchor)
+                for node in nodes:
+                    cell = cells.get((node.x, node.z))
+                    material = (cell.material if cell else None) or {}
+                    if material.get("blocks_cycling"):
+                        bike_blockers.append({
+                            "zone_id": node.zone_id, "x": node.x, "y": node.y, "z": node.z,
+                            "kind": material.get("kind"), "label": material.get("label"),
+                        })
+        environments = {"exterior" if bool(area.is_exterior) else "interior" for area in areas}
         return {
             "zone_id": int(zone_id),
-            "environment": "exterior" if bool(area.is_exterior) else "interior",
-            "enable_running": bool(zone.enable_running),
-            "enable_cycling": bool(zone.enable_cycling),
+            "zone_ids": zone_ids,
+            "environment": environments.pop() if len(environments) == 1 else "mixed",
+            "enable_running": enable_running,
+            "enable_cycling": enable_cycling,
             "bike_blockers": bike_blockers,
-            "source": "ROM ZoneHeader + AreaHeader + decoded TileClass semantics",
+            "source": "ROM ZoneHeader + AreaHeader + decoded TileClass semantics across route Zones",
         }
 
     def warp_display_center(
@@ -482,7 +712,17 @@ class RomStaticNavigationGraph:
         allowed: Iterable[NavNode | dict[str, Any] | tuple[int, int]] = (),
     ) -> dict[str, Any]:
         if start.zone_id != goal.zone_id:
-            return {"reachable": False, "reason": "static candidate graph is same-Zone only", "path": [], "confidence": "candidate_static"}
+            try:
+                start_matrix = int(self.rom.zone(start.zone_id).matrix_id)
+                goal_matrix = int(self.rom.zone(goal.zone_id).matrix_id)
+            except (IndexError, ValueError):
+                return {"reachable": False, "reason": "Zone Matrix metadata unavailable", "path": [], "confidence": "candidate_static"}
+            if start_matrix != goal_matrix:
+                return {"reachable": False, "reason": "cross-Matrix path requires a verified connector", "path": [], "confidence": "candidate_static"}
+            return self.find_global_path(
+                start, matrix_id=start_matrix, x=goal.x, y=goal.y, z=goal.z,
+                player_sample=player_sample, occupied=occupied,
+            )
         if start.y != goal.y:
             return {"reachable": False, "reason": "static candidate graph does not infer an elevation transition", "path": [], "confidence": "candidate_static"}
         anchor = self._anchor_from_sample(player_sample, start.zone_id)

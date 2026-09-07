@@ -225,6 +225,12 @@ class NavigationTaskService:
     def _button_facing(button: str | None) -> str | None:
         return {"Up": "North", "Down": "South", "Left": "West", "Right": "East"}.get(button)
 
+    def _same_spatial_node(self, a: NavNode | None, b: NavNode | None) -> bool:
+        return self.planner.same_spatial_node(a, b)
+
+    def _in_spatial_set(self, node: NavNode | None, values: list[NavNode] | tuple[NavNode, ...] | set[NavNode]) -> bool:
+        return node is not None and any(self._same_spatial_node(node, value) for value in values)
+
     @staticmethod
     def _actor_grid(actor: dict[str, Any]) -> NavNode | None:
         grid = actor.get("grid") if isinstance(actor.get("grid"), dict) else None
@@ -555,7 +561,7 @@ class NavigationTaskService:
         if len(path) - 1 > max_steps:
             return _stop("NAV_LIMIT_EXCEEDED", "Route exceeds max_steps.")
         current, _player = self._current_node()
-        if current != path[0]:
+        if not self._same_spatial_node(current, path[0]):
             return _stop("NAV_POSITION_DIVERGED", "Player moved after planning; no input was issued.",
                          current=current.public() if current else None)
         control_error = self._not_controllable()
@@ -681,14 +687,14 @@ class NavigationTaskService:
                 previous, expected, allowed_nodes=path[start_index - 1:end_index],
                 timeout_seconds=landing_timeout,
             )
-            if landed != expected:
+            if not self._same_spatial_node(landed, expected):
                 post_control_error = self._not_controllable()
                 if post_control_error:
                     return _stop("NAV_NOT_CONTROLLABLE",
                                  "The player became non-controllable while waiting for the next segment.",
                                  **post_control_error)
                 diagnostic_stationary = float((self._last_landing_diagnostics or {}).get("stationary_seconds", 0) or 0)
-                code = "NAV_STUCK" if landed == previous or diagnostic_stationary >= min(2.0, landing_timeout) else "NAV_POSITION_DIVERGED"
+                code = "NAV_STUCK" if self._same_spatial_node(landed, previous) or diagnostic_stationary >= min(2.0, landing_timeout) else "NAV_POSITION_DIVERGED"
                 return _stop(code, "The player did not land on the next verified path node.",
                              expected=expected.public(), observed=landed.public() if landed else None,
                              segment={"button": button, "start_step": start_index, "end_step": end_index - 1},
@@ -713,8 +719,8 @@ class NavigationTaskService:
 
         arrived, arrival_player = self._current_node()
         goal = path[-1]
-        if arrived != goal:
-            return _stop("NAV_POSITION_DIVERGED", "Final canonical Zone/GPos does not satisfy destination.",
+        if not self._same_spatial_node(arrived, goal):
+            return _stop("NAV_POSITION_DIVERGED", "Final Matrix-global GPos does not satisfy destination.",
                          expected=goal.public(), observed=arrived.public() if arrived else None)
         interaction = plan.get("interaction")
         if interaction is not None:
@@ -728,7 +734,7 @@ class NavigationTaskService:
                     **{key: value for key, value in turn_result.items() if key != "ok"},
                 )
             _turned_node, turned_player = self._current_node()
-            if _turned_node != goal:
+            if not self._same_spatial_node(_turned_node, goal):
                 return _stop(
                     "NAV_POSITION_DIVERGED",
                     "The player moved away from the NPC standing tile while turning.",
@@ -761,7 +767,7 @@ class NavigationTaskService:
         while attempts < 2:
             current, player = self._current_node()
             last_facing = self._facing_name(self.player_sample())
-            if current != stand:
+            if not self._same_spatial_node(current, stand):
                 return {"ok": False, "reason": "stand_tile_changed", "observed": current.public() if current else None}
             if last_facing == expected_facing:
                 return {"ok": True, "facing": last_facing, "attempts": attempts}
@@ -775,7 +781,7 @@ class NavigationTaskService:
                 await asyncio.sleep(self.poll_seconds)
                 current, _player = self._current_node()
                 last_facing = self._facing_name(self.player_sample())
-                if current != stand:
+                if not self._same_spatial_node(current, stand):
                     return {"ok": False, "reason": "turn_input_moved_player", "observed": current.public() if current else None}
                 if last_facing == expected_facing:
                     return {"ok": True, "facing": last_facing, "attempts": attempts}
@@ -837,7 +843,7 @@ class NavigationTaskService:
             if current_key != last_key:
                 last_key = current_key
                 last_change_at = loop.time()
-            if node == expected:
+            if self._same_spatial_node(node, expected):
                 if control_error is None:
                     self._last_landing_diagnostics = {
                         "timeout_seconds": round(loop.time() - started_at, 3),
@@ -874,13 +880,14 @@ class NavigationTaskService:
             # In a continuous segment, intermediate nodes are expected and
             # must not be mistaken for divergence.  A node outside the
             # planned straight run still aborts immediately.
-            if node is not None and node != previous and node not in set(allowed_nodes or (previous, expected)):
+            allowed = list(allowed_nodes or (previous, expected))
+            if node is not None and not self._same_spatial_node(node, previous) and not self._in_spatial_set(node, allowed):
                 return node, player
             if control_error and control_error.get("reason") != "locomotion_not_idle":
                 return None, player
         # An expected GPos that never settled is not a verified landing.
         final_control_error = self._not_controllable()
-        if last_node == expected and final_control_error is not None:
+        if self._same_spatial_node(last_node, expected) and final_control_error is not None:
             last_control_error = final_control_error
         self._last_landing_diagnostics = {
             "timeout_seconds": round(loop.time() - started_at, 3),
@@ -893,6 +900,6 @@ class NavigationTaskService:
             "control_error": last_control_error,
             "input_stopped_at_expected": input_stopped,
         }
-        if last_node == expected and final_control_error is not None:
+        if self._same_spatial_node(last_node, expected) and final_control_error is not None:
             return None, last_player
         return last_node, last_player

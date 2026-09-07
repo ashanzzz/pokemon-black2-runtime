@@ -184,3 +184,26 @@ POST /api/v1/encounters/tasks/{task_id}/cancel
 ```
 
 详见 `docs/ENCOUNTER_REGION_WORKBENCH_V12_CN.md` 与 `LIVE_TEST_ENCOUNTER_V12_CN.md`。
+
+## Matrix Global Navigation v13
+
+v13 将同一 `MapMatrix` 内的 Zone 从导航地址中移除。推荐目标只使用：
+
+```text
+matrix_id? + x + y + z
+```
+
+实时执行时 `matrix_id` 也可从 PlayerRuntime 自动推断；目标 Zone 由 ROM Matrix ownership 自动解析。
+
+新增：
+
+```text
+POST /api/v1/navigation/plans             global_grid
+POST /api/v1/navigation/tasks             global_grid
+GET  /api/v1/navigation/global/resolve
+POST /api/v1/navigation/global/snap
+```
+
+同 Matrix 相邻 Zone 可以由一个懒加载 A* 直接生成长路线并连续执行，Zone transition 只保留为 metadata。不同 Matrix 仍要求 verified connector，不会把独立室内场景硬压进同一套 `(x,y,z)`。
+
+详见 `docs/GLOBAL_NAVIGATION_V13_CN.md` 与 `LIVE_TEST_GLOBAL_NAV_V13_CN.md`。

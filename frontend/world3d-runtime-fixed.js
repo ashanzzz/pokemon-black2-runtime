@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { clone as cloneSkeleton } from 'three/addons/utils/SkeletonUtils.js';
-import {Black2World3D as BaseWorld3D, esc} from '/frontend/world3d-runtime.js?base=17&navigation=2&static-preview=1&cell-grid=1&connected-map=1';
+import {Black2World3D as BaseWorld3D, esc} from '/frontend/world3d-runtime.js?base=17&navigation=2&static-preview=1&cell-grid=1&connected-map=1&global-nav=1';
 
 function marker(radius=6){
   const group=new THREE.Group();

@@ -255,12 +255,22 @@ class NavigationPlanService:
         except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError, TypeError):
             return False
 
+    def same_spatial_node(self, a: NavNode | None, b: NavNode | None) -> bool:
+        """Compare canonical positions while treating same-Matrix Zone as metadata."""
+        if a is None or b is None:
+            return a is b
+        if (a.x, a.y, a.z) != (b.x, b.y, b.z):
+            return False
+        if a.zone_id == b.zone_id:
+            return True
+        return self._matrix_id_for_zone(a.zone_id) == self._matrix_id_for_zone(b.zone_id) not in (None,)
+
     def capabilities(self) -> dict[str, Any]:
         graph = self.graph.status()
         return {
             "format": "black2-navigation-capabilities/v1",
-            "coordinate_spaces": ["gen5-field-grid-v1"],
-            "destination_types": ["grid"],
+            "coordinate_spaces": ["gen5-field-grid-v1", "gen5-matrix-grid-v1"],
+            "destination_types": ["grid", "global_grid"],
             "navigation_intents": ["walk_to_tile", "interact", "route"],
             "navigation_intent_semantics": {
                 "walk_to_tile": "pure movement to an exact walkable tile; never auto-interacts",
@@ -271,7 +281,9 @@ class NavigationPlanService:
                 "available": True,
                 "read_only": True,
                 "same_zone": True,
-                "cross_zone": False,
+                "cross_zone": True,
+                "cross_zone_scope": "same Matrix with ROM Zone ownership; Zone is resolved metadata, not an address boundary",
+                "cross_matrix": False,
                 "start_types": ["player_runtime", "explicit_grid"],
                 "exact_elevation_required": True,
                 "evidence": "observed_layered_edges_then_rom_static_candidates",
@@ -472,6 +484,88 @@ class NavigationPlanService:
             normalized["actor_id"] = str(interaction["actor_id"])
         return normalized
 
+    def _global_provider(self) -> Any | None:
+        provider = self._resolve_static_provider()
+        return provider if callable(getattr(provider, "resolve_zone_for_global", None)) else None
+
+    def _matrix_id_for_zone(self, zone_id: int) -> int | None:
+        provider = self._global_provider()
+        rom = getattr(provider, "rom", None) if provider is not None else None
+        try:
+            return int(rom.zone(int(zone_id)).matrix_id)
+        except (AttributeError, IndexError, TypeError, ValueError):
+            return None
+
+    def _resolve_destination_node(self, destination: dict[str, Any], start: NavNode) -> tuple[NavNode, dict[str, Any]]:
+        dtype = str(destination.get("type") or "grid")
+        space = str(destination.get("space") or "")
+        if dtype == "grid":
+            if space != "gen5-field-grid-v1":
+                raise NavigationPlanningError("NAV_INVALID_DESTINATION", "grid destination must use gen5-field-grid-v1.", status_code=422)
+            try:
+                node = NavNode(int(destination["zone_id"]), int(destination["x"]), int(destination["y"]), int(destination["z"]))
+            except (KeyError, TypeError, ValueError) as exc:
+                raise NavigationPlanningError("NAV_INVALID_DESTINATION", "Destination must be a complete gen5-field-grid-v1 coordinate.", status_code=422, details={"reason": str(exc)}) from exc
+            return node, {"input_type": "grid", "matrix_id": self._matrix_id_for_zone(node.zone_id), "zone_resolved": False}
+        if dtype != "global_grid" or space != "gen5-matrix-grid-v1":
+            raise NavigationPlanningError("NAV_INVALID_DESTINATION", "Destination must be grid/gen5-field-grid-v1 or global_grid/gen5-matrix-grid-v1.", status_code=422)
+        provider = self._global_provider()
+        if provider is None:
+            raise NavigationPlanningError("NAV_GLOBAL_UNAVAILABLE", "Matrix-global navigation requires the ROM static navigation provider.", status_code=503)
+        matrix_id = destination.get("matrix_id")
+        if matrix_id is None:
+            matrix_id = self._matrix_id_for_zone(start.zone_id)
+        try:
+            matrix_id = int(matrix_id)
+            x, y, z = int(destination["x"]), int(destination["y"]), int(destination["z"])
+        except (KeyError, TypeError, ValueError) as exc:
+            raise NavigationPlanningError("NAV_INVALID_DESTINATION", "global_grid requires x/y/z and an inferable Matrix.", status_code=422, details={"reason": str(exc)}) from exc
+        start_matrix = self._matrix_id_for_zone(start.zone_id)
+        if start_matrix != matrix_id:
+            raise NavigationPlanningError(
+                "NAV_MATRIX_TRANSITION_UNVERIFIED",
+                "The destination is in another Matrix. A verified connector transition is required.",
+                details={"start_matrix_id": start_matrix, "goal_matrix_id": matrix_id},
+            )
+        try:
+            zone_id = provider.resolve_zone_for_global(matrix_id, x, z, preferred_zone=start.zone_id)
+        except TypeError:
+            zone_id = provider.resolve_zone_for_global(matrix_id, x, z)
+        if zone_id is None:
+            raise NavigationPlanningError(
+                "NAV_GLOBAL_DESTINATION_UNOWNED",
+                "The Matrix-global destination does not resolve to an owned ROM Zone cell.",
+                status_code=422,
+                details={"matrix_id": matrix_id, "x": x, "y": y, "z": z},
+            )
+        return NavNode(int(zone_id), x, y, z), {"input_type": "global_grid", "matrix_id": matrix_id, "zone_resolved": True}
+
+    def _resolve_start_node(self, start_position: dict[str, Any], player: dict[str, Any] | None = None) -> tuple[NavNode, dict[str, Any]]:
+        dtype = str(start_position.get("type") or "grid")
+        space = str(start_position.get("space") or "")
+        if dtype == "grid" and space == "gen5-field-grid-v1":
+            try:
+                return NavNode(int(start_position["zone_id"]), int(start_position["x"]), int(start_position["y"]), int(start_position["z"])), {"input_type": "grid"}
+            except (KeyError, TypeError, ValueError) as exc:
+                raise NavigationPlanningError("NAV_INVALID_START", "Explicit start must be a complete gen5-field-grid-v1 coordinate.", status_code=422, details={"reason": str(exc)}) from exc
+        if dtype == "global_grid" and space == "gen5-matrix-grid-v1":
+            provider = self._global_provider()
+            if provider is None:
+                raise NavigationPlanningError("NAV_GLOBAL_UNAVAILABLE", "Matrix-global navigation requires the ROM static navigation provider.", status_code=503)
+            matrix_id = start_position.get("matrix_id")
+            if matrix_id is None and isinstance(player, dict) and isinstance(player.get("zone_id"), int):
+                matrix_id = self._matrix_id_for_zone(int(player["zone_id"]))
+            try:
+                matrix_id = int(matrix_id)
+                x, y, z = int(start_position["x"]), int(start_position["y"]), int(start_position["z"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise NavigationPlanningError("NAV_INVALID_START", "global_grid start requires x/y/z and matrix_id.", status_code=422, details={"reason": str(exc)}) from exc
+            zone_id = provider.resolve_zone_for_global(matrix_id, x, z)
+            if zone_id is None:
+                raise NavigationPlanningError("NAV_GLOBAL_START_UNOWNED", "The Matrix-global start does not resolve to an owned ROM Zone cell.", status_code=422)
+            return NavNode(int(zone_id), x, y, z), {"input_type": "global_grid", "matrix_id": matrix_id}
+        raise NavigationPlanningError("NAV_INVALID_START", "Explicit start must be grid or global_grid.", status_code=422)
+
     def create_plan(
         self,
         destination: dict[str, Any],
@@ -494,47 +588,20 @@ class NavigationPlanService:
                     details={"player_status": player.get("status"), "reason": player.get("reason")},
                 )
         else:
-            # An explicit start is useful for offline/static map previews. It
-            # is caller-supplied evidence only and is never accepted by the
-            # task executor as a replacement for a live player sample.
-            try:
-                if start_position.get("type") != "grid" or start_position.get("space") != "gen5-field-grid-v1":
-                    raise ValueError("start.type/space must describe gen5-field-grid-v1")
-                start = NavNode(
-                    zone_id=int(start_position["zone_id"]),
-                    x=int(start_position["x"]),
-                    y=int(start_position["y"]),
-                    z=int(start_position["z"]),
-                )
-            except (AttributeError, KeyError, TypeError, ValueError) as exc:
-                raise NavigationPlanningError(
-                    "NAV_INVALID_START",
-                    "Explicit start must be a complete gen5-field-grid-v1 coordinate.",
-                    status_code=422,
-                    details={"reason": str(exc)},
-                ) from exc
-            start_source = "explicit_grid"
+            # Explicit starts are for offline/static planning only.
             player = {"status": "candidate", "confidence": "candidate", "frame": None}
+            start, start_meta = self._resolve_start_node(start_position, player)
+            start_source = "explicit_global_grid" if start_meta.get("input_type") == "global_grid" else "explicit_grid"
 
-        try:
-            goal = NavNode(
-                zone_id=int(destination["zone_id"]),
-                x=int(destination["x"]),
-                y=int(destination["y"]),
-                z=int(destination["z"]),
-            )
-        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+        goal, goal_meta = self._resolve_destination_node(destination, start)
+        start_matrix_id = self._matrix_id_for_zone(start.zone_id)
+        goal_matrix_id = self._matrix_id_for_zone(goal.zone_id)
+        if goal.zone_id != start.zone_id and (start_matrix_id is None or goal_matrix_id is None or start_matrix_id != goal_matrix_id):
+            code = "NAV_MATRIX_TRANSITION_UNVERIFIED" if start_matrix_id is not None and goal_matrix_id is not None else "NAV_TRANSITION_UNVERIFIED"
             raise NavigationPlanningError(
-                "NAV_INVALID_DESTINATION",
-                "Destination must be a complete gen5-field-grid-v1 coordinate.",
-                status_code=422,
-                details={"reason": str(exc)},
-            ) from exc
-        if goal.zone_id != start.zone_id:
-            raise NavigationPlanningError(
-                "NAV_TRANSITION_UNVERIFIED",
-                "Cross-Zone planning is unavailable until connector evidence is verified.",
-                details={"start_zone_id": start.zone_id, "goal_zone_id": goal.zone_id},
+                code,
+                "Cross-Matrix planning requires a verified connector; Zone boundaries inside one proven Matrix are not navigation barriers.",
+                details={"start_zone_id": start.zone_id, "goal_zone_id": goal.zone_id, "start_matrix_id": start_matrix_id, "goal_matrix_id": goal_matrix_id},
             )
         if navigation_intent not in {"route", "walk_to_tile", "interact"}:
             raise NavigationPlanningError(
@@ -586,7 +653,11 @@ class NavigationPlanService:
                 "The fixed destination tile is currently occupied by a runtime actor.",
                 details={"destination": goal.public(), "occupied": sorted(occupied_nodes)},
             )
-        result = self.graph.find_path(start, goal, require_direct_observation=True)
+        result = (
+            self.graph.find_path(start, goal, require_direct_observation=True)
+            if start.zone_id == goal.zone_id
+            else {"reachable": False, "reason": "cross-Zone same-Matrix route requires Matrix-global static graph", "path": []}
+        )
         if result.get("reachable"):
             observed_path = result.get("path") or []
             if occupied_nodes and any(
@@ -733,6 +804,7 @@ class NavigationPlanService:
             "navigation_intent": navigation_intent,
             "resolved_start": {
                 "zone_id": start.zone_id,
+                **({"global": {"type": "global_grid", "space": "gen5-matrix-grid-v1", "matrix_id": start_matrix_id, "x": start.x, "y": start.y, "z": start.z}} if start_matrix_id is not None else {}),
                 "position": {"x": start.x, "y": start.y, "z": start.z},
                 "frame": player.get("frame"),
                 "source": start_source,
@@ -741,6 +813,8 @@ class NavigationPlanService:
             "resolved_goal": {
                 "zone_id": goal.zone_id,
                 "position": {"x": goal.x, "y": goal.y, "z": goal.z},
+                **({"global": {"type": "global_grid", "space": "gen5-matrix-grid-v1", "matrix_id": goal_matrix_id, "x": goal.x, "y": goal.y, "z": goal.z}} if goal_matrix_id is not None else {}),
+                **({"zone_resolved_from_global": True} if goal_meta.get("zone_resolved") else {}),
             },
             "route_detail": {
                 "start": start.public(),
@@ -753,8 +827,9 @@ class NavigationPlanService:
             },
             "segments": [
                 {
-                    "kind": "local",
-                    "zone_id": start.zone_id,
+                    "kind": "matrix_global" if start.zone_id != goal.zone_id else "local",
+                    "zone_id": start.zone_id if start.zone_id == goal.zone_id else None,
+                    "matrix_id": start_matrix_id,
                     "from": start.public(),
                     "to": goal.public(),
                     "steps": steps,
@@ -768,7 +843,8 @@ class NavigationPlanService:
                     "actions": action_segments,
                 }
             ],
-            "cost": {"steps": steps, "turns": turns, "connectors": 0},
+            "cost": {"steps": steps, "turns": turns, "zone_transitions": len(result.get("zone_transitions") or []), "connectors": 0},
+            "zone_transitions": result.get("zone_transitions") or [],
             "movement": movement,
             "warnings": warnings,
             "blockers": [],

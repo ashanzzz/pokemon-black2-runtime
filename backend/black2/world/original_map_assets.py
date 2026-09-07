@@ -74,13 +74,28 @@ class OriginalMapAssetService:
         cell = matrix.cell(x, y)
         chunk_id = int(cell["chunk_id"])
         chunk = self.rom.chunk(chunk_id)
-        texture = self.rom.terrain_texture(zone.area_id)
+
+        # In stitched multi-zone matrix maps, adjacent chunks belong to neighbouring zones
+        # and require that neighbouring zone's texture bundle; otherwise textures fail to match
+        # and render as black untextured surfaces.
+        cell_zone_id = cell.get("zone_id")
+        effective_zone_id = zone_id
+        effective_area_id = zone.area_id
+        if cell_zone_id is not None and cell_zone_id != 0xFFFFFFFF and cell_zone_id < self.rom.zone_count:
+            try:
+                cell_zone = self.rom.zone(cell_zone_id)
+                effective_zone_id = cell_zone_id
+                effective_area_id = cell_zone.area_id
+            except Exception:
+                pass
+
+        texture = self.rom.terrain_texture(effective_area_id)
         return chunk.terrain_model, texture, {
-            "zone_id": zone_id,
+            "zone_id": effective_zone_id,
             "matrix_id": zone.matrix_id,
             "chunk_id": chunk_id,
             "cell": {"x": x, "y": y},
-            "texture_id": self.rom.area(zone.area_id).textures_id,
+            "texture_id": self.rom.area(effective_area_id).textures_id,
         }
 
     async def terrain_glb(self, zone_id: int, x: int, y: int) -> tuple[Path, dict[str, Any]]:

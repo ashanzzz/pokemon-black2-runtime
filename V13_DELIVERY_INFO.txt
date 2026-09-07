@@ -1,0 +1,16 @@
+Pokémon Black 2 Runtime - Matrix Global Navigation v13
+
+Source basis: user-uploaded pokemon-black2-runtime-v12-full-20260907.zip
+Release: 13.0.0
+New protocol: black2-matrix-global-navigation/v1
+
+Primary behavior:
+- Zone-less global_grid destination for user/AI
+- matrix_id optional when live PlayerRuntime resolves current Matrix
+- same-Matrix cross-Zone lazy A*
+- Zone retained as resolved ownership metadata
+- global 3D surface snap for far stitched-map clicks
+- same-Matrix Zone changes do not invalidate path/executor position
+- cross-Matrix movement remains connector-gated
+- legacy gen5-field-grid-v1 API remains supported
+Git baseline commit: fd393a9fa46776e01f7ca86d4b6c9a6ebaa33aaa
