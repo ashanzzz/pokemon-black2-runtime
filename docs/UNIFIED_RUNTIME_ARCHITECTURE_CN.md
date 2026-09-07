@@ -141,7 +141,9 @@ ROM 路径不再阻止 FastAPI 启动。
 
 - `/api/state`
 - `/api/bizhawk/status`
+- `/api/v1/runtime/popup`
 - `/api/observer/presentation`
 - `/api/v1/map/current`
 
 但它们不再独立产生第二份事实，而是投影统一 Runtime 缓存或已验证 Player Runtime。
+RuntimeHub 会持续缓存本地 BizHawk 窗口探测结果（约每 2 秒刷新一次）；`/api/v1/runtime/health` 同时带有 `popup` 和 `emulation_blocked_by_popup`，专用 `/api/v1/runtime/popup` 返回 `clear`、`blocked` 或 `unresolved`。只识别已确认的 savestate mismatch 对话框，不会碰任意窗口；加载 RPC 因该对话框阻塞时，失败路径会自动通过本地 API 消除它。

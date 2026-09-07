@@ -56,6 +56,7 @@ class UniversalSnapshotManagerTests(unittest.IsolatedAsyncioTestCase):
 
             self.assertTrue(result["complete"])
             self.assertTrue(result["bundle"]["verification"]["ok"])
+            self.assertEqual(result["bundle"]["file_name"], "bundle.zip")
             self.assertEqual(result["bridge_written_bytes"], 0x400000)  # not the multi-domain total
             self.assertTrue(all(record["complete"] for record in result["memory_domains"]))
             folder = Path(result["folder"])

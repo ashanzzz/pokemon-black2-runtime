@@ -62,6 +62,12 @@ async def health(hub: RuntimeHub = Depends(_runtime_hub)) -> dict[str, Any]:
     return hub.health()
 
 
+@router.get("/popup")
+async def popup(hub: RuntimeHub = Depends(_runtime_hub)) -> dict[str, Any]:
+    """Read the cached long-running BizHawk native popup monitor."""
+    return hub.popup_status()
+
+
 @router.get("/snapshot")
 async def snapshot(hub: RuntimeHub = Depends(_runtime_hub)) -> dict[str, Any]:
     return hub.snapshot()

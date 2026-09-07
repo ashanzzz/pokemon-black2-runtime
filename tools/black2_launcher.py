@@ -35,6 +35,7 @@ _RUN_RUNTIME = (ROOT / "run_runtime.py").resolve()
 _INSTANCE_KEY = hashlib.sha256(str(ROOT.resolve()).lower().encode("utf-8")).hexdigest()[:20]
 _LAUNCHER_MUTEX_HANDLE: int | None = None
 _FALLBACK_LOCK_FD: int | None = None
+_NO_WINDOW: int = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
 
 
 def _load(path: Path) -> dict[str, Any]:
@@ -92,9 +93,25 @@ def bridge(config: dict[str, Any]) -> bool:
 
 
 def pid_alive(pid: int | None) -> bool:
-    if not pid:
+    if not pid or pid <= 0:
         return False
     if os.name == "nt":
+        try:
+            import ctypes
+            from ctypes import wintypes
+            # SYNCHRONIZE (0x00100000) or PROCESS_QUERY_LIMITED_INFORMATION (0x1000)
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            STILL_ACTIVE = 259
+            handle = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+            if handle:
+                try:
+                    exit_code = wintypes.DWORD()
+                    if ctypes.windll.kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+                        return exit_code.value == STILL_ACTIVE
+                finally:
+                    ctypes.windll.kernel32.CloseHandle(handle)
+        except Exception:
+            pass
         try:
             result = subprocess.run(
                 ["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"],
@@ -102,6 +119,7 @@ def pid_alive(pid: int | None) -> bool:
                 text=True,
                 timeout=3,
                 check=False,
+                creationflags=_NO_WINDOW,
             )
             return str(int(pid)) in result.stdout
         except (OSError, subprocess.SubprocessError):
@@ -125,6 +143,7 @@ def backend_listener_pid(config: dict[str, Any]) -> int | None:
             text=True,
             timeout=3,
             check=False,
+            creationflags=_NO_WINDOW,
         )
         for line in result.stdout.splitlines():
             fields = line.split()
@@ -158,6 +177,7 @@ def _powershell_process_rows() -> list[dict[str, Any]]:
             errors="replace",
             timeout=5,
             check=False,
+            creationflags=_NO_WINDOW,
         )
         if result.returncode != 0 or not result.stdout.strip():
             return []
@@ -249,17 +269,17 @@ def ensure_env() -> Path:
     created = not target.is_file()
     if created:
         _log("creating local .venv")
-        subprocess.run([sys.executable, "-m", "venv", str(ROOT / ".venv")], cwd=ROOT, check=True)
+        subprocess.run([sys.executable, "-m", "venv", str(ROOT / ".venv")], cwd=ROOT, check=True, creationflags=_NO_WINDOW)
     if not target.is_file():
         raise RuntimeError("创建 .venv 失败")
     requirement = ROOT / "requirements.txt"
-    pip_ready = subprocess.run([str(target), "-m", "pip", "--version"], cwd=ROOT, capture_output=True).returncode == 0
+    pip_ready = subprocess.run([str(target), "-m", "pip", "--version"], cwd=ROOT, capture_output=True, creationflags=_NO_WINDOW).returncode == 0
     if not pip_ready:
         _log("bootstrapping local pip")
-        subprocess.run([str(target), "-m", "ensurepip", "--upgrade"], cwd=ROOT, check=True)
+        subprocess.run([str(target), "-m", "ensurepip", "--upgrade"], cwd=ROOT, check=True, creationflags=_NO_WINDOW)
     if requirement.is_file() and (created or not pip_ready):
         _log("installing requirements")
-        subprocess.run([str(target), "-m", "pip", "install", "-r", str(requirement)], cwd=ROOT, check=True)
+        subprocess.run([str(target), "-m", "pip", "install", "-r", str(requirement)], cwd=ROOT, check=True, creationflags=_NO_WINDOW)
     return target
 
 
@@ -476,6 +496,7 @@ def stop_backend() -> dict[str, Any]:
                     text=True,
                     timeout=8,
                     check=False,
+                    creationflags=_NO_WINDOW,
                 )
                 if result.returncode == 0 or not pid_alive(pid):
                     stopped.append(pid)
@@ -592,11 +613,11 @@ def stop() -> dict[str, Any]:
     return stop_backend()
 
 
-def status() -> dict[str, Any]:
+def status(fast: bool = False) -> dict[str, Any]:
     config = cfg()
     state = _load(STATE)
     control = runtime_control_status(config)
-    owned_backend = project_backend_pids() if os.name == "nt" else []
+    owned_backend = [] if fast else (project_backend_pids() if os.name == "nt" else [])
     try:
         emu_pid = int(state.get("emuhawk_pid") or 0)
     except (TypeError, ValueError):
@@ -874,7 +895,7 @@ def gui() -> None:
                 save_paths()
 
         def refresh():
-            current = status()
+            current = status(fast=True)
             state_text.set(
                 f"后端 {'在线' if current['backend_online'] else '未启动'}   ·   "
                 f"Bridge {'已连接' if current['bridge_connected'] else '未连接'}   ·   "

@@ -1,0 +1,732 @@
+{
+  "format": "black2-closed-loop-walk/v1",
+  "events": [
+    {
+      "step": 0,
+      "before": {
+        "frame": 359185,
+        "zone_id": 439,
+        "x": 118,
+        "y": 2,
+        "z": 661,
+        "facing": "North",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359201,
+            "zone_id": 439,
+            "x": 118,
+            "y": 2,
+            "z": 661,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": false
+        },
+        {
+          "button": "Left",
+          "after": {
+            "frame": 359228,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 661,
+            "facing": "West",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 1,
+      "before": {
+        "frame": 359228,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 661,
+        "facing": "West",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359266,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 661,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": false
+        },
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359283,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 662,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 2,
+      "before": {
+        "frame": 359283,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 662,
+        "facing": "South",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359296,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 661,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 3,
+      "before": {
+        "frame": 359296,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 661,
+        "facing": "North",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359312,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 662,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 4,
+      "before": {
+        "frame": 359312,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 662,
+        "facing": "South",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359327,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 661,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 5,
+      "before": {
+        "frame": 359327,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 661,
+        "facing": "North",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359345,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 662,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 6,
+      "before": {
+        "frame": 359345,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 662,
+        "facing": "South",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359357,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 661,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 7,
+      "before": {
+        "frame": 359357,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 661,
+        "facing": "North",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359374,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 662,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 8,
+      "before": {
+        "frame": 359374,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 662,
+        "facing": "South",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359390,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 661,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 9,
+      "before": {
+        "frame": 359390,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 661,
+        "facing": "North",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359423,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 662,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 10,
+      "before": {
+        "frame": 359423,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 662,
+        "facing": "South",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359439,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 662,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": false
+        },
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359453,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 663,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 11,
+      "before": {
+        "frame": 359453,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 663,
+        "facing": "South",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359466,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 662,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 12,
+      "before": {
+        "frame": 359466,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 662,
+        "facing": "North",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359474,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 663,
+            "facing": "South",
+            "status": "candidate"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 13,
+      "before": {
+        "frame": 359474,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 663,
+        "facing": "South",
+        "status": "candidate"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359491,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 663,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": false
+        },
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359505,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 664,
+            "facing": "South",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 14,
+      "before": {
+        "frame": 359505,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 664,
+        "facing": "South",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Up",
+          "after": {
+            "frame": 359517,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 663,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 15,
+      "before": {
+        "frame": 359517,
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 663,
+        "facing": "North",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "current",
+        "can_act": true,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "attempts": [
+        {
+          "button": "Down",
+          "after": {
+            "frame": 359530,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 663,
+            "facing": "North",
+            "status": "resolved"
+          },
+          "moved": false
+        },
+        {
+          "button": "Left",
+          "after": {
+            "frame": 359563,
+            "zone_id": 439,
+            "x": 117,
+            "y": 2,
+            "z": 663,
+            "facing": "West",
+            "status": "resolved"
+          },
+          "moved": false
+        },
+        {
+          "button": "Right",
+          "after": {
+            "frame": 359575,
+            "zone_id": 439,
+            "x": 118,
+            "y": 2,
+            "z": 663,
+            "facing": "East",
+            "status": "resolved"
+          },
+          "moved": true
+        }
+      ]
+    },
+    {
+      "step": 16,
+      "before": {
+        "frame": 359575,
+        "zone_id": 439,
+        "x": 118,
+        "y": 2,
+        "z": 663,
+        "facing": "East",
+        "status": "resolved"
+      },
+      "screen": {
+        "status": "unresolved",
+        "can_act": null,
+        "screen_type": "OVERWORLD",
+        "observation_status": "current"
+      },
+      "goal": {
+        "zone_id": 439,
+        "x": 117,
+        "y": 2,
+        "z": 643
+      },
+      "result": "modal_or_unresolved"
+    }
+  ]
+}

@@ -28,10 +28,10 @@ class ObserverPresentationState(BaseModel):
     facing: str
     player_control: str
     story_objective: str
-    player_name: str
-    party_count: int
-    money: int
-    badges_count: int
+    player_name: Optional[str] = None
+    party_count: Optional[int] = None
+    money: Optional[int] = None
+    badges_count: Optional[int] = None
 
     # Three-tier goals & action directive
     goals: Optional[Dict[str, Any]] = None
@@ -128,7 +128,7 @@ def build_observer_presentation(state_dict: Dict[str, Any]) -> ObserverPresentat
             "evidence": f"[{dlg_speaker}]: {dlg_text[:16].replace(chr(10), ' ')}..." if is_dlg else "No active dialogue buffer changes",
         },
         {"detector": "CutsceneScript", "candidate": "ACTIVE" if is_dlg else "INACTIVE", "confidence": 0.95, "evidence": "Script event active" if is_dlg else "Free field control"},
-        {"detector": "BattleSystem", "candidate": "INACTIVE", "confidence": 1.0, "evidence": "Battle struct pointer null"},
+        {"detector": "BattleSystem", "candidate": "UNRESOLVED", "confidence": 0.0, "evidence": "No verified battle runtime decoder"},
         {"detector": "MenuController", "candidate": "INACTIVE", "confidence": 0.99, "evidence": "Bag/Party modal closed"},
         {"detector": "TransitionFade", "candidate": "INACTIVE", "confidence": 1.0, "evidence": "Display brightness normal"}
     ]
@@ -176,10 +176,10 @@ def build_observer_presentation(state_dict: Dict[str, Any]) -> ObserverPresentat
         facing=facing_text,
         player_control=player_control,
         story_objective=story_obj,
-        player_name="zero",
-        party_count=0,
-        money=3000,
-        badges_count=0,
+        player_name=state_dict.get("player_name"),
+        party_count=state_dict.get("party_count"),
+        money=state_dict.get("money"),
+        badges_count=state_dict.get("badges"),
         goals=evaluated_goals,
         dialogue_active=is_dlg,
         dialogue_speaker=dlg_speaker,

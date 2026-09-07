@@ -923,11 +923,14 @@ class RuntimeFieldLocator:
     last_failure_reason: str = ""
     min_discovery_interval: float = 5.0
     last_discovery_result: dict[str, Any] | None = None
+    lifecycle_rediscovery_pending: bool = False
 
-    def invalidate(self) -> None:
+    def invalidate(self, *, preserve_lifecycle_retry: bool = False) -> None:
         self.addresses = None
         self.discovery_confidence = "unresolved"
         self.last_discovery_result = None
+        if not preserve_lifecycle_retry:
+            self.lifecycle_rediscovery_pending = False
 
     async def discover(self, reader: MemoryReader) -> dict[str, Any]:
         self.last_discovery_attempt = time.monotonic()
@@ -1208,11 +1211,22 @@ class RuntimeFieldLocator:
         }
 
     async def sample_player(self, reader: MemoryReader, *, allow_discovery: bool = False) -> dict[str, Any]:
+        had_cached_locator = bool(self.addresses)
         cached = await self._sample_cached(reader)
         if cached is not None:
+            self.lifecycle_rediscovery_pending = False
             return cached
-        self.invalidate()
-        if not allow_discovery:
+        if had_cached_locator:
+            # A previously coherent Field object graph disappearing is the
+            # runtime's map-lifecycle signal.  A door/warp commonly replaces
+            # Field, Mapper and ActorSystem together, so bounded reads cannot
+            # recover the new addresses.  Remember this condition across
+            # transient loading frames and permit a throttled one-off
+            # rediscovery from the background sampler.
+            self.lifecycle_rediscovery_pending = True
+        self.invalidate(preserve_lifecycle_retry=True)
+        lifecycle_retry = self.lifecycle_rediscovery_pending
+        if not allow_discovery and not lifecycle_retry:
             return {
                 "format": "black2-runtime-player-live/v2",
                 "status": "unresolved",
@@ -1227,26 +1241,36 @@ class RuntimeFieldLocator:
                 "confidence": "unresolved",
                 "reason": self.last_failure_reason or "Field rediscovery is throttled after a recent failed/stale sample",
                 "retry_after_seconds": max(0.0, self.min_discovery_interval - since),
+                "lifecycle_rediscovery_pending": lifecycle_retry,
             }
         discovery = await self.discover(reader)
         if discovery.get("status") not in {"resolved", "candidate"}:
+            # Loading screens can briefly expose no coherent Field candidate.
+            # Keep retrying at the normal throttle until the replacement scene
+            # settles; a fresh process with no prior locator never enters this
+            # path implicitly.
+            self.lifecycle_rediscovery_pending = lifecycle_retry
             return {
                 "format": "black2-runtime-player-live/v2",
                 "status": "unresolved",
                 "confidence": "unresolved",
                 "reason": discovery.get("reason", "runtime Field discovery failed"),
+                "lifecycle_rediscovery_pending": lifecycle_retry,
             }
         cached = await self._sample_cached(reader)
         if cached is None:
-            self.invalidate()
+            self.invalidate(preserve_lifecycle_retry=lifecycle_retry)
             return {
                 "format": "black2-runtime-player-live/v2",
                 "status": "unresolved",
                 "confidence": "unresolved",
                 "reason": "Field chain changed immediately after discovery",
+                "lifecycle_rediscovery_pending": lifecycle_retry,
             }
+        self.lifecycle_rediscovery_pending = False
         cached["discovery"] = {
             "performed": True,
+            "reason": "map_lifecycle_transition" if lifecycle_retry and not allow_discovery else "explicit_request",
             "confidence": discovery.get("confidence"),
             "field": discovery.get("root", {}).get("field"),
         }

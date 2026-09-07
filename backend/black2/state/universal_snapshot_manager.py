@@ -445,7 +445,9 @@ def _scan_gfl_heap_candidates(ram: bytes, frame: int) -> Dict[str, Any]:
 
 
 def _build_bundle(target_folder: Path, snapshot_id: str, file_names: List[str]) -> Path:
-    bundle_path = target_folder / f"{snapshot_id}.zip"
+    # The parent directory already carries the snapshot id. Repeating it in
+    # the archive name can exceed Windows path limits for descriptive labels.
+    bundle_path = target_folder / "bundle.zip"
     with zipfile.ZipFile(bundle_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for file_name in file_names:
             path = target_folder / file_name

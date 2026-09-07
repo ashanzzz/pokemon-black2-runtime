@@ -154,3 +154,57 @@ class TestWorld3DSceneV6(unittest.TestCase):
         # coordinate grid even when the BMD0/BTX0 pair was valid.
         self.assertEqual(static["terrains"][0]["asset_url"], "/api/v1/map/v5/terrain/428/0/0/model.glb")
         self.assertEqual(static["runtime_matrix_binding"]["status"], "probable")
+
+    def test_static_preview_is_explicitly_candidate_and_has_camera_anchor(self):
+        class Exported:
+            @staticmethod
+            def zone(_zone_id):
+                return {
+                    "matrix": {"matrix_id": 3},
+                    "render_coordinate_system": {"chunk_span_world": 512},
+                    "cells": [{"x": 0, "y": 0, "chunk_id": 77, "present": True}],
+                    "buildings": [{
+                        "instance_id": "b1", "model_uid": 2,
+                        "world_position": {"x": 16, "y": 0, "z": 32},
+                        "resource": {"door_uid": 9, "door_offset": {"x": 16, "y": 0, "z": 0}},
+                    }],
+                    "entities": {"warps": [{
+                        "id": 0, "target_zone_or_map_raw": 8,
+                        "x_world": 16, "y_world": 32, "z": 0,
+                        "coordinate_units": "map_world_units_16_per_tile_candidate",
+                    }]},
+                    "zone": {}, "area": {"is_exterior": True},
+                }
+
+        result = World3DSceneService(original=None, truth=None, exported=Exported()).static_preview_scene(7)
+
+        self.assertTrue(result["preview_only"])
+        self.assertEqual(result["status"], "candidate")
+        self.assertEqual(result["player"]["source"], "static_rom_preview")
+        self.assertEqual(result["scene_origin"]["source"], "static_preview_bounds")
+        self.assertEqual(result["static"]["entities"]["warps"][0]["world"]["z"], 32.0)
+        self.assertEqual(result["static"]["location"]["name_source"], "zone_id_fallback")
+
+    def test_warp_exports_raw_anchor_and_display_center_separately(self):
+        class Exported:
+            @staticmethod
+            def zone(_zone_id):
+                return {
+                    "matrix": {"matrix_id": 3},
+                    "render_coordinate_system": {"chunk_span_world": 512},
+                    "cells": [], "buildings": [],
+                    "entities": {"warps": [{
+                        "id": 0, "target_zone_or_map_raw": 439,
+                        "x_world": 88, "y_world": 152, "z": 0,
+                        "width": 3, "height": 1,
+                        "coordinate_units": "map_world_units_16_per_tile_candidate",
+                    }]},
+                    "zone": {}, "area": {"is_exterior": False},
+                }
+
+        result = World3DSceneService(original=None, truth=None, exported=Exported()).static_preview_scene(441)
+        warp = result["static"]["entities"]["warps"][0]
+        self.assertEqual(warp["world"], {"x": 88.0, "y": 0.0, "z": 152.0})
+        self.assertEqual(warp["rom_anchor_world"], warp["world"])
+        self.assertEqual(warp["display_world_center"], {"x": 104.0, "y": 0.0, "z": 152.0})
+        self.assertEqual(warp["semantic_entry_grid"], {"x": 6, "y": 0, "z": 9})

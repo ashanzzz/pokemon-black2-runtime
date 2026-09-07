@@ -22,9 +22,12 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from ..bizhawk.bridge_client import BridgeClient
+from ..bizhawk.process_probe import public_bizhawk_popup
 from ..memory.reader import MemoryReader
 from ..state.engine import SemanticStateEngine
 from ..world.runtime_player_state import player_runtime_service
+from ..world.observed_navigation import observed_navigation_graph
+from ..world.world3d_scene import canonical_player
 
 
 @dataclass
@@ -93,10 +96,14 @@ class RuntimeHub:
             return dict(self._process_cache)
         try:
             probe = self.process_probe()
+            popup = public_bizhawk_popup(getattr(probe, "popup", None))
             self._process_cache = {
                 "emulator_running": bool(getattr(probe, "running", False)),
                 "emulator_pid": getattr(probe, "pid", None),
                 "emulator_exe": getattr(probe, "exe_path", None),
+                "popup": popup,
+                "emulation_blocked_by_popup": bool(popup.get("blocking")),
+                "popup_checked_at": time.time(),
             }
         except Exception as exc:
             self._process_cache = {
@@ -165,6 +172,8 @@ class RuntimeHub:
         state = copy.deepcopy(self._last_good_semantic) if self._last_good_semantic else None
         player = copy.deepcopy(player_runtime_service.latest) if player_runtime_service.latest else None
         transport = self._transport()
+        if not transport["bridge_connected"] or self._last_semantic_error:
+            observed_navigation_graph.reset_trace()
         self._latest = {
             "format": "black2-runtime-snapshot/v4",
             "sampled_at": self._last_sample_at or None,
@@ -202,8 +211,25 @@ class RuntimeHub:
             # state_engine.read_live_map_state() uses player_runtime_service, so
             # reuse its exact latest sample instead of issuing another RAM read.
             player = copy.deepcopy(player_runtime_service.latest) if player_runtime_service.latest else None
-            self._last_sample_at = time.time()
             transport = self._transport()
+            # Feed the already decoded PlayerRuntime sample into the observed
+            # navigation graph.  This is cache-only bookkeeping: it performs
+            # no additional bridge read and only persists bounded evidence
+            # when a new node/edge is seen.  Zone changes therefore become
+            # available to the future route planner without requiring a
+            # calibration session to be running.
+            try:
+                if self._last_semantic_error:
+                    observed_navigation_graph.reset_trace()
+                else:
+                    observed_player = canonical_player(player)
+                    observed_player["session_id"] = transport.get("session_id")
+                    observed_navigation_graph.observe_player(observed_player, source="runtime:hub")
+            except Exception:
+                # Navigation evidence must never be allowed to interrupt the
+                # runtime sampler or make PlayerRuntime appear degraded.
+                pass
+            self._last_sample_at = time.time()
             semantic_ok = state is not None and self._last_semantic_error is None
             player_ok = bool(player and player.get("status") in {"resolved", "candidate"})
             self._latest = {
@@ -250,6 +276,29 @@ class RuntimeHub:
             "player_status": (snap.get("runtime") or {}).get("player_status"),
             "snapshot_age_seconds": snap.get("age_seconds"),
             "semantic_error": (snap.get("runtime") or {}).get("semantic_error"),
+            "popup": transport.get("popup"),
+            "emulation_blocked_by_popup": transport.get("emulation_blocked_by_popup"),
+            "popup_checked_at": transport.get("popup_checked_at"),
+        }
+
+    def popup_status(self) -> dict[str, Any]:
+        """Return the cached long-running native BizHawk popup observation."""
+        snap = self.snapshot()
+        transport = snap.get("transport") or {}
+        popup = transport.get("popup")
+        known = isinstance(popup, dict)
+        blocked = bool(transport.get("emulation_blocked_by_popup")) if known else None
+        return {
+            "format": "black2-runtime-popup/v1",
+            "status": "blocked" if blocked else "clear" if known else "unresolved",
+            "popup": popup if known else {},
+            "emulation_blocked_by_popup": blocked,
+            "popup_checked_at": transport.get("popup_checked_at"),
+            "emulator_running": transport.get("emulator_running"),
+            "emulator_pid": transport.get("emulator_pid"),
+            "bridge_connected": transport.get("bridge_connected"),
+            "detection": "cached_local_win32_window_observation",
+            "dismiss_endpoint": "/api/dev/bizhawk/popup/dismiss",
         }
 
     def semantic_state(self) -> dict[str, Any] | None:

@@ -25,6 +25,22 @@ from backend.black2.decoders.visible_text_ledger import VisibleTextLedger, Visib
 API_BASE = "http://127.0.0.1:8765"
 
 
+def load_fixture_slot(slot: int) -> None:
+    """Load a live EXP-021 fixture, or skip when the fixture is unavailable.
+
+    A slot made with another BizHawk core/sync profile is an expected safety
+    refusal, not a parser regression.  Keep unexpected gateway failures and
+    all post-load assertions as hard test failures.
+    """
+    response = requests.post(f"{API_BASE}/api/dev/savestate/load?slot={slot}")
+    if response.status_code in {404, 409, 503}:
+        pytest.skip(
+            f"EXP-021 fixture slot {slot} is unavailable in the current BizHawk session "
+            f"(HTTP {response.status_code})"
+        )
+    response.raise_for_status()
+
+
 def fetch_live_ram_snapshot() -> Dict[str, bytes]:
     """Capture raw memory snapshot on current frame."""
     ranges = [
@@ -67,9 +83,12 @@ def parse_snapshot_with_fresh_decoder(
 
 def test_exp021_all():
     try:
-        requests.get(f"{API_BASE}/health", timeout=0.5).raise_for_status()
+        health_response = requests.get(f"{API_BASE}/health", timeout=0.5)
+        health_response.raise_for_status()
     except requests.RequestException:
         pytest.skip("runtime backend is not running; EXP-021 is a live integration test")
+    if health_response.json().get("bridge_connected") is not True:
+        pytest.skip("BizHawk bridge is not connected; EXP-021 requires live savestate access")
     sys.stdout.reconfigure(encoding="utf-8")
     print("=" * 70)
     print("EXP-021: SNAPSHOT INDEPENDENCE TEST SUITE (ZERO-HISTORY PARSER)")
@@ -77,7 +96,7 @@ def test_exp021_all():
 
     # 1. Test Slot 2 (WAIT_CLEAR)
     print("\n--- [EXP-021A: Load Slot 2 (WAIT_CLEAR)] ---")
-    requests.post(f"{API_BASE}/api/dev/savestate/load?slot=2").raise_for_status()
+    load_fixture_slot(2)
     snap_data = fetch_live_ram_snapshot()
     res2 = parse_snapshot_with_fresh_decoder(snap_data["control"], snap_data["msg"], snap_data["pixel"])
     print(f"Phase: {res2.phase_name}, Latch: {res2.is_first_page}, Cursor: 0x{res2.cursor_addr:08X}")
@@ -91,7 +110,7 @@ def test_exp021_all():
 
     # 2. Test Slot 3 (WAIT_SCROLL)
     print("\n--- [EXP-021B: Load Slot 3 (WAIT_SCROLL)] ---")
-    requests.post(f"{API_BASE}/api/dev/savestate/load?slot=3").raise_for_status()
+    load_fixture_slot(3)
     snap_data = fetch_live_ram_snapshot()
     res3 = parse_snapshot_with_fresh_decoder(snap_data["control"], snap_data["msg"], snap_data["pixel"])
     print(f"Phase: {res3.phase_name}, Latch: {res3.is_first_page}, Cursor: 0x{res3.cursor_addr:08X}")
@@ -105,7 +124,7 @@ def test_exp021_all():
 
     # 3. Test Slot 9 (WAIT_EOS)
     print("\n--- [EXP-021C: Load Slot 9 (WAIT_EOS)] ---")
-    requests.post(f"{API_BASE}/api/dev/savestate/load?slot=9").raise_for_status()
+    load_fixture_slot(9)
     snap_data = fetch_live_ram_snapshot()
     res9 = parse_snapshot_with_fresh_decoder(snap_data["control"], snap_data["msg"], snap_data["pixel"])
     print(f"Phase: {res9.phase_name}, Latch: {res9.is_first_page}, Cursor: 0x{res9.cursor_addr:08X}")

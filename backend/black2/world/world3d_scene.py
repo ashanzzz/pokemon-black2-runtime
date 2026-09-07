@@ -15,6 +15,7 @@ import asyncio
 import math
 import time
 from dataclasses import dataclass, field
+from copy import deepcopy
 from typing import Any
 
 from ..memory.reader import MemoryReader
@@ -23,6 +24,7 @@ from .original_world import OriginalWorldService
 from .exported_world_store import ExportedWorldStore
 from .runtime_player_state import player_runtime_service
 from .runtime_actor_overlay import runtime_actor_overlay_service
+from .map_graph import ZONE_LABEL_OVERRIDES
 
 TILE_WORLD = 16.0
 TILE_HALF = 8.0
@@ -30,6 +32,16 @@ TILE_HALF = 8.0
 
 def _num(value: Any) -> float | None:
     return float(value) if isinstance(value, (int, float)) and math.isfinite(float(value)) else None
+
+
+def _int(value: Any) -> int | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return None
+    return parsed
 
 
 def canonical_player(sample: dict[str, Any] | None) -> dict[str, Any]:
@@ -197,6 +209,7 @@ class World3DSceneService:
             and runtime_matrix_id != matrix_meta.get("matrix_id")
             and self.original is not None
         )
+        runtime_cells_excluded = 0
         if runtime_matrix_bound:
             # Runtime FieldG3DMapper's exact ROM-matched matrix is stronger
             # evidence than a ZoneHeader's static matrix field.  This matters
@@ -204,14 +217,42 @@ class World3DSceneService:
             # different shared world.  The matching ROM chunk is still served
             # through the normal lazy BMD0+BTX0 converter below.
             matrix = self.original.rom.matrix(runtime_matrix_id)
-            source_cells = [
-                {
+            # Runtime FieldG3DMapper exposes the complete loaded matrix, which
+            # can include neighbouring zones.  The browser scene is scoped to
+            # the current ZoneID, so retain only coordinates that the ROM
+            # ZoneData assigns to this zone.  Without this guard, unrelated
+            # terrain cells (including the blue platform seen around
+            # 18/19,10/11 in Sangi Town) leak into the current map even though
+            # the NDS renderer never draws them for this zone.
+            # Some lightweight callers provide no exported cell inventory
+            # (for example a metadata-only test fixture). In that case there
+            # is no evidence with which to exclude neighboring cells, so keep
+            # the matched runtime matrix intact. A populated inventory still
+            # enables the strict current-Zone filter used by the browser.
+            has_zone_inventory = any(
+                isinstance(cell, dict) and cell.get("present")
+                for cell in source_cells
+            )
+            zone_cells = {
+                (int(cell.get("x")), int(cell.get("y")))
+                for cell in source_cells
+                if cell.get("present") and cell.get("belongs_to_zone") is not False
+            } if has_zone_inventory else None
+            runtime_cells = []
+            for cell in matrix.cells():
+                key = (int(cell["x"]), int(cell["y"]))
+                if zone_cells is not None and key not in zone_cells:
+                    if cell.get("chunk_id") != 0xFFFFFFFF:
+                        runtime_cells_excluded += 1
+                    continue
+                runtime_cells.append({
                     "x": cell["x"], "y": cell["y"], "chunk_id": cell["chunk_id"],
                     "present": cell["chunk_id"] != 0xFFFFFFFF,
                     "belongs_to_zone": True,
                     "runtime_matrix_bound": True,
-                }
-                for cell in matrix.cells()
+                })
+            source_cells = [
+                cell for cell in runtime_cells if cell["present"]
             ]
             matrix_meta = {
                 "matrix_id": matrix.matrix_id,
@@ -253,6 +294,7 @@ class World3DSceneService:
                 "world": {"x": _num(p.get("x")), "y": _num(p.get("y")), "z": _num(p.get("z"))},
                 "rotation_degrees": item.get("rotation_degrees"),
                 "door_uid": (item.get("resource") or {}).get("door_uid"),
+                "door_offset": (item.get("resource") or {}).get("door_offset"),
                 "has_door_metadata": bool((item.get("resource") or {}).get("has_door_metadata")),
                 "asset_url": f"/api/v1/map/v5/building/{zone_id}/{item.get('model_uid')}/model.glb",
             })
@@ -276,10 +318,109 @@ class World3DSceneService:
             "runtime_matrix_binding": {
                 "status": "probable" if runtime_matrix_bound else "not_needed",
                 "matrix_id": runtime_matrix_id if runtime_matrix_bound else matrix_meta.get("matrix_id"),
+                "excluded_neighbour_cells": runtime_cells_excluded,
                 "reason": (
-                    "exact runtime mapper chunk table matched this ROM matrix"
+                    "exact runtime mapper chunk table matched this ROM matrix; current ZoneID filter applied"
                     if runtime_matrix_bound else "ZoneHeader matrix agrees with static world"
                 ),
+            },
+        }
+
+    def static_preview_scene(self, zone_id: int) -> dict[str, Any]:
+        """Build a self-contained, read-only scene envelope for a Zone.
+
+        The normal ``scene/current`` contract is intentionally anchored to a
+        live PlayerRuntime sample.  That is the right contract for execution,
+        but it leaves the map workbench blank when BizHawk is not connected.
+        This preview contract uses only ROM data and supplies a clearly marked
+        synthetic camera anchor.  It must never be used as proof of the
+        player's current location or as authorization to execute inputs.
+        """
+        static = self.static_scene(int(zone_id))
+        # ``static_scene`` reuses the decoded entity lists from the world
+        # store.  Copy before promoting warp coordinates so a browser preview
+        # cannot mutate the cached ROM projection used by other endpoints.
+        static = deepcopy(static)
+        self._attach_warp_world_positions(static, {})
+        zone_meta = static.get("zone") or {}
+        label = ZONE_LABEL_OVERRIDES.get(int(zone_id))
+        static["location"] = {
+            "name_zh": (label or {}).get("name_zh") or f"Zone {zone_id}",
+            "name_en": (label or {}).get("name_en") or f"Zone {zone_id}",
+            "location_name_id": zone_meta.get("location_name_id"),
+            "parent_zone_id": zone_meta.get("parent_zone_id"),
+            "name_source": "operator_confirmed" if label else "zone_id_fallback",
+        }
+
+        positions: list[tuple[float, float, float]] = []
+        for item in static.get("terrains") or []:
+            world = item.get("world") if isinstance(item, dict) else None
+            if isinstance(world, dict):
+                x, y, z = _num(world.get("x")), _num(world.get("y")), _num(world.get("z"))
+                if x is not None and y is not None and z is not None:
+                    positions.append((x, y, z))
+        for item in static.get("buildings") or []:
+            world = item.get("world") if isinstance(item, dict) else None
+            if isinstance(world, dict):
+                x, y, z = _num(world.get("x")), _num(world.get("y")), _num(world.get("z"))
+                if x is not None and y is not None and z is not None:
+                    positions.append((x, y, z))
+        for item in (static.get("entities") or {}).get("warps") or []:
+            world = item.get("world") if isinstance(item, dict) else None
+            if isinstance(world, dict):
+                x, y, z = _num(world.get("x")), _num(world.get("y")), _num(world.get("z"))
+                if x is not None and y is not None and z is not None:
+                    positions.append((x, y, z))
+
+        if positions:
+            origin = {
+                "x": (min(p[0] for p in positions) + max(p[0] for p in positions)) / 2.0,
+                "y": 0.0,
+                "z": (min(p[2] for p in positions) + max(p[2] for p in positions)) / 2.0,
+                "source": "static_preview_bounds",
+            }
+        else:
+            # A malformed/empty map remains inspectable and keeps the reason
+            # explicit rather than inventing a world coordinate.
+            origin = {"x": 0.0, "y": 0.0, "z": 0.0, "source": "static_preview_empty_fallback"}
+
+        gx = math.floor(origin["x"] / TILE_WORLD)
+        gz = math.floor(origin["z"] / TILE_WORLD)
+        player = {
+            "format": "black2-world3d-player/v6",
+            "status": "candidate",
+            "confidence": "candidate",
+            "source": "static_rom_preview",
+            "zone_id": int(zone_id),
+            "frame": None,
+            "coordinate_space": "gen5-field-world-v1",
+            "grid": {"x": gx, "y": 0, "z": gz},
+            "world": {"x": origin["x"], "y": origin["y"], "z": origin["z"]},
+            "orientation": {"face_dir_raw": None, "facing": "Unresolved", "verified": False},
+            "locomotion": {"phase": "StaticPreview", "semantic_state": "PreviewOnly", "transport_mode": None, "gait": None},
+            "validation": {"grid_to_world_formula": "preview anchor only", "grid_world_consistent": None},
+        }
+        matrix_id = (static.get("matrix") or {}).get("matrix_id")
+        key = f"zone:{int(zone_id)}:matrix:{matrix_id}:static-preview"
+        return {
+            "format": "black2-world3d-scene/v6",
+            "status": "candidate",
+            "confidence": "candidate",
+            "preview_only": True,
+            "zone_id": int(zone_id),
+            "environment": static.get("environment"),
+            "coordinate_space": "gen5-field-world-v1",
+            "scene_key": key,
+            "render_key": key,
+            "scene_origin": origin,
+            "player": player,
+            "identity": {"confidence": "candidate", "source": "static_rom_preview"},
+            "static": static,
+            "render_contract": {
+                "canonical_position": "ROM terrain/buildings/entities use Gen-5 field world units",
+                "browser_display_position": "canonical - scene_origin (x/z only)",
+                "player_position_source": "synthetic static preview anchor; no runtime claim",
+                "execution": "disabled until a live PlayerRuntime sample replaces this preview",
             },
         }
 
@@ -359,6 +500,80 @@ class World3DSceneService:
         }
         return static
 
+    @staticmethod
+    def _attach_warp_world_positions(static: dict[str, Any], player: dict[str, Any]) -> dict[str, Any]:
+        """Promote ROM warp-local coordinates into canonical world X/Z.
+
+        Entity archives store warp X/Y in map-local 16-unit coordinates.  For
+        exterior maps those coordinates are relative to the currently loaded
+        mapper chunk; interiors use the single chunk at (0, 0).  Keeping the
+        raw fields and adding ``world`` lets the browser place an entrance
+        without guessing a second coordinate system.
+        """
+        entities = static.get("entities")
+        if not isinstance(entities, dict):
+            return static
+        span = float(static.get("chunk_span_world") or 512.0)
+        chunk = (player.get("chunk") or {}) if isinstance(player, dict) else {}
+        chunk_x = chunk.get("x") if isinstance(chunk.get("x"), (int, float)) else 0
+        chunk_z = chunk.get("z") if isinstance(chunk.get("z"), (int, float)) else 0
+        # Entity coordinates are already absolute field WPos in the v6
+        # scene assembled from the ROM matrix.  The old code added the live
+        # chunk origin a second time, placing every warp hundreds of tiles
+        # away (for example Zone 439 warp X=1688 became X=3224).  Preserve
+        # the raw values and only apply a chunk transform for legacy local
+        # coordinates explicitly marked as such.
+        warps = entities.get("warps") or []
+        for warp in warps:
+            if not isinstance(warp, dict):
+                continue
+            x = warp.get("x_world")
+            z = warp.get("y_world")
+            if not isinstance(x, (int, float)) or not isinstance(z, (int, float)):
+                continue
+            # The scene builder receives coordinates from the decoded Zone
+            # entity archive.  These values are field WPos already (the same
+            # 16-unit grid used by buildings and FieldActor.WPos), so adding
+            # the live chunk origin here would double-translate the marker.
+            # Keep a legacy fallback only for archives explicitly tagged as
+            # map-local tile coordinates.
+            units = str(warp.get("coordinate_units") or "")
+            # The decoder labels the archive fields as map-world units.  They
+            # are already absolute WPos in this renderer's matrix contract.
+            # Only a future explicitly local-tile source should receive the
+            # chunk-origin transform.
+            if "local_tile" in units or "map_local" in units:
+                wx = float(chunk_x) * span + float(x)
+                wz = float(chunk_z) * span + float(z)
+            else:
+                wx, wz = float(x), float(z)
+            width = max(1, _int(warp.get("width")) or 1)
+            height = max(1, _int(warp.get("height")) or 1)
+            # The ROM record is the footprint's first tile, while the
+            # renderer's orange marker represents the middle tile.  Export
+            # both explicitly so a client never has to repeat (or accidentally
+            # double-apply) this presentation offset.  A one-tile exterior
+            # warp therefore remains exactly on its ROM coordinate.
+            center_x = wx + (width - 1) * TILE_WORLD * 0.5
+            center_z = wz + (height - 1) * TILE_WORLD * 0.5
+            world_y = float(warp.get("z") or 0.0)
+            warp["world"] = {
+                "x": wx,
+                "y": world_y,
+                "z": wz,
+            }
+            warp["rom_anchor_world"] = {"x": wx, "y": world_y, "z": wz}
+            warp["display_world_center"] = {"x": center_x, "y": world_y, "z": center_z}
+            warp["semantic_entry_world"] = {"x": center_x, "y": world_y, "z": center_z}
+            warp["semantic_entry_grid"] = {
+                "x": math.floor(center_x / TILE_WORLD),
+                "y": 0,
+                "z": math.floor(center_z / TILE_WORLD),
+            }
+            warp["display_footprint"] = {"width": width, "height": height}
+            warp["world_position_confidence"] = "runtime_chunk_aligned"
+        return static
+
     async def current_scene(
         self,
         reader: MemoryReader,
@@ -390,11 +605,29 @@ class World3DSceneService:
         # caller.  Normal UI polling consumes the latest RAM-derived Player
         # cache and any already-completed identity result.
         identity = cached_identity
+        # Identity and mapper data are scene-specific.  Keeping an exterior
+        # identity cache while the player has entered an interior zone causes
+        # ``runtime_matrix_id`` from the previous scene to replace the
+        # interior's one-cell matrix, placing its terrain thousands of world
+        # units away from the camera.  Treat a zone mismatch as a cache miss.
+        if identity is not None:
+            identity_zone = (
+                ((identity.get("consistency") or {}).get("runtime_zone"))
+                or ((identity.get("runtime") or {}).get("zone_id"))
+                or ((identity.get("zone_identity") or {}).get("value"))
+            )
+            if isinstance(identity_zone, int) and identity_zone != zone_id:
+                identity = None
+                self._identity_cache = None
         if force_identity or identity is None:
             # A successful PlayerRuntime discovery already contains the full
             # mapper chunk table.  Reuse it before considering a new RAM scan.
             discovered = player_runtime_service.locator.last_discovery_result
-            if discovered and discovered.get("status") in {"resolved", "candidate"}:
+            if (
+                discovered
+                and discovered.get("status") in {"resolved", "candidate"}
+                and discovered.get("zone_id") == zone_id
+            ):
                 identity = self.truth.from_runtime(discovered, include_world=False)
                 self._identity_cache = identity
                 self._identity_time = time.monotonic()
@@ -406,6 +639,18 @@ class World3DSceneService:
             span = runtime_mapper.get("chunk_span_world")
         runtime_matrix_id = ((identity.get("matrix_match") or {}).get("selected_matrix_id") if identity else None)
         static = self.static_scene(zone_id, live_span=span, runtime_matrix_id=runtime_matrix_id)
+        # Promote the lossless Zone/parent/location fields into the scene
+        # payload so the UI and future route planner do not need a second ROM
+        # lookup.  Names are registry/operator labels; raw IDs remain present.
+        zone_meta = static.get("zone") or {}
+        label = ZONE_LABEL_OVERRIDES.get(zone_id)
+        static["location"] = {
+            "name_zh": (label or {}).get("name_zh") or f"Zone {zone_id}",
+            "name_en": (label or {}).get("name_en") or f"Zone {zone_id}",
+            "location_name_id": zone_meta.get("location_name_id"),
+            "parent_zone_id": zone_meta.get("parent_zone_id"),
+            "name_source": "operator_confirmed" if label else "zone_id_fallback",
+        }
         static_matrix = (static.get("matrix") or {}).get("matrix_id")
         if loaded_visual is not None:
             self._loaded_visual_cache = {
@@ -420,6 +665,7 @@ class World3DSceneService:
             else None
         )
         static = self._bind_loaded_visual(static, matching_visual)
+        static = self._attach_warp_world_positions(static, player)
         visual_key = (static.get("visual_binding") or {}).get("cache_key") or "rom-fallback"
         return {
             "format": "black2-world3d-scene/v6",

@@ -203,13 +203,17 @@ def _select_texture_for_model(
     candidates = _texture_candidate_ids(expected, texture_files)
     if not candidates:
         raise NativeMapError(f"model {model_id} has no exact ROM BTX0 material match")
+    calibrated_id = _SCREEN_VALIDATED_TEXTURE_IDS.get(_model_name(bmd0))
+    # A runtime RAM scan can see several resident BTX0 archives from nearby
+    # maps.  For models with a direct screen-validated archive, that evidence
+    # is stronger than the incidental preferred/resident id; archive 307 is a
+    # known blue variant of m_h02_00_00 while 282 matches the NDS renderer.
+    if calibrated_id in candidates:
+        return calibrated_id, len(expected), len(expected)
     if preferred_id in candidates:
         return preferred_id, len(expected), len(expected)
     if len(candidates) == 1:
         return candidates[0], len(expected), len(expected)
-    calibrated_id = _SCREEN_VALIDATED_TEXTURE_IDS.get(_model_name(bmd0))
-    if calibrated_id in candidates:
-        return calibrated_id, len(expected), len(expected)
     raise NativeMapError(
         f"model {model_id} has multiple exact BTX0 candidates {list(candidates)} without runtime/area identity"
     )

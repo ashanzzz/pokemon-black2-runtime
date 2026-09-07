@@ -26,6 +26,8 @@ from ..world.original_world import OriginalWorldService
 from ..world.world3d_scene import World3DSceneService
 from ..world.runtime_player_state import player_runtime_service
 from ..world.world3d_scene import canonical_player
+from ..world.map_graph import RomMapGraphService
+from ..world.observed_navigation import observed_navigation_graph
 
 router = APIRouter(tags=["map-v5-v6"])
 _reader: MemoryReader | None = None
@@ -34,6 +36,7 @@ _truth: MapTruthV3 | None = None
 _assets: OriginalMapAssetService | None = None
 _actors: OriginalActorAssetService | None = None
 _scene: World3DSceneService | None = None
+_graph: RomMapGraphService | None = None
 
 
 def configure_map_v5_routes(reader: MemoryReader) -> None:
@@ -48,7 +51,7 @@ def _map_reader() -> MemoryReader:
 
 
 def _services() -> tuple[OriginalWorldService, MapTruthV3, OriginalMapAssetService, OriginalActorAssetService, World3DSceneService]:
-    global _world, _truth, _assets, _actors, _scene
+    global _world, _truth, _assets, _actors, _scene, _graph
     try:
         if _world is None:
             _world = OriginalWorldService()
@@ -60,9 +63,62 @@ def _services() -> tuple[OriginalWorldService, MapTruthV3, OriginalMapAssetServi
             _actors = OriginalActorAssetService()
         if _scene is None:
             _scene = World3DSceneService(original=_world, truth=_truth)
+        if _graph is None:
+            _graph = RomMapGraphService(_world.rom)
     except (FileNotFoundError, OSError, ValueError) as error:
         raise HTTPException(status_code=503, detail=f"ROM unavailable: {error}") from error
     return _world, _truth, _assets, _actors, _scene
+
+
+def _graph_service() -> RomMapGraphService:
+    """Build the ROM graph without initializing unrelated 3D asset services.
+
+    Navigation is a static ROM read and must remain available when an optional
+    actor/Apicula/scene service is unavailable.  Previously the graph routes
+    called ``_services()``, so an error in any of those unrelated constructors
+    surfaced as an opaque HTTP 500 before graph generation even started.
+    """
+    global _world, _graph
+    try:
+        if _world is None:
+            _world = OriginalWorldService()
+        if _graph is None:
+            _graph = RomMapGraphService(_world.rom)
+        return _graph
+    except (FileNotFoundError, OSError, ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=503, detail=f"ROM unavailable: {error}") from error
+
+
+@router.get("/api/v1/map/v6/navigation/graph")
+async def v6_navigation_graph() -> dict[str, Any]:
+    """Return the ROM-wide Zone/Warp graph used as the navigation baseline."""
+    graph_service = _graph_service()
+    try:
+        return graph_service.build()
+    except Exception as error:
+        # A malformed optional event record must not turn the navigation API
+        # into an opaque 500.  Keep this endpoint diagnosable while scene APIs
+        # remain independent and available.
+        return {
+            "format": "black2-rom-navigation-graph/v1",
+            "status": "degraded",
+            "nodes": [],
+            "edges": [],
+            "error": f"{type(error).__name__}: {error}",
+        }
+
+
+@router.get("/api/v1/map/v6/navigation/zone/{zone_id}")
+async def v6_navigation_zone(zone_id: int) -> dict[str, Any]:
+    graph_service = _graph_service()
+    try:
+        graph = graph_service.build()
+        node = graph_service.zone(zone_id)
+    except (IndexError, ValueError, OSError) as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except Exception as error:
+        return {"status": "degraded", "zone_id": zone_id, "node": None, "outgoing_edges": [], "error": f"{type(error).__name__}: {error}"}
+    return {"node": node, "outgoing_edges": [edge for edge in graph["edges"] if edge.get("source_zone_id") == zone_id]}
 
 
 # ---------------- v5 compatibility ----------------
@@ -264,7 +320,34 @@ async def v6_scene_current(
 async def v6_scene_zone(zone_id: int) -> dict[str, Any]:
     *_prefix, scene = _services()
     try:
-        return scene.static_scene(zone_id)
+        # Keep the legacy static fields at the top level while also exposing
+        # the same scene envelope consumed by the live renderer.  The latter
+        # includes a synthetic, explicitly candidate camera anchor so the
+        # workbench can inspect a ROM Zone with BizHawk disconnected.
+        preview = scene.static_preview_scene(zone_id)
+        static = preview.get("static") or {}
+        preview_player = preview.get("player") if isinstance(preview.get("player"), dict) else {}
+        preview_grid = preview_player.get("grid") if isinstance(preview_player.get("grid"), dict) else None
+        navigation_preview = observed_navigation_graph.preview_component(
+            zone_id,
+            anchor=preview_grid,
+        )
+        return {
+            **static,
+            "format": preview.get("format"),
+            "status": preview.get("status"),
+            "confidence": preview.get("confidence"),
+            "preview_only": True,
+            "zone_id": preview.get("zone_id", zone_id),
+            "scene_key": preview.get("scene_key"),
+            "render_key": preview.get("render_key"),
+            "scene_origin": preview.get("scene_origin"),
+            "player": preview.get("player"),
+            "identity": preview.get("identity"),
+            "navigation_preview": navigation_preview,
+            "static": static,
+            "render_contract": preview.get("render_contract"),
+        }
     except (IndexError, ValueError, OSError) as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
 

@@ -2,6 +2,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from backend.black2.world.spatial_calibration import SpatialCalibrationService
+from backend.black2.world.observed_navigation import ObservedNavigationGraph
 
 
 def p(frame,x,y,z):
@@ -10,10 +11,13 @@ def p(frame,x,y,z):
 
 def test_calibration_exports_zip():
     with TemporaryDirectory() as td:
-        svc=SpatialCalibrationService(project_root=Path(td));svc.start("bridge-test","bridge")
+        root=Path(td)
+        graph=ObservedNavigationGraph(project_root=root)
+        svc=SpatialCalibrationService(project_root=root,navigation_graph=graph);svc.start("bridge-test","bridge")
         svc.sample(p(1,1,2,1),{"scene_key":"z1","environment":"exterior","static":{"buildings":[]}})
         svc.sample(p(2,2,3,1),{"scene_key":"z1","environment":"exterior","static":{"buildings":[]}})
         out=svc.finish(renderer_diagnostics={"fps":30,"buildings_failed":1})
         assert out["ok"] is True
         assert (svc.out_dir/out["zip_name"]).is_file()
         assert out["summary"]["observed_elevation_changes"]==1
+        assert graph.status()["node_count"]==2

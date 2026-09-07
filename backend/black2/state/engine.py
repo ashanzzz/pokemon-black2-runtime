@@ -68,12 +68,12 @@ class SemanticGameState(BaseModel):
     context: SemanticScreenContext = SemanticScreenContext()
     location: str = "实时 ARM9 地图（Map Section 未验证）"
     map_loaded: bool = True
-    player_name: str = "zero"
-    rival_name: str = "NO"
-    gender: str = "男孩子 (Male)"
-    party_count: int = 0
-    money: int = 3000
-    badges: int = 0
+    player_name: Optional[str] = None
+    rival_name: Optional[str] = None
+    gender: Optional[str] = None
+    party_count: Optional[int] = None
+    money: Optional[int] = None
+    badges: Optional[int] = None
     ready_for_input: bool = True
     suggested_buttons: List[str] = ["A"]
     map_section_id: Optional[int] = None
@@ -290,7 +290,6 @@ class SemanticStateEngine:
         state = SemanticGameState(
             timestamp=time.time(), frame=frame, context=ctx, location=location,
             map_loaded=not title_login_state.is_main_menu,
-            player_name="zero", gender="男孩子 (Male)", party_count=0, money=3000, badges=0,
             ready_for_input=ready_for_input, suggested_buttons=suggested_buttons,
             map_section_id=map_section_id if not title_login_state.is_main_menu else None,
             player_facing=(porient.get("facing", "Unresolved") if has_player_position and not title_login_state.is_main_menu else "Unresolved"),

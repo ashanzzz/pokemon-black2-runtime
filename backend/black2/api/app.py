@@ -15,9 +15,15 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from pydantic import BaseModel
 
-from ..bizhawk.process_probe import probe_bizhawk_process
+from ..bizhawk.process_probe import dismiss_bizhawk_popup, probe_bizhawk_process, public_bizhawk_popup
 from ..bizhawk.socket_transport import SocketTransport
 from ..bizhawk.bridge_client import BridgeClient
+from ..bizhawk.savestate import (
+    classify_bridge_unavailable,
+    classify_load_failure,
+    classify_save_failure,
+    is_confirmed_load,
+)
 from ..bizhawk.doctor import BizHawkDoctor
 from ..memory.reader import MemoryReader
 from ..state.engine import SemanticStateEngine
@@ -39,6 +45,11 @@ from .workbench_routes import configure_workbench_routes, router as workbench_ro
 from .map_v5_routes import configure_map_v5_routes, router as map_v5_router
 from .world_lab_routes import configure_world_lab_routes, router as world_lab_router
 from .player_routes import configure_player_routes, router as player_router
+from .navigation_routes import configure_navigation_routes, router as navigation_router
+from .semantic_routes import configure_semantic_routes, router as semantic_router
+from .battle_routes import router as battle_router
+from .dex_routes import router as dex_router
+from .catalog_routes import router as catalog_router
 from .map_routes import (
     configure_map_routes,
     router as map_router,
@@ -73,6 +84,12 @@ configure_world_lab_routes(memory_reader)
 configure_player_routes(memory_reader)
 configure_runtime_routes(runtime_hub)
 configure_workbench_routes(runtime_hub)
+configure_navigation_routes(
+    client=client,
+    control_sample=runtime_hub.snapshot,
+    runtime_reader=memory_reader,
+)
+configure_semantic_routes(memory_reader, runtime_hub)
 
 
 @asynccontextmanager
@@ -133,6 +150,11 @@ app.include_router(player_router)
 app.include_router(map_router)
 app.include_router(map_v5_router)
 app.include_router(world_lab_router)
+app.include_router(navigation_router)
+app.include_router(semantic_router)
+app.include_router(battle_router)
+app.include_router(dex_router)
+app.include_router(catalog_router)
 
 
 class PressButtonRequest(BaseModel):
@@ -337,8 +359,84 @@ async def get_bizhawk_status():
         "session_id": transport.session_id,
         "transport": transport_status,
         "hello": transport.hello_data,
+        "popup": public_bizhawk_popup(probe.popup),
+        "emulation_blocked_by_popup": bool(probe.popup.get("blocking")),
         "roles": runtime_config.public_schema(),
     }
+
+
+@app.post("/api/dev/bizhawk/popup/dismiss")
+async def post_bizhawk_popup_dismiss():
+    """Dismiss only the known savestate mismatch dialog through a local OS API."""
+    probe = probe_bizhawk_process()
+    if not probe.running or probe.pid is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "code": "BIZHAWK_NOT_RUNNING",
+                "message": "没有检测到正在运行的 BizHawk。",
+                "dismissed": False,
+            },
+        )
+    result = dismiss_bizhawk_popup(probe.pid)
+    result["pid"] = probe.pid
+    result["bridge_connected_after"] = bool(client.is_connected)
+    if not result.get("ok"):
+        raise HTTPException(status_code=409, detail=result)
+    return result
+
+
+@app.get("/api/dev/savestate/status")
+async def get_savestate_status():
+    """Expose the non-mutating savestate safety contract for the workbench."""
+    observed = transport.bridge_version if client.is_connected else None
+    probe = probe_bizhawk_process()
+    return {
+        "available": bool(client.is_connected),
+        "bridge_version": observed,
+        "expected_bridge_version": BIZHAWK_BRIDGE_VERSION,
+        "load_result_required": "explicit_boolean_confirmation",
+        "incompatible_http_status": 409,
+        "preserves_current_game_on_failure": True,
+        "requires_bridge_reload": bool(not client.is_connected or observed != BIZHAWK_BRIDGE_VERSION),
+        "popup": public_bizhawk_popup(probe.popup),
+        "popup_detection": "local_win32_window_observation_even_when_bridge_is_stalled",
+        "popup_dismiss_endpoint": "/api/dev/bizhawk/popup/dismiss",
+        "native_popup_dismissal": "local_os_api_for_known_savestate_mismatch_only",
+        "popup_monitor_endpoint": "/api/v1/runtime/popup",
+        "future_popup_prevention": (
+            "savestate.loadslot(slot, true) suppresses the successful-load OSD only; "
+            "the runtime monitor detects native mismatch dialogs and a failed load auto-dismisses the known modal"
+        ),
+    }
+
+
+def _known_savestate_popup_failure(slot: int, *, error: str | None = None) -> dict[str, Any] | None:
+    """Classify and recover the known native mismatch modal after an RPC stall."""
+    probe = probe_bizhawk_process()
+    popup = probe.popup or {}
+    if popup.get("kind") != "savestate_sync_settings_mismatch":
+        return None
+
+    # The modal blocks BizHawk's Lua callback, so the bridge may still report
+    # disconnected here.  Dismiss only this positively classified dialog;
+    # arbitrary windows are never touched by the recovery path.
+    dismissal = dismiss_bizhawk_popup(probe.pid) if probe.pid is not None else {
+        "ok": False, "dismissed": False, "reason": "bizhawk_pid_unavailable",
+    }
+    result = {
+        "slot": slot,
+        "status": "incompatible",
+        "loaded": False,
+        "confirmed": False,
+        "error_kind": "savestate_sync_settings_mismatch",
+        "error": popup.get("text") or error or "BizHawk rejected the savestate",
+    }
+    detail = classify_load_failure(result, error, slot=slot)
+    detail["popup"] = {key: value for key, value in popup.items() if not key.startswith("_")}
+    detail["popup_dismissal"] = {key: value for key, value in dismissal.items() if key != "popup"}
+    detail["bridge_connected_after_dismissal"] = bool(client.is_connected)
+    return detail
 
 
 @app.get("/api/dev/bridge_log")
@@ -600,17 +698,45 @@ async def post_dev_snapshot(req: SnapshotRequest):
 
 @app.post("/api/dev/savestate/save")
 async def post_savestate_save(slot: int = 1):
+    if slot < 1 or slot > 10:
+        raise HTTPException(status_code=422, detail="savestate slot must be between 1 and 10")
     if not client.is_connected:
-        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
-    res = await client.save_state(slot)
+        detail = classify_bridge_unavailable(slot=slot)
+        raise HTTPException(status_code=detail["http_status"], detail=detail)
+    try:
+        res = await client.save_state(slot)
+    except (ConnectionError, TimeoutError, RuntimeError) as exc:
+        detail = classify_save_failure({"status": "error", "error": str(exc)}, slot=slot)
+        raise HTTPException(status_code=detail["http_status"], detail=detail) from exc
+    if res.get("status") != "saved" or res.get("saved") is not True or res.get("confirmed") is not True:
+        detail = classify_save_failure(res, slot=slot)
+        raise HTTPException(status_code=detail["http_status"], detail=detail)
     return {"ok": True, "slot": slot, "result": res}
 
 
 @app.post("/api/dev/savestate/load")
 async def post_savestate_load(slot: int = 1):
+    if slot < 1 or slot > 10:
+        raise HTTPException(status_code=422, detail="savestate slot must be between 1 and 10")
     if not client.is_connected:
-        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
-    res = await client.load_state(slot)
+        detail = classify_bridge_unavailable(slot=slot)
+        raise HTTPException(status_code=detail["http_status"], detail=detail)
+    try:
+        res = await client.load_state(slot)
+    except (ConnectionError, TimeoutError, RuntimeError) as exc:
+        popup_detail = _known_savestate_popup_failure(slot, error=str(exc))
+        if popup_detail is not None:
+            raise HTTPException(status_code=popup_detail["http_status"], detail=popup_detail) from exc
+        detail = classify_load_failure({"status": "error", "error": str(exc)}, str(exc), slot=slot)
+        raise HTTPException(status_code=detail["http_status"], detail=detail) from exc
+    if not is_confirmed_load(res):
+        popup_detail = _known_savestate_popup_failure(
+            slot, error=str(res.get("error") or res.get("message") or "")
+        )
+        if popup_detail is not None:
+            raise HTTPException(status_code=popup_detail["http_status"], detail=popup_detail)
+        detail = classify_load_failure(res, slot=slot)
+        raise HTTPException(status_code=detail["http_status"], detail=detail)
     return {"ok": True, "slot": slot, "result": res}
 
 

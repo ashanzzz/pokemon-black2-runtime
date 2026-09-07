@@ -45,3 +45,8 @@ node_modules/
 *.v8bak
 reverse_engineering/dumps/
 runtime/calibration_reports/
+
+# Local ROM-derived caches
+temp_catalog.json
+temp_graph.json
+temp_z441.json

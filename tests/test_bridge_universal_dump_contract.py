@@ -13,7 +13,7 @@ BRIDGE_PATH = Path(__file__).resolve().parents[1] / "bridge" / "bizhawk" / "blac
 class BridgeUniversalDumpContractTests(unittest.TestCase):
     def test_advertised_universal_dump_has_a_registered_handler(self) -> None:
         source = BRIDGE_PATH.read_text(encoding="utf-8")
-        self.assertIn('local BRIDGE_VERSION = "1.8.0-world-lab"', source)
+        self.assertIn('local BRIDGE_VERSION = "1.9.0-savestate-safe"', source)
         self.assertIn("universal_dump = true", source)
         self.assertIn('elseif op == "memory.dump_universal" then', source)
         self.assertIn("dump_universal_memory(payload, current_frame)", source)

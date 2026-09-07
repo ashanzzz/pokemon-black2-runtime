@@ -18,7 +18,7 @@ import threading
 from typing import Any
 import zipfile
 
-from .observed_navigation import observed_navigation_graph
+from .observed_navigation import ObservedNavigationGraph, observed_navigation_graph
 
 
 def _clean(value: str) -> str:
@@ -35,8 +35,20 @@ def _distance_xz(a: dict[str, Any], b: dict[str, Any]) -> float | None:
 @dataclass
 class SpatialCalibrationService:
     project_root: Path = field(default_factory=lambda: Path(__file__).resolve().parents[3])
+    navigation_graph: ObservedNavigationGraph | None = None
     _lock: threading.RLock = field(default_factory=threading.RLock)
     _session: dict[str, Any] | None = None
+
+    def __post_init__(self) -> None:
+        # A custom project root denotes an isolated report/test store and must
+        # never leak its samples into the process-global production graph.
+        if self.navigation_graph is None:
+            default_root = Path(__file__).resolve().parents[3]
+            self.navigation_graph = (
+                observed_navigation_graph
+                if self.project_root.resolve() == default_root.resolve()
+                else ObservedNavigationGraph(project_root=self.project_root)
+            )
 
     @property
     def out_dir(self) -> Path:
@@ -45,7 +57,7 @@ class SpatialCalibrationService:
     def start(self, label: str, scenario: str = "general") -> dict[str, Any]:
         now = datetime.now()
         with self._lock:
-            observed_navigation_graph.reset_trace()
+            self.navigation_graph.reset_trace()
             self._session = {
                 "format": "black2-spatial-calibration-session/v1",
                 "session_id": now.strftime("%Y%m%d_%H%M%S_%f"),
@@ -107,7 +119,7 @@ class SpatialCalibrationService:
                 "nearest_buildings": nearest[:5],
             }
             self._session["samples"].append(rec)
-            nav = observed_navigation_graph.observe_player(player, source=f"calibration:{self._session['scenario']}")
+            nav = self.navigation_graph.observe_player(player, source=f"calibration:{self._session['scenario']}")
             return {"ok": True, "sample": rec, "navigation_observation": nav, "sample_count": len(self._session["samples"])}
 
     def finish(self, *, renderer_diagnostics: dict[str, Any] | None = None, notes: str | None = None) -> dict[str, Any]:
@@ -180,7 +192,7 @@ class SpatialCalibrationService:
                 "npc_fallback_count": renderer.get("npc_fallback_count"),
                 "fps": renderer.get("fps"),
             },
-            "navigation_graph": observed_navigation_graph.status(),
+            "navigation_graph": self.navigation_graph.status(),
         }
 
     def _write_report(self, session: dict[str, Any]) -> dict[str, Any]:

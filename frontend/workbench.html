@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pokémon Black 2 逆向工作台</title>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/","/frontend/world3d-runtime.js":"/frontend/world3d-runtime-fixed.js"}}</script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.170.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.170.0/examples/jsm/","/frontend/world3d-runtime.js":"/frontend/world3d-runtime-fixed.js?clip=6&warp=6&npc=10&player=5&static-preview=2&cell-grid=1"}}</script>
 <link rel="stylesheet" href="/frontend/workbench.css">
-<script src="/frontend/ui/i18n.js"></script>
+<script src="/frontend/ui/i18n.js?v=10"></script>
 <script src="/frontend/ui/runtime-client.js"></script>
 </head>
 <body>
@@ -22,6 +22,7 @@
     <button data-workspace="world" class="active" title="World"><span class="rail-icon">◫</span><span data-i18n="workspace.world">世界</span></button>
     <button data-workspace="player" title="Player"><span class="rail-icon">●</span><span data-i18n="workspace.player">主角</span></button>
     <button data-workspace="dialogue" title="Dialogue"><span class="rail-icon">▤</span><span data-i18n="workspace.dialogue">对话</span></button>
+    <button data-workspace="battle" title="Battle and Dex"><span class="rail-icon">⚔</span><span data-i18n="workspace.battle">战斗 / 图鉴</span></button>
     <button data-workspace="memory" title="Memory"><span class="rail-icon">⌗</span><span data-i18n="workspace.memory">内存</span></button>
     <button data-workspace="evidence" title="Evidence"><span class="rail-icon">◆</span><span data-i18n="workspace.evidence">证据</span></button>
     <button data-workspace="monitor" title="Monitor"><span class="rail-icon">⌁</span><span data-i18n="workspace.monitor">监控</span></button>
@@ -40,19 +41,28 @@
         <button class="tool" id="frameButton" data-i18n="world.frame">定位主角</button>
         <button class="tool" id="refreshSceneButton" data-i18n="world.refresh">重载场景</button>
         <span class="toolbar-sep"></span>
+        <div class="scene-source-control" aria-label="Static Zone preview">
+          <label><span data-i18n="world.staticZone">静态 Zone</span><input id="staticZoneInput" type="number" min="0" step="1" placeholder="439"></label>
+          <button class="tool" id="staticZoneButton" data-i18n="world.staticPreview">预览</button>
+          <button class="tool" id="liveSceneButton" data-i18n="world.liveScene" hidden>返回实时</button>
+          <span class="tag" id="sceneModeBadge" data-i18n="world.liveMode">实时</span>
+        </div>
+        <button class="tool" id="routePickButton" data-i18n="nav.pickOnMap" aria-pressed="false">点击寻路</button>
+        <span class="toolbar-sep"></span>
         <label class="toggle-tool"><input type="checkbox" id="terrainToggle" checked><span data-i18n="world.terrain">地形</span></label>
         <label class="toggle-tool"><input type="checkbox" id="buildingToggle" checked><span data-i18n="world.buildings">建筑</span></label>
-        <label class="toggle-tool"><input type="checkbox" id="npcToggle"><span data-i18n="world.npc">显示 NPC</span></label>
+        <label class="toggle-tool"><input type="checkbox" id="npcToggle" checked><span data-i18n="world.npc">显示 NPC</span></label>
         <label class="toggle-tool"><input type="checkbox" id="gridToggle"><span data-i18n="world.grid">证据网格</span></label>
         <div class="toolbar-grow"></div><span class="toolbar-note" data-i18n="world.selectHint">点击 3D 对象可在右侧查看证据</span>
       </div>
       <div id="world" class="world-canvas"></div>
-      <div class="world-coordinate world-coordinate-hover" id="worldPointer" aria-live="polite">鼠标 X/Z：等待地图…</div>
-      <div class="world-coordinate world-coordinate-picked" id="worldPickedPoint" aria-live="polite">点击 X/Z：—</div>
+      <div class="world-coordinate world-coordinate-hover" id="worldPointer" aria-live="polite">悬浮地面 · 等待地图…</div>
+      <div class="world-coordinate world-coordinate-picked" id="worldPickedPoint" aria-live="polite">点击地面 · —</div>
       <div class="viewport-overlay" id="worldOverlay" data-state="waiting"><strong data-i18n="world.statusWaiting">等待 PlayerRuntime…</strong><span id="worldOverlayDetail">HTTP → Bridge → Player → Scene</span></div>
     </section>
     <section class="editor-pane" data-editor="player"><div class="document-view" id="playerEditor"></div></section>
     <section class="editor-pane" data-editor="dialogue"><div class="document-view" id="dialogueEditor"></div></section>
+    <section class="editor-pane" data-editor="battle"><div class="document-view" id="battleEditor"></div></section>
     <section class="editor-pane" data-editor="memory"><div class="document-view" id="memoryEditor"></div></section>
     <section class="editor-pane" data-editor="evidence"><div class="document-view" id="evidenceEditor"></div></section>
     <section class="editor-pane" data-editor="monitor"><div class="document-view" id="monitorEditor"></div></section>
@@ -70,6 +80,7 @@
       <button data-dock="calibration" data-i18n="dock.calibration">校准</button>
       <button data-dock="performance" data-i18n="dock.performance">性能</button>
       <button data-dock="memory" data-i18n="dock.memory">原始/结构</button>
+      <button data-dock="ai" data-i18n="dock.ai">AI API</button>
       <div class="dock-grow"></div><button class="dock-collapse" id="dockCollapse">⌄</button>
     </div>
     <div class="dock-body" id="dockBody"></div>
@@ -84,6 +95,6 @@
   </footer>
 </div>
 <div class="palette" id="palette" hidden><div class="palette-box"><input id="paletteInput" placeholder="Command…"><div id="paletteResults"></div></div></div>
-<script type="module" src="/frontend/workbench.js"></script>
+<script type="module" src="/frontend/workbench.js?world=10&npc=5&height=3&navigation=5&static-preview=2&cell-grid=2"></script>
 </body>
 </html>

@@ -1,12 +1,12 @@
 -- ============================================================================
--- Pokémon Black 2 - BizHawk Greenfield Bridge v1.8.0-world-lab
+-- Pokémon Black 2 - BizHawk Greenfield Bridge v1.9.0-savestate-safe
 -- 100% Background LuaSocket TCP Bridge (Zero Window Focus Needed)
 -- ============================================================================
 
 -- This version advertises the raw, non-ROM multi-domain evidence dump API.
 -- Reload this file in BizHawk's Lua Console after changing it: Lua scripts are
 -- loaded into the emulator process and do not hot-reload from disk.
-local BRIDGE_VERSION = "1.8.0-world-lab"
+local BRIDGE_VERSION = "1.9.0-savestate-safe"
 local SOCKET_HOST = "127.0.0.1"
 local SOCKET_PORT = 8766
 
@@ -1138,13 +1138,78 @@ local function handle_command(cmd)
 
     elseif op == "savestate.save" then
         local slot = payload.slot or 1
-        savestate.saveslot(slot)
-        resp.payload = { slot = slot, saved = true }
+        local call_ok, save_ok = pcall(function()
+            -- suppressOSD keeps a rejected/failed operation from taking over
+            -- the user's game window; the structured response is the source
+            -- of truth for the workbench.
+            return savestate.saveslot(slot, true)
+        end)
+        if call_ok and save_ok == true then
+            resp.payload = {
+                slot = slot,
+                status = "saved",
+                saved = true,
+                confirmed = true,
+            }
+        elseif call_ok then
+            resp.payload = {
+                slot = slot,
+                status = "unconfirmed",
+                saved = false,
+                confirmed = false,
+                error = "savestate.saveslot returned false",
+            }
+        else
+            resp.payload = {
+                slot = slot,
+                status = "error",
+                saved = false,
+                confirmed = false,
+                error = tostring(save_ok),
+            }
+        end
 
     elseif op == "savestate.load" then
         local slot = payload.slot or 1
-        savestate.loadslot(slot)
-        resp.payload = { slot = slot, loaded = true }
+        local frame_before = current_frame
+        local call_ok, load_ok = pcall(function()
+            -- BizHawk returns true iff the slot was actually loaded.  Passing
+            -- true suppresses the native OSD error; the API still receives a
+            -- precise incompatibility result and can keep the current game.
+            return savestate.loadslot(slot, true)
+        end)
+        local frame_after = emu.framecount and emu.framecount() or current_frame
+        if call_ok and load_ok == true then
+            resp.payload = {
+                slot = slot,
+                status = "loaded",
+                loaded = true,
+                confirmed = true,
+                frame_before = frame_before,
+                frame_after = frame_after,
+            }
+        elseif call_ok then
+            resp.payload = {
+                slot = slot,
+                status = "incompatible",
+                loaded = false,
+                confirmed = false,
+                error_kind = "loadstate_cancelled_or_unavailable",
+                error = "savestate.loadslot returned false; BizHawk rejected the state",
+                frame_before = frame_before,
+                frame_after = frame_after,
+            }
+        else
+            resp.payload = {
+                slot = slot,
+                status = "error",
+                loaded = false,
+                confirmed = false,
+                error = tostring(load_ok),
+                frame_before = frame_before,
+                frame_after = frame_after,
+            }
+        end
 
     else
         resp.ok = false

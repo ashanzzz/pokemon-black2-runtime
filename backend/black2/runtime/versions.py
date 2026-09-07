@@ -12,7 +12,7 @@ from typing import Any
 RUNTIME_RELEASE_VERSION = "10.1.0"
 WORLD3D_SCENE_VERSION = "10.1.0"
 ORIGINAL_MAP_UI_VERSION = "10.1.0"
-BIZHAWK_BRIDGE_VERSION = "1.8.0-world-lab"
+BIZHAWK_BRIDGE_VERSION = "1.9.0-savestate-safe"
 
 COMPONENT_VERSIONS: tuple[dict[str, Any], ...] = (
     {

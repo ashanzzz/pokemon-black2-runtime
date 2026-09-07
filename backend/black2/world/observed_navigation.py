@@ -53,6 +53,7 @@ class ObservedNavigationGraph:
     _edges: dict[str, dict[str, dict[str, Any]]] = field(default_factory=dict)
     _last_node: NavNode | None = None
     _last_frame: int | None = None
+    _last_session_id: str | None = None
 
     @property
     def path(self) -> Path:
@@ -68,6 +69,12 @@ class ObservedNavigationGraph:
                 data = json.loads(self.path.read_text(encoding="utf-8"))
                 self._nodes = data.get("nodes") or {}
                 self._edges = data.get("edges") or {}
+                # Stores written before direct observations were explicit are
+                # useful for display, but cannot authorize automatic input.
+                for outgoing in self._edges.values():
+                    for edge in outgoing.values():
+                        if "direct_observations" not in edge:
+                            edge["legacy_unverified"] = True
             except (OSError, ValueError):
                 self._nodes, self._edges = {}, {}
             self._loaded = True
@@ -98,8 +105,12 @@ class ObservedNavigationGraph:
     def observe_player(self, player: dict[str, Any] | None, *, source: str = "calibration") -> dict[str, Any]:
         self._ensure_loaded()
         node = NavNode.from_player(player)
-        frame = int(player.get("frame") or 0) if player else 0
+        frame_value = player.get("frame") if player else None
+        frame = int(frame_value) if isinstance(frame_value, int) else None
+        session_value = player.get("session_id") if player else None
+        session_id = str(session_value) if session_value is not None else None
         if node is None:
+            self.reset_trace()
             return {"ok": False, "reason": "player grid/zone unresolved"}
         with self._lock:
             entry = self._nodes.setdefault(node.key(), {**node.public(), "observations": 0, "world_samples": []})
@@ -113,12 +124,27 @@ class ObservedNavigationGraph:
                     del samples[:-12]
 
             edge_record = None
-            if self._last_node is not None and self._last_node != node:
+            trace_continuous = (
+                self._last_node is not None
+                and self._last_frame is not None
+                and frame is not None
+                and frame > self._last_frame
+                and frame - self._last_frame <= 180
+                and self._last_node.zone_id == node.zone_id
+                and self._last_session_id == session_id
+                and (
+                    session_id is not None
+                    or source == "calibration"
+                    or source.startswith("calibration:")
+                )
+            )
+            if trace_continuous and self._last_node != node:
                 kind = self._edge_kind(self._last_node, node)
                 if kind is not None:
                     edge_record = self._record_edge(self._last_node, node, kind, frame, source)
             self._last_node = node
             self._last_frame = frame
+            self._last_session_id = session_id
             if edge_record or entry["observations"] in (1, 5, 20):
                 self._save()
         return {"ok": True, "node": node.public(), "edge": edge_record}
@@ -134,17 +160,158 @@ class ObservedNavigationGraph:
             if source not in rec.setdefault("sources", []):
                 rec["sources"].append(source)
             return rec
+        reverse_existing = (self._edges.get(b.key()) or {}).get(a.key())
+        reverse_was_direct = bool(reverse_existing and not reverse_existing.get("inferred_reverse"))
         forward = one(a, b)
+        forward["direct_observations"] = int(forward.get("direct_observations", 0)) + 1
+        # If this record was previously created as an inferred reverse edge,
+        # a traversal in this direction now promotes it to direct evidence.
+        forward.pop("inferred_reverse", None)
         # Normal movement edges are reversible after direct observation of one
         # direction only as a candidate.  Do not assume cross-Zone warp reverses.
         if kind != "zone_transition":
             reverse = one(b, a)
-            reverse["inferred_reverse"] = True
+            if not reverse_was_direct and int(reverse.get("direct_observations", 0)) == 0:
+                reverse["inferred_reverse"] = True
         return {"from": a.public(), **forward}
 
     def reset_trace(self) -> None:
         self._last_node = None
         self._last_frame = None
+        self._last_session_id = None
+
+    def has_direct_edge(self, start: NavNode, goal: NavNode) -> bool:
+        """Return whether this exact direction still has direct observed evidence."""
+        self._ensure_loaded()
+        with self._lock:
+            edge = (self._edges.get(start.key()) or {}).get(goal.key())
+            return self._is_direct_local_edge(edge)
+
+    @staticmethod
+    def _is_direct_local_edge(edge: dict[str, Any] | None) -> bool:
+        return bool(
+            edge
+            and edge.get("kind") != "zone_transition"
+            and not edge.get("inferred_reverse")
+            and not edge.get("legacy_unverified")
+            and int(edge.get("direct_observations", 0)) > 0
+        )
+
+    def preview_component(
+        self,
+        zone_id: int,
+        *,
+        anchor: dict[str, Any] | None = None,
+        limit: int = 256,
+    ) -> dict[str, Any]:
+        """Return one bounded directed component for an offline map preview.
+
+        The start is historical evidence, not a claim about the live player.
+        Only the same directly observed edges accepted by the executor are
+        exposed, so the frontend can demonstrate a real route without turning
+        a synthetic camera anchor into a traversable node.
+        """
+        self._ensure_loaded()
+        limit = max(1, min(int(limit), 2048))
+        with self._lock:
+            zone_keys = {
+                key for key, value in self._nodes.items()
+                if value.get("zone_id") == int(zone_id)
+            }
+            adjacency: dict[str, list[str]] = {}
+            for source in sorted(zone_keys):
+                targets = [
+                    target for target, edge in (self._edges.get(source) or {}).items()
+                    if target in zone_keys and self._is_direct_local_edge(edge)
+                ]
+                if targets:
+                    adjacency[source] = sorted(targets)
+
+            requested = {
+                key: int(anchor[key])
+                for key in ("x", "y", "z")
+                if isinstance((anchor or {}).get(key), int)
+            }
+            if not adjacency:
+                return {
+                    "format": "black2-navigation-observations/v1",
+                    "status": "unresolved",
+                    "zone_id": int(zone_id),
+                    "anchor": requested or None,
+                    "start": None,
+                    "nodes": [],
+                    "edges": [],
+                    "reachable_node_count": 0,
+                    "truncated": False,
+                    "execution_eligible": False,
+                    "reason": "No directly observed local edge is available in this Zone.",
+                    "confidence": "unresolved",
+                }
+
+            def start_score(key: str) -> tuple[float, str]:
+                value = self._nodes[key]
+                if {"x", "z"}.issubset(requested):
+                    score = abs(int(value["x"]) - requested["x"]) + abs(int(value["z"]) - requested["z"])
+                    if "y" in requested:
+                        score += 0.1 * abs(int(value["y"]) - requested["y"])
+                    return score, key
+                newest = max(
+                    (int(edge.get("last_frame", 0)) for edge in (self._edges.get(key) or {}).values()
+                     if self._is_direct_local_edge(edge)),
+                    default=0,
+                )
+                return -float(newest), key
+
+            start_key = min(adjacency, key=start_score)
+            queue = [start_key]
+            visited: list[str] = []
+            seen = {start_key}
+            for source in queue:
+                if len(visited) >= limit:
+                    break
+                visited.append(source)
+                for target in adjacency.get(source, []):
+                    if target not in seen:
+                        seen.add(target)
+                        queue.append(target)
+
+            visible = set(visited)
+            nodes = [
+                {
+                    "zone_id": int(self._nodes[key]["zone_id"]),
+                    "x": int(self._nodes[key]["x"]),
+                    "y": int(self._nodes[key]["y"]),
+                    "z": int(self._nodes[key]["z"]),
+                    "observations": int(self._nodes[key].get("observations", 0)),
+                }
+                for key in visited
+            ]
+            edges = []
+            for source in visited:
+                for target in adjacency.get(source, []):
+                    if target not in visible:
+                        continue
+                    edge = self._edges[source][target]
+                    edges.append({
+                        "from": NavNode(**{k: int(self._nodes[source][k]) for k in ("zone_id", "x", "y", "z")}).public(),
+                        "to": NavNode(**{k: int(self._nodes[target][k]) for k in ("zone_id", "x", "y", "z")}).public(),
+                        "kind": edge.get("kind"),
+                        "direct_observations": int(edge.get("direct_observations", 0)),
+                    })
+            return {
+                "format": "black2-navigation-observations/v1",
+                "status": "available",
+                "zone_id": int(zone_id),
+                "anchor": requested or None,
+                "start": nodes[0],
+                "nodes": nodes,
+                "edges": edges,
+                "reachable_node_count": len(nodes),
+                "truncated": len(seen) > len(nodes),
+                "execution_eligible": False,
+                "reason": "Historical directly observed component for read-only route previews.",
+                "confidence": "verified_observation_graph",
+            }
 
     def status(self) -> dict[str, Any]:
         self._ensure_loaded()
@@ -159,9 +326,31 @@ class ObservedNavigationGraph:
             "confidence": "verified_observation_graph",
         }
 
+    def tile_evidence(self, node: NavNode) -> dict[str, Any]:
+        """Read exact-layer occupation and directed movement evidence, without probing."""
+        import copy
+
+        self._ensure_loaded()
+        with self._lock:
+            entry = self._nodes.get(node.key())
+            outgoing = self._edges.get(node.key(), {})
+            direct = [
+                copy.deepcopy(edge) for edge in outgoing.values()
+                if not edge.get("inferred_reverse") and not edge.get("legacy_unverified")
+                and edge.get("kind") != "zone_transition"
+                and int(edge.get("direct_observations", 0)) > 0
+            ]
+            return {
+                "occupied_observations": (entry or {}).get("observations", 0),
+                "last_world_sample": copy.deepcopy(((entry or {}).get("world_samples") or [None])[-1]),
+                "outgoing_direct_edges": direct,
+                "scope": "historical exact Zone/X/Y/Z; no guarantee against current actors or story flags",
+            }
+
     @staticmethod
     def _heuristic(a: NavNode, b: NavNode) -> float:
-        return abs(a.x - b.x) + abs(a.z - b.z) + 0.35 * abs(a.y - b.y)
+        # Every traversable edge costs at least 0.8 after observation bonus.
+        return 0.8 * (abs(a.x - b.x) + abs(a.z - b.z))
 
     def nearest_known_node(self, zone_id: int, x: int, z: int, y: int | None = None, max_radius: int = 2) -> NavNode | None:
         self._ensure_loaded()
@@ -177,7 +366,7 @@ class ObservedNavigationGraph:
             candidates.append((score, node))
         return min(candidates, key=lambda item: item[0])[1] if candidates else None
 
-    def find_path(self, start: NavNode, goal: NavNode) -> dict[str, Any]:
+    def find_path(self, start: NavNode, goal: NavNode, *, require_direct_observation: bool = False) -> dict[str, Any]:
         self._ensure_loaded()
         if start.zone_id != goal.zone_id:
             return {"reachable": False, "reason": "cross-zone routing requires verified warp edges; not enabled as a general shortcut", "path": [], "confidence": "unresolved"}
@@ -196,6 +385,12 @@ class ObservedNavigationGraph:
                 if dest not in self._nodes:
                     continue
                 if edge.get("kind") == "zone_transition":
+                    continue
+                if require_direct_observation and edge.get("inferred_reverse"):
+                    continue
+                if require_direct_observation and (
+                    edge.get("legacy_unverified") or int(edge.get("direct_observations", 0)) <= 0
+                ):
                     continue
                 # Repeated direct observations are slightly preferred.
                 obs = int(edge.get("observations", 1))
