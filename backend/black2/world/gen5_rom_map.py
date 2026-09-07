@@ -606,8 +606,16 @@ def decode_permission_from_chunk(chunk: MapChunk) -> PermissionModel | None:
 class Gen5RomMap:
     """Lazy read-only static map database for one B2/W2 ROM."""
 
+    _DEFAULT_ROM_PATHS = (
+        r"D:\SynologyDrive\download\desmume-0.9.13-win64\口袋妖怪黑2.nds",
+        r"D:\口袋妖怪黑2.nds",
+        r"D:\game\desmume-0.9.13-win64\口袋妖怪黑2.nds",
+    )
+
     def __init__(self, rom_path: str | Path | None = None) -> None:
-        selected = str(rom_path) if rom_path else os.getenv("BLACK2_ROM_PATH")
+        candidates: tuple[str | None, ...] = (str(rom_path),) if rom_path else ()
+        candidates += (os.getenv("BLACK2_ROM_PATH"),) + self._DEFAULT_ROM_PATHS
+        selected = next((p for p in candidates if p and os.path.isfile(p)), None)
         if not selected:
             raise FileNotFoundError("BLACK2_ROM_PATH is not set and no ROM path was supplied")
         self.rom = NitroRom(selected)

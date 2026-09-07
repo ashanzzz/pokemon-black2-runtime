@@ -118,10 +118,47 @@ function selectionConfidence(sel){const p=sel?.payload||{};if(sel?.kind==='playe
 function renderInspector(){const sel=state.selection,body=$('#inspectorBody'),badge=$('#selectionConfidence');if(!sel){body.innerHTML=`<div class="empty-state">${esc3d(t('inspector.nothing'))}</div>`;return}const c=confidence(selectionConfidence(sel));badge.className=`confidence-badge ${c}`;badge.textContent=t(`confidence.${c}`,c);const p=sel.payload||{};let rows=[];
   if(sel.kind==='player'){rows=[['角色','Player'],[t('common.status'),p.status],['可信度',p.confidence],[t('common.frame'),p.frame],[t('common.zone'),p.zone_id],['环境',state.scene?.environment||'—'],['世界坐标 WPos',p.world?`X ${fmt(p.world.x)} · Y ${fmt(p.world.y)} · Z ${fmt(p.world.z)}`:'—'],['连续高度 WPos.y',p.world?.y],['网格坐标 GPos',p.grid?`X ${p.grid.x} · Y ${p.grid.y} · Z ${p.grid.z}`:'—'],['离散高度层 GPos.y',p.grid?.y],['高度说明',p.locomotion?.phase==='Moving'?'移动及楼梯中段使用连续 WPos.y':'WPos.y 为角色脚底的权威连续高度'],['区块',p.chunk?`X ${p.chunk.x} · Z ${p.chunk.z} · tile ${p.chunk.tile_size}`:'—'],['朝向',p.orientation?.facing],['FaceDir',p.orientation?.face_dir_raw],['移动状态',p.locomotion?.semantic_state],['交通模式',p.locomotion?.transport_mode],['步态',p.locomotion?.gait],['坐标校验',p.validation?.grid_world_consistent===true?'GPos/WPos 一致':p.validation?.grid_world_consistent===false?'不一致':'移动中']];}
   else if(sel.kind==='building'){rows=[['ID',p.id],[t('common.model'),p.uid],[t('common.door'),p.door_uid],[t('common.position'),p.world?`${fmt(p.world.x)}, ${fmt(p.world.y)}, ${fmt(p.world.z)}`:'—'],[t('common.rotation'),p.rotation_degrees],[t('common.source'),'ROM ChunkBuildings + AreaBuildingResource']];}
-  else if(sel.kind==='npc'){rows=[['Slot',p.slot],['Actor UID',p.actor_uid],[t('common.model'),p.model_id],[t('common.zone'),p.zone_id],[t('common.position'),p.world?`${fmt(p.world.x)}, ${fmt(p.world.y)}, ${fmt(p.world.z)}`:'—'],['GPos',p.grid?`${p.grid.x}, ${p.grid.y}, ${p.grid.z}`:'—'],['Facing',p.facing],[t('common.source'),'RAM FieldActorSystem']];}
-  else if(sel.kind==='scene'){const loc=p.location||{};rows=[[t('common.status'),p.status],['地点（中文）',loc.name_zh],["Location (English)",loc.name_en],['location_name_id',loc.location_name_id],['父区域 Zone',loc.parent_zone_id],[t('common.zone'),p.zone_id],['Environment',p.environment],['Scene Key',p.scene_key],['Coordinate Space',p.coordinate_space],['Identity',p.identity?.confidence]];}
-  else if(sel.kind==='terrain'){rows=[['ID',p.id],['Chunk',p.chunk_id],[t('common.position'),p.world?`${fmt(p.world.x)}, ${fmt(p.world.y)}, ${fmt(p.world.z)}`:'—'],['Pick X/Z',p.picked_coordinate?.world?`${fmt(p.picked_coordinate.world.x)}, ${fmt(p.picked_coordinate.world.z)}`:'—'],['Asset',p.asset_url],[t('common.source'),'ROM terrain']];}
-  else if(sel.kind==='map_point'){rows=[['Surface',p.surface_kind||'—'],['Ground candidate',p.is_ground===true?'是':p.is_ground===false?'否':'—'],['World X/Z',p.world?`${fmt(p.world.x)}, ${fmt(p.world.z)}`:'—'],['Visual Y',fmt(p.world?.y)],['当前格 GPos',p.grid?`${p.grid.x}, ${p.grid.y}, ${p.grid.z}`:'—'],['规划坐标',p.planning_coordinate?`${p.planning_coordinate.zone_id}, ${p.planning_coordinate.x}, ${p.planning_coordinate.y}, ${p.planning_coordinate.z}`:'—'],['Tile centre WPos',p.tile_centre?`${fmt(p.tile_centre.x)}, ${fmt(p.tile_centre.y)}, ${fmt(p.tile_centre.z)}`:'—'],['Chunk / local tile',p.chunk?`${p.chunk.x}, ${p.chunk.z} / ${p.chunk.local_tile.x}, ${p.chunk.local_tile.z}`:'—'],['Hit source',p.source],['Pointer CSS px',p.pointer?.css?`${fmt(p.pointer.css.x)}, ${fmt(p.pointer.css.y)}`:'—'],['Pointer device px',p.pointer?.device_px?`${fmt(p.pointer.device_px.x)}, ${fmt(p.pointer.device_px.y)}`:'—'],['NDC',p.pointer?.ndc?`${fmt(p.pointer.ndc.x)}, ${fmt(p.pointer.ndc.y)}`:'—'],['后端吸附',p.snap?.target?`${p.snap.target.zone_id}, ${p.snap.target.x}, ${p.snap.target.y}, ${p.snap.target.z}`:p.snap_error||'尚未校验']];}
+  else if(sel.kind==='npc'){
+    const staticNpcs=Array.isArray(state.scene?.static?.entities?.npcs)?state.scene.static.entities.npcs:[];
+    const snpc=staticNpcs.find(n=>Number(n.x)===Number(p.grid?.x)&&Number(n.z)===Number(p.grid?.z))||staticNpcs.find(n=>Number(n.id)===Number(p.slot));
+    const flagVal=snpc?Number(snpc.flag_id)||0:null;
+    const flagHex=flagVal!=null?(flagVal?'0x'+flagVal.toString(16).toUpperCase().padStart(4,'0'):'0x0000'):'—';
+    const isBlocker=snpc&&flagVal>0;
+    rows=[
+      ['Slot',p.slot],
+      ['Actor UID',p.actor_uid],
+      [t('common.model'),p.model_id],
+      [t('common.zone'),p.zone_id],
+      [t('common.position'),p.world?`${fmt(p.world.x)}, ${fmt(p.world.y)}, ${fmt(p.world.z)}`:'—'],
+      ['GPos',p.grid?`${p.grid.x}, ${p.grid.y}, ${p.grid.z}`:'—'],
+      ['Facing',p.facing],
+      ['剧情 Flag',flagHex],
+      ['事件脚本 Script',snpc?`#${snpc.script_id}`:'—'],
+      ['阻挡角色判定',isBlocker?'剧情路障候选 (Story Blocker)':'普通场上角色'],
+      [t('common.source'),'RAM FieldActorSystem + ROM Entities']
+    ];
+  }
+  else if(sel.kind==='map_point'){
+    const staticTriggers=Array.isArray(state.scene?.static?.entities?.triggers)?state.scene.static.entities.triggers:[];
+    const matchedTrig=staticTriggers.find(t=>Number(t.x)===Number(p.grid?.x)&&Number(t.z)===Number(p.grid?.z));
+    rows=[
+      ['Surface',p.surface_kind||'—'],
+      ['Ground candidate',p.is_ground===true?'是':p.is_ground===false?'否':'—'],
+      ['World X/Z',p.world?`${fmt(p.world.x)}, ${fmt(p.world.z)}`:'—'],
+      ['Visual Y',fmt(p.world?.y)],
+      ['当前格 GPos',p.grid?`${p.grid.x}, ${p.grid.y}, ${p.grid.z}`:'—'],
+      ['事件触发器',matchedTrig?`Trigger #${matchedTrig.id} · Script #${matchedTrig.reference} · Var 0x${matchedTrig.constant.toString(16).toUpperCase()}`:'无'],
+      ['剧情准入分析',matchedTrig?'⚠️ 包含脚本触发器（踩入将执行事件脚本）':'正常地块'],
+      ['规划坐标',p.planning_coordinate?`${p.planning_coordinate.zone_id}, ${p.planning_coordinate.x}, ${p.planning_coordinate.y}, ${p.planning_coordinate.z}`:'—'],
+      ['Tile centre WPos',p.tile_centre?`${fmt(p.tile_centre.x)}, ${fmt(p.tile_centre.y)}, ${fmt(p.tile_centre.z)}`:'—'],
+      ['Chunk / local tile',p.chunk?`${p.chunk.x}, ${p.chunk.z} / ${p.chunk.local_tile.x}, ${p.chunk.local_tile.z}`:'—'],
+      ['Hit source',p.source],
+      ['Pointer CSS px',p.pointer?.css?`${fmt(p.pointer.css.x)}, ${fmt(p.pointer.css.y)}`:'—'],
+      ['Pointer device px',p.pointer?.device_px?`${fmt(p.pointer.device_px.x)}, ${fmt(p.pointer.device_px.y)}`:'—'],
+      ['NDC',p.pointer?.ndc?`${fmt(p.pointer.ndc.x)}, ${fmt(p.pointer.ndc.y)}`:'—'],
+      ['后端吸附',p.snap?.target?`${p.snap.target.zone_id}, ${p.snap.target.x}, ${p.snap.target.y}, ${p.snap.target.z}`:p.snap_error||'尚未校验']
+    ];
+  }
   else if(sel.kind==='warp'){const target=p.target_label_candidate||{};rows=[['ID',p.id],['Target Raw',p.target_zone_or_map_raw],['目标 Zone（中文）',target.name_zh],['Target Zone (English)',target.name_en],['Target Warp',p.target_warp_id],['验证状态',p.verification?.runtime_observed?'runtime_observed':p.verification?.status],['世界坐标',p.world?`X ${fmt(p.world.x)} · Y ${fmt(p.world.y)} · Z ${fmt(p.world.z)}`:'—'],['入口尺寸',p.width!=null?`${p.width} × ${p.height||1} 格`:'—'],['X',p.x_world],['Y',p.y_world],['Z',p.z],[t('common.source'),'ROM entity definition']];}
   else if(sel.kind==='door'){rows=[['建筑',p.id||p.uid],['Door UID',p.door_uid],['世界坐标',p.world?`X ${fmt(p.world.x)} · Y ${fmt(p.world.y)} · Z ${fmt(p.world.z)}`:'—'],['朝向',p.rotation_degrees],[t('common.source'),'ROM building door metadata']];}
   else rows=Object.entries(p).slice(0,18).map(([k,v])=>[k,typeof v==='object'?JSON.stringify(v):v]);
@@ -246,6 +283,161 @@ async function startEncounterTask(){
 }
 async function pollEncounterTask(taskId){stopEncounterPolling();const e=state.encounters;try{const task=await R.jsonFetch(`/api/v1/encounters/tasks/${encodeURIComponent(taskId)}`,{},6000);if(e.task?.task_id!==taskId)return;e.task=task;if(encounterTaskActive(task))e.taskTimer=setTimeout(()=>pollEncounterTask(taskId),220);else{addClientEvent('encounter_task_end',`${task.status} · ${task.stop_reason?.code||''}`,task.status==='failed'?'error':'candidate',task);e.taskTimer=null}if(state.dock==='encounters')renderDock()}catch(error){e.error=readableError(error,'巡逻状态读取失败');e.taskTimer=setTimeout(()=>pollEncounterTask(taskId),700);if(state.dock==='encounters')renderDock()}}
 async function cancelEncounterTask(){const e=state.encounters;if(!e.task?.task_id)return;try{e.task=await R.jsonFetch(`/api/v1/encounters/tasks/${encodeURIComponent(e.task.task_id)}/cancel`,{method:'POST'},6000);stopEncounterPolling();renderDock()}catch(error){e.error=readableError(error,'取消巡逻失败');renderDock()}}
+function progressionGatesForCurrentZone(){
+  const zone=Number(state.scene?.zone_id??state.player?.zone_id);
+  const entities=state.scene?.static?.entities||{};
+  const staticNpcs=Array.isArray(entities.npcs)?entities.npcs:[];
+  const staticTriggers=Array.isArray(entities.triggers)?entities.triggers:[];
+  const staticWarps=Array.isArray(entities.warps)?entities.warps:[];
+  const liveActors=state.actors||[];
+  const blockers=[];
+  for(const snpc of staticNpcs){
+    const matchLive=liveActors.find(a=>{
+      const g=a.position?.grid||a.grid||{};
+      return Number(g.x)===Number(snpc.x)&&Number(g.z)===Number(snpc.z);
+    });
+    const isLive=!!matchLive;
+    const flagVal=Number(snpc.flag_id)||0;
+    const flagHex=flagVal?'0x'+flagVal.toString(16).toUpperCase().padStart(4,'0'):'0x0000';
+    blockers.push({
+      id:snpc.id,
+      flag_id:flagVal,
+      flag_hex:flagHex,
+      script_id:snpc.script_id,
+      movement_id:snpc.movement_id,
+      facing_id:snpc.facing_id,
+      x:snpc.x,y:snpc.y,z:snpc.z,
+      is_live:isLive,
+      live_actor:matchLive||null,
+      status:isLive?(flagVal>0?'live_blocker':'standing_npc'):'cleared_or_inactive'
+    });
+  }
+  const playerGrid=state.player?.grid;
+  const triggers=staticTriggers.map(t=>{
+    const dist=playerGrid?(Math.abs(t.x-playerGrid.x)+Math.abs(t.z-playerGrid.z)):null;
+    return{
+      id:t.id,entity_id:t.entity_id,constant:t.constant,reference:t.reference,
+      x:t.x,y:t.y,z:t.z,distance:dist,
+      severity:dist!==null&&dist<=2?'imminent':'idle'
+    };
+  });
+  return{zone,blockers,triggers,warps:staticWarps};
+}
+
+function checkPathProgressionGates(path){
+  if(!Array.isArray(path)||!path.length)return[];
+  const gates=progressionGatesForCurrentZone(),alerts=[];
+  const pathTiles=new Set(path.map(p=>`${p.x}:${p.z}`));
+  for(const trig of gates.triggers){
+    if(pathTiles.has(`${trig.x}:${trig.z}`)){
+      alerts.push({
+        kind:'trigger',x:trig.x,z:trig.z,script:trig.reference,constant:trig.constant,
+        message:`路线经过脚本触发器 (${trig.x}, ${trig.z}) · Script #${trig.reference}`
+      });
+    }
+  }
+  for(const npc of gates.blockers){
+    if(npc.is_live&&pathTiles.has(`${npc.x}:${npc.z}`)){
+      alerts.push({
+        kind:'npc',x:npc.x,z:npc.z,flag:npc.flag_hex,id:npc.id,
+        message:`路线包含在场 NPC (${npc.x}, ${npc.z}) · Flag ${npc.flag_hex} · Script #${npc.script_id}`
+      });
+    }
+  }
+  return alerts;
+}
+
+function renderGatesDock(body){
+  const data=progressionGatesForCurrentZone();
+  const playerPos=state.player?.grid?`(${state.player.grid.x}, ${state.player.grid.y}, ${state.player.grid.z})`:'—';
+  const liveBlockerCount=data.blockers.filter(b=>b.is_live).length;
+  body.innerHTML=`
+    <div class="gate-panel">
+      <div class="gate-toolbar">
+        <span class="gate-summary-stat">Zone <strong>${data.zone||'—'}</strong></span>
+        <span class="toolbar-sep"></span>
+        <span class="gate-summary-stat">主角坐标 <strong>${playerPos}</strong></span>
+        <span class="toolbar-sep"></span>
+        <span class="gate-summary-stat">在场 NPC <strong>${liveBlockerCount} / ${data.blockers.length}</strong></span>
+        <span class="toolbar-sep"></span>
+        <span class="gate-summary-stat">脚本触发器 (Triggers) <strong>${data.triggers.length}</strong></span>
+        <span class="toolbar-sep"></span>
+        <span class="gate-summary-stat">转移 Warp <strong>${data.warps.length}</strong></span>
+        <div class="command-grow"></div>
+        <button class="tool" id="refreshGates">刷新状态</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;height:calc(100% - 30px);overflow:hidden">
+        <div style="border-right:1px solid var(--line2);overflow:auto">
+          <div class="panel-title"><span>剧情与路障 NPC (Story Blockers)</span><span class="panel-meta">在场: ${liveBlockerCount}</span></div>
+          <table class="dock-table">
+            <thead>
+              <tr><th>NPC</th><th>Flag</th><th>坐标 (GPos)</th><th>状态</th><th>脚本</th><th>操作</th></tr>
+            </thead>
+            <tbody>
+              ${data.blockers.map(b=>`
+                <tr style="${b.is_live?'background:rgba(240,136,62,0.06)':''}">
+                  <td><strong>#${b.id}</strong></td>
+                  <td><code>${b.flag_hex}</code></td>
+                  <td><code>(${b.x}, ${b.y}, ${b.z})</code></td>
+                  <td>
+                    ${b.is_live
+                      ?`<span class="gate-badge npc-blocker">RAM 实证在场 · 阻断</span>`
+                      :`<span class="gate-badge cleared">已消除 / 未激活</span>`}
+                  </td>
+                  <td><code>Script #${b.script_id}</code></td>
+                  <td>
+                    <button class="small-button locate-gate-btn" data-x="${b.x}" data-y="${b.y}" data-z="${b.z}">设为目标</button>
+                  </td>
+                </tr>
+              `).join('')||`<tr><td colspan="6" class="empty-state">当前 Zone 无 NPC 记录</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+        <div style="overflow:auto">
+          <div class="panel-title"><span>事件拦截触发块 (Script Triggers)</span><span class="panel-meta">总数: ${data.triggers.length}</span></div>
+          <table class="dock-table">
+            <thead>
+              <tr><th>ID</th><th>坐标 (X, Z)</th><th>判断参数 (Var/Const)</th><th>目标脚本</th><th>距主角</th></tr>
+            </thead>
+            <tbody>
+              ${data.triggers.map(t=>`
+                <tr style="${t.severity==='imminent'?'background:rgba(210,153,34,0.1)':''}">
+                  <td>#${t.id}</td>
+                  <td><code>(${t.x}, ${t.z})</code></td>
+                  <td><code>0x${t.constant.toString(16).toUpperCase()} (${t.constant})</code></td>
+                  <td><code>Script #${t.reference}</code></td>
+                  <td>
+                    ${t.distance!==null
+                      ?(t.distance<=2?`<strong style="color:var(--candidate)">${t.distance} 格 (贴近!)</strong>`:`${t.distance} 格`)
+                      :'—'}
+                  </td>
+                </tr>
+              `).join('')||`<tr><td colspan="5" class="empty-state">当前 Zone 无事件触发器记录</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+  $('#refreshGates').onclick=async()=>{
+    await refreshNavigationActors({force:true});
+    renderDock();
+  };
+  $$('.locate-gate-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      const gx=Number(btn.dataset.x),gy=Number(btn.dataset.y),gz=Number(btn.dataset.z);
+      state.navigation.goal={
+        matrix_id:'',
+        zone_id:String(data.zone),
+        x:String(gx),y:String(gy),z:String(gz)
+      };
+      state.dock='navigation';
+      renderDock();
+      requestNavigationPlan();
+    };
+  });
+}
+
 function renderEncounterDock(body){
   const e=state.encounters,payload=e.payload,all=payload?.regions||[],regions=all.filter(encounterRegionVisible),selected=encounterRegionById(),task=e.task,taskActive=encounterTaskActive(task),cap=e.capabilities||{},execution=cap.execution?.available!==false;
   const list=regions.map(region=>`<div class="encounter-region-row ${String(region.region_id)===String(e.selectedId)?'selected':''}" data-encounter-region="${esc3d(region.region_id)}"><span class="encounter-swatch ${esc3d(region.encounter_method)}"></span><div class="encounter-region-main"><div class="encounter-region-title">${esc3d(encounterMethodLabel(region.encounter_method))} · ${esc3d(region.region_id)}</div><div class="encounter-region-meta">${esc3d(encounterRegionSummary(region))}</div></div><span class="encounter-evidence ${esc3d(region.evidence)}">${esc3d(region.evidence)}</span></div>`).join('')||`<div class="encounter-empty">${e.loading?'正在解析 ROM Tile Region…':e.error?esc3d(e.error):'当前筛选条件下没有区域。'}</div>`;
@@ -258,6 +450,7 @@ function renderEncounterDock(body){
 function renderDock(){const body=$('#dockBody');$$('[data-dock]').forEach(b=>b.classList.toggle('active',b.dataset.dock===state.dock));if(state.dock==='events'){const rows=[...state.clientEvents,...state.events].slice(0,120);body.innerHTML=`<table class="dock-table"><thead><tr><th>Time</th><th>Source</th><th>Event</th><th>${esc3d(t('inspector.confidence'))}</th><th>Summary</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${esc3d((x.time||'').slice(11,23)||'—')}</td><td>${esc3d(x.source||'runtime')}</td><td>${esc3d(x.kind||'event')}</td><td>${confBadge(x.confidence)}</td><td>${esc3d(x.summary||'')}</td></tr>`).join('')||`<tr><td colspan="5">${esc3d(t('dock.empty'))}</td></tr>`}</tbody></table>`}
   else if(state.dock==='assets'){const f=state.diag?.failed_assets||[];body.innerHTML=`<table class="dock-table"><thead><tr><th>Kind</th><th>ID</th><th>URL</th><th>${esc3d(t('common.reason'))}</th></tr></thead><tbody>${f.map(x=>`<tr><td>${esc3d(x.kind)}</td><td>${esc3d(x.id||'—')}</td><td>${esc3d(x.url||'—')}</td><td>${esc3d(x.error||'—')}</td></tr>`).join('')||`<tr><td colspan="4">${esc3d(t('dock.empty'))}</td></tr>`}</tbody></table>`}
   else if(state.dock==='navigation')renderNavigationDock(body)
+  else if(state.dock==='gates')renderGatesDock(body)
   else if(state.dock==='encounters')renderEncounterDock(body)
   else if(state.dock==='calibration'){const scenarios=['outdoor_flat','door_transition','indoor','stairs','bridge','npc','building','general'];body.innerHTML=`<div class="dock-form"><select id="calScenario">${scenarios.map(x=>`<option value="${x}">${esc3d(t(`cal.${x}`))}</option>`).join('')}</select><input id="calLabel" value="test" placeholder="${esc3d(t('evidence.label'))}"><button class="tool" id="calStart" ${state.calActive?'disabled':''}>${esc3d(t('evidence.start'))}</button><button class="tool" id="calStop" ${!state.calActive?'disabled':''}>${esc3d(t('evidence.stop'))}</button><span id="calState">${state.calActive?'REC':'IDLE'}</span></div>`;$('#calStart').onclick=startCalibration;$('#calStop').onclick=finishCalibration}
   else if(state.dock==='performance'){const d=state.diag||{},p=state.bootstrap?.performance_policy||{};body.innerHTML=`<div class="dock-form"><span>FPS ${safe(d.fps)}</span><span>Scene ${safe(d.scene_load_ms)} ms</span><span>Terrain ${safe(d.terrain_loaded,0)}/${safe(d.terrain_total,0)}</span><span>坐标底板 ${safe(d.terrain_fallback,0)}</span><span>Buildings ${safe(d.buildings_loaded,0)}/${safe(d.buildings_total,0)}</span><span>Doors ${safe(d.doors_rendered,0)}/${safe(d.doors_total,0)}</span><span>NPC ${safe(d.npc_total,0)}</span><span>Failed ${safe(d.failed_assets?.length,0)}</span></div><pre class="code-block" style="margin:0 8px 8px">${esc3d(pretty(p))}</pre>`}
@@ -406,7 +599,9 @@ function renderNavigationDock(body){
   const interaction=n.interaction,interactionNote=interaction?`<span class="tag good">NPC ${esc3d(interaction.target?.x)},${esc3d(interaction.target?.y)},${esc3d(interaction.target?.z)} · 站位 ${esc3d(interaction.stand_tile?.x)},${esc3d(interaction.stand_tile?.y)},${esc3d(interaction.stand_tile?.z)} · 面向 ${esc3d(interaction.facing)}${interaction.turn_only?' · 原地转身':''}${interaction.actor_id!=null?` · Actor ${esc3d(interaction.actor_id)}`:''}</span>`:'';
   const routeDetail=navigationRouteDetails(plan,path),startNote=plan?.resolved_start?`Matrix ${esc3d(plan.resolved_start.global?.matrix_id??plan.resolved_goal?.global?.matrix_id??'?')} · ${esc3d(navigationPointLabel(plan.resolved_start.position||plan.resolved_start))} → ${esc3d(navigationPointLabel(plan.resolved_goal?.position||plan.resolved_goal))}${plan.resolved_start.zone_id!==plan.resolved_goal?.zone_id?` · Zone ${esc3d(plan.resolved_start.zone_id)}→${esc3d(plan.resolved_goal?.zone_id)}`:''}`:'';
   const segmentRows=segments.map((s,i)=>`<div class="nav-segment"><span class="nav-segment-index">${i+1}</span><div><strong>${esc3d(t(`nav.segment.${s.kind}`,s.kind||'route'))}</strong><span>${s.matrix_id!=null?`Matrix ${esc3d(s.matrix_id)}`:`Zone ${esc3d(s.zone_id??'?')}`} · ${esc3d(s.steps??0)} ${esc3d(t('nav.steps'))}</span></div>${confBadge(s.confidence)}</div>`).join('');
-  body.innerHTML=`<div class="navigation-panel"><div class="navigation-controls"><div class="navigation-method"><span class="navigation-label">${esc3d(t('nav.trigger'))}</span><button class="tool ${n.pickMode?'active':''}" id="navPick" ${taskActive?'disabled':''}>${esc3d(n.pickMode?t('nav.pickWaiting'):t('nav.pickOnMap'))}</button><select id="navKnown" ${taskActive?'disabled':''}>${options}</select></div><div class="navigation-coordinate"><label><span>导航语义</span><select id="navIntent" ${taskActive?'disabled':''}>${intentOptions}</select></label><label><span>Matrix</span><input id="goalMatrix" type="number" step="1" value="${esc3d(n.goal.matrix_id)}" placeholder="自动" ${taskActive?'disabled':''}></label><label><span>X</span><input id="goalX" type="number" step="1" value="${esc3d(n.goal.x)}" placeholder="${esc3d(t('nav.goalX'))}" ${taskActive?'disabled':''}></label><label><span>Y</span><input id="goalY" type="number" step="1" value="${esc3d(n.goal.y)}" placeholder="${esc3d(t('nav.goalY'))}" ${taskActive?'disabled':''}></label><label><span>Z</span><input id="goalZ" type="number" step="1" value="${esc3d(n.goal.z)}" placeholder="${esc3d(t('nav.goalZ'))}" ${taskActive?'disabled':''}></label><button class="tool primary" id="navPreview" ${n.planning||taskActive?'disabled':''}>${esc3d(n.planning?t('nav.planning'):t('nav.preview'))}</button><button class="tool good-action" id="navStart" ${canStart?'':'disabled'}>${esc3d(t('nav.start'))}</button><button class="tool danger-action" id="navCancel" ${taskActive?'':'disabled'}>${esc3d(t('nav.cancel'))}</button><button class="tool" id="navClear" ${taskActive?'disabled':''}>${esc3d(t('nav.clear'))}</button></div></div><div class="navigation-status"><span class="tag ${statusClass}" id="navStatus">${esc3d(t(`nav.status.${n.status}`,n.status))}</span><span>${esc3d(n.message||t('nav.note'))}</span>${startNote?`<span class="tag">${startNote}</span>`:''}${interactionNote}${plan?.plan_id?`<code>${esc3d(plan.plan_id)}</code>`:''}${path.length?`<span>${esc3d(path.length)} ${esc3d(t('nav.nodes'))}</span>`:''}${cost.steps!=null?`<span>${esc3d(cost.steps)} ${esc3d(t('nav.steps'))}</span>`:''}${cost.turns!=null?`<span>${esc3d(cost.turns)} 转向</span>`:''}<span class="tag ${executionAvailable()?'good':'warn'}">${esc3d(executionText)}</span></div>${routeDetail?`<details class="navigation-route-detail" open><summary>路径详情（起点 / 终点 / 每个节点 / 连续动作）</summary><pre>${esc3d(routeDetail)}</pre></details>`:''}${task?`<div class="navigation-task"><strong>${esc3d(t('nav.taskTitle'))} · ${esc3d(task.task_id||'—')}</strong><span>${esc3d(taskStatusMessage(task))}</span></div>`:''}${blockers.length||warnings.length?`<div class="navigation-alerts">${blockers.map(x=>`<span class="tag bad">${esc3d(typeof x==='string'?x:x.code||x.message||JSON.stringify(x))}</span>`).join('')}${warnings.map(x=>`<span class="tag warn">${esc3d(typeof x==='string'?x:x.code||x.message||JSON.stringify(x))}</span>`).join('')}</div>`:''}${segmentRows?`<div class="navigation-segments">${segmentRows}</div>`:''}</div>`;
+  const progressionAlerts=checkPathProgressionGates(path);
+  const gateAlertHtml=progressionAlerts.length?`<div class="nav-gate-alert"><strong>⚠️ 剧情准入提示：</strong><span>${esc3d(progressionAlerts[0].message)}</span>${progressionAlerts.length>1?`<span class="tag">共 ${progressionAlerts.length} 处拦截</span>`:''}</div>`:'';
+  body.innerHTML=`<div class="navigation-panel"><div class="navigation-controls"><div class="navigation-method"><span class="navigation-label">${esc3d(t('nav.trigger'))}</span><button class="tool ${n.pickMode?'active':''}" id="navPick" ${taskActive?'disabled':''}>${esc3d(n.pickMode?t('nav.pickWaiting'):t('nav.pickOnMap'))}</button><select id="navKnown" ${taskActive?'disabled':''}>${options}</select></div><div class="navigation-coordinate"><label><span>导航语义</span><select id="navIntent" ${taskActive?'disabled':''}>${intentOptions}</select></label><label><span>Matrix</span><input id="goalMatrix" type="number" step="1" value="${esc3d(n.goal.matrix_id)}" placeholder="自动" ${taskActive?'disabled':''}></label><label><span>X</span><input id="goalX" type="number" step="1" value="${esc3d(n.goal.x)}" placeholder="${esc3d(t('nav.goalX'))}" ${taskActive?'disabled':''}></label><label><span>Y</span><input id="goalY" type="number" step="1" value="${esc3d(n.goal.y)}" placeholder="${esc3d(t('nav.goalY'))}" ${taskActive?'disabled':''}></label><label><span>Z</span><input id="goalZ" type="number" step="1" value="${esc3d(n.goal.z)}" placeholder="${esc3d(t('nav.goalZ'))}" ${taskActive?'disabled':''}></label><button class="tool primary" id="navPreview" ${n.planning||taskActive?'disabled':''}>${esc3d(n.planning?t('nav.planning'):t('nav.preview'))}</button><button class="tool good-action" id="navStart" ${canStart?'':'disabled'}>${esc3d(t('nav.start'))}</button><button class="tool danger-action" id="navCancel" ${taskActive?'':'disabled'}>${esc3d(t('nav.cancel'))}</button><button class="tool" id="navClear" ${taskActive?'disabled':''}>${esc3d(t('nav.clear'))}</button></div></div><div class="navigation-status"><span class="tag ${statusClass}" id="navStatus">${esc3d(t(`nav.status.${n.status}`,n.status))}</span><span>${esc3d(n.message||t('nav.note'))}</span>${startNote?`<span class="tag">${startNote}</span>`:''}${interactionNote}${plan?.plan_id?`<code>${esc3d(plan.plan_id)}</code>`:''}${path.length?`<span>${esc3d(path.length)} ${esc3d(t('nav.nodes'))}</span>`:''}${cost.steps!=null?`<span>${esc3d(cost.steps)} ${esc3d(t('nav.steps'))}</span>`:''}${cost.turns!=null?`<span>${esc3d(cost.turns)} 转向</span>`:''}<span class="tag ${executionAvailable()?'good':'warn'}">${esc3d(executionText)}</span></div>${gateAlertHtml}${routeDetail?`<details class="navigation-route-detail" open><summary>路径详情（起点 / 终点 / 每个节点 / 连续动作）</summary><pre>${esc3d(routeDetail)}</pre></details>`:''}${task?`<div class="navigation-task"><strong>${esc3d(t('nav.taskTitle'))} · ${esc3d(task.task_id||'—')}</strong><span>${esc3d(taskStatusMessage(task))}</span></div>`:''}${blockers.length||warnings.length?`<div class="navigation-alerts">${blockers.map(x=>`<span class="tag bad">${esc3d(typeof x==='string'?x:x.code||x.message||JSON.stringify(x))}</span>`).join('')}${warnings.map(x=>`<span class="tag warn">${esc3d(typeof x==='string'?x:x.code||x.message||JSON.stringify(x))}</span>`).join('')}</div>`:''}${segmentRows?`<div class="navigation-segments">${segmentRows}</div>`:''}</div>`;
    const modeHost=$('#navKnown');if(modeHost){modeHost.insertAdjacentHTML('afterend',`<label><span>${esc3d(t('nav.movement'))}</span><select id="navMovementMode" ${taskActive?'disabled':''}>${movementOptions}</select></label>`)}
    const sync=()=>{n.goal={matrix_id:$('#goalMatrix').value.trim(),zone_id:n.interaction?String(n.interaction.stand_tile?.zone_id??''):'',x:$('#goalX').value.trim(),y:$('#goalY').value.trim(),z:$('#goalZ').value.trim()};n.intent='walk_to_tile';n.interaction=null;n.plan=null;n.status='selected';n.message=t('nav.goalChanged');$('#navStart').disabled=true;const goal=navigationGoalFromForm();if(goal)state.viewer?.setNavigationTarget(goal);else state.viewer?.clearNavigationPath()};
   for(const id of ['goalMatrix','goalX','goalY','goalZ']){$(`#${id}`).oninput=sync;$(`#${id}`).onkeydown=e=>{if(e.key==='Enter'){sync();requestNavigationPlan()}}}
