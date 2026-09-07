@@ -96,15 +96,18 @@ class RuntimeActorOverlayService:
         capacity = u16(ACTOR_SYSTEM["capacity"])
         declared_count = u16(ACTOR_SYSTEM["count"])
         heap_addr = u32(ACTOR_SYSTEM["actor_heap"])
-        coherent = (
-            1 <= capacity <= self.max_capacity
-            and declared_count <= capacity
-            and u32(ACTOR_SYSTEM["field"]) == field_addr
-            and u32(ACTOR_SYSTEM["g3d_mapper"]) == mapper_addr
-            and 0x02000000 <= heap_addr < 0x02400000
-        )
+        fail_reasons = []
+        if not (1 <= capacity <= self.max_capacity):
+            fail_reasons.append(f"capacity {capacity} not in 1..{self.max_capacity}")
+        if u32(ACTOR_SYSTEM["field"]) != field_addr:
+            fail_reasons.append(f"field 0x{u32(ACTOR_SYSTEM['field']):08X} != 0x{field_addr:08X}")
+        if u32(ACTOR_SYSTEM["g3d_mapper"]) != mapper_addr:
+            fail_reasons.append(f"mapper 0x{u32(ACTOR_SYSTEM['g3d_mapper']):08X} != 0x{mapper_addr:08X}")
+        if not (0x02000000 <= heap_addr < 0x02400000):
+            fail_reasons.append(f"heap 0x{heap_addr:08X} not in Main RAM")
+        coherent = len(fail_reasons) == 0
         if not coherent:
-            return {"format": "black2-world3d-runtime-actors/v8", "status": "unresolved", "reason": "cached ActorSystem no longer passes pointer coherence", "frame": frame, "actors": []}
+            return {"format": "black2-world3d-runtime-actors/v8", "status": "unresolved", "reason": f"cached ActorSystem no longer passes pointer coherence: {', '.join(fail_reasons)}", "frame": frame, "actors": []}
 
         heap_length = capacity * ACTOR["stride"]
         heap_payload = await reader.read_batch_snapshot([

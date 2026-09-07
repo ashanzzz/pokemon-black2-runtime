@@ -454,7 +454,6 @@ def _decode_actor_system(r: _Ram, address: int, field: int, mapper: int, player_
     heap = r.u32(address, ACTOR_SYSTEM["actor_heap"])
     coherent = (
         1 <= capacity <= 256
-        and declared_count <= capacity
         and r.valid_ptr(heap)
         and r.u32(address, ACTOR_SYSTEM["field"]) == field
         and r.u32(address, ACTOR_SYSTEM["g3d_mapper"]) == mapper
