@@ -1,0 +1,31 @@
+{
+  "schema": "black2-irej1-battle-field-status-evidence/v1",
+  "target": "Pokemon Black 2 IREJ rev.1",
+  "date": "2026-09-07",
+  "samples": [
+    {"bundle":"b1","label":"战斗中","frame":5977495,"legacy_screen_type":"DIALOGUE_ACTIVE"},
+    {"bundle":"b2","label":"战斗中3.5","frame":5998441,"legacy_screen_type":"DIALOGUE_ACTIVE"},
+    {"bundle":"b3","label":"战斗中3","frame":5997150,"legacy_screen_type":"DIALOGUE_ACTIVE"},
+    {"bundle":"b4","label":"战斗中2.5","frame":5994492,"legacy_screen_type":"DIALOGUE_ACTIVE"},
+    {"bundle":"b5","label":"战斗中","frame":5977495,"legacy_screen_type":"DIALOGUE_ACTIVE","duplicate_of":"b1"},
+    {"bundle":"b6","label":"战斗中2","frame":5993438,"legacy_screen_type":"DIALOGUE_ACTIVE"}
+  ],
+  "recovered": {
+    "game_data": "0x0223B570",
+    "party_pointer_address": "0x0223B704",
+    "party_pointer_value": "0x0221E624",
+    "field_status_pointer_address": "0x0223B728",
+    "field_status_pointer_value": "0x0224211C",
+    "field_status_busy_address": "0x0224212D",
+    "field_status_busy_value": 1,
+    "party_capacity": 6,
+    "party_count": 1
+  },
+  "interpretation": {
+    "busy_0": "none candidate",
+    "busy_1": "battle candidate",
+    "busy_2": "loading candidate",
+    "verified": false,
+    "reason": "Supplied set contains battle captures only; paired IREJ rev.1 negative/control captures are still required."
+  }
+}

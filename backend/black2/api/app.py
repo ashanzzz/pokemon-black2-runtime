@@ -47,7 +47,8 @@ from .world_lab_routes import configure_world_lab_routes, router as world_lab_ro
 from .player_routes import configure_player_routes, router as player_router
 from .navigation_routes import configure_navigation_routes, router as navigation_router
 from .semantic_routes import configure_semantic_routes, router as semantic_router
-from .battle_routes import router as battle_router
+from .status_routes import configure_status_routes, router as status_router
+from .battle_routes import configure_battle_routes, router as battle_router
 from .dex_routes import router as dex_router
 from .catalog_routes import router as catalog_router
 from .map_routes import (
@@ -90,6 +91,8 @@ configure_navigation_routes(
     runtime_reader=memory_reader,
 )
 configure_semantic_routes(memory_reader, runtime_hub)
+configure_status_routes(memory_reader, runtime_hub)
+configure_battle_routes(memory_reader, runtime_hub)
 
 
 @asynccontextmanager
@@ -152,6 +155,7 @@ app.include_router(map_v5_router)
 app.include_router(world_lab_router)
 app.include_router(navigation_router)
 app.include_router(semantic_router)
+app.include_router(status_router)
 app.include_router(battle_router)
 app.include_router(dex_router)
 app.include_router(catalog_router)
@@ -1301,9 +1305,20 @@ async def evidence_workbench_page():
     return RedirectResponse(url="/#evidence", status_code=307)
 
 
-@app.get("/")
-async def root():
-    page = os.path.join(FRONTEND_DIR, "workbench.html")
+@app.get("/battle")
+async def battle_dashboard_page():
+    page = os.path.join(FRONTEND_DIR, "home.html")
     if os.path.exists(page):
         return FileResponse(page)
-    return {"title": "Pokémon Black 2 Reverse Engineering Workbench", "version": RUNTIME_RELEASE_VERSION, "docs_url": "/docs"}
+    raise HTTPException(status_code=404, detail="home.html not found")
+
+
+@app.get("/")
+async def root():
+    page = os.path.join(FRONTEND_DIR, "home.html")
+    if os.path.exists(page):
+        return FileResponse(page)
+    fallback = os.path.join(FRONTEND_DIR, "workbench.html")
+    if os.path.exists(fallback):
+        return FileResponse(fallback)
+    return {"title": "Pokémon Black 2 AI Runtime", "version": RUNTIME_RELEASE_VERSION, "docs_url": "/docs"}

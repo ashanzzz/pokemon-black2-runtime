@@ -312,6 +312,17 @@ export class Black2World3D{
   }
 
   _nodeForHit(hit){let node=hit?.object;while(node&&node!==this.worldRoot&&!node.userData?.kind)node=node.parent;return node&&node.userData?.kind?node:null}
+  _semanticPickId(node){
+    if(!node)return 'player';
+    if(node.userData?.kind==='npc'){
+      const actor=node.userData.actor||{};
+      // slot/actor_uid zero are valid IDs.  Nullish fallback is required;
+      // truthiness would misidentify slot 0 as the player.
+      return actor.slot ?? actor.actor_uid ?? actor.uid ?? 'player';
+    }
+    const name=node.name||null;
+    return name ?? node.userData?.uid ?? 'player';
+  }
   _sceneBounds(){const terrain=this.sceneData?.static?.terrains||[],span=Math.max(TILE,finite(this.sceneData?.static?.chunk_span_world)??512);if(!terrain.length)return null;const xs=terrain.map(x=>finite(x.world?.x)).filter(x=>x!=null),zs=terrain.map(x=>finite(x.world?.z)).filter(x=>x!=null);if(!xs.length||!zs.length)return null;return {minX:Math.min(...xs)-span/2,maxX:Math.max(...xs)+span/2,minZ:Math.min(...zs)-span/2,maxZ:Math.max(...zs)+span/2}}
   _pointerContext(event){
     const rect=this.renderer.domElement.getBoundingClientRect();if(!rect.width||!rect.height)return null;
@@ -390,7 +401,7 @@ export class Black2World3D{
       // only after the backend has proved a collision-valid standing tile.
       if(!point.is_ground){this._disposeRoot(this.cellLockedRoot);this.lockedCell=null}
       const kind=node?.userData?.kind||'map_point';
-      const id=node?(node.name||node.userData?.uid||node.userData?.actor?.slot||'player'):`${point.grid?.x},${point.grid?.z}`;
+      const id=node?this._semanticPickId(node):`${point.grid?.x},${point.grid?.z}`;
       // Pass the hit identity alongside the geometric point.  The workbench
       // uses this to distinguish a floor click from a wall/furniture/NPC hit
       // before asking the backend to snap to a standing tile.
@@ -400,7 +411,7 @@ export class Black2World3D{
     }
     if(node&&point?.status==='resolved'){// A floor click selects a logical cell, not the full terrain asset bounding box.
       if(point.is_ground){this._highlight(null);this.ui.onSelect?.({kind:'map_point',id:`${point.grid.x},${point.grid.z}`,payload:point});return;}
-      this._highlight(node);const kind=node.userData.kind;const item=kind==='building'||kind==='terrain'?node.userData.item:kind==='door'?node.userData.building:kind==='npc'?node.userData.actor:kind==='warp'?{...(node.userData.warp||{}),semantic_entry_world:node.userData.semantic_world,display_world_center:node.userData.display_world_center,rom_anchor_world:node.userData.rom_anchor_world}:this.player;const payload={...(item||{}),picked_coordinate:point};this.ui.onSelect?.({kind,id:node.name||node.userData.uid||node.userData.actor?.slot||'player',payload,node});return;}
+      this._highlight(node);const kind=node.userData.kind;const item=kind==='building'||kind==='terrain'?node.userData.item:kind==='door'?node.userData.building:kind==='npc'?node.userData.actor:kind==='warp'?{...(node.userData.warp||{}),semantic_entry_world:node.userData.semantic_world,display_world_center:node.userData.display_world_center,rom_anchor_world:node.userData.rom_anchor_world}:this.player;const payload={...(item||{}),picked_coordinate:point};this.ui.onSelect?.({kind,id:this._semanticPickId(node),payload,node});return;}
     if(point?.status==='resolved'){this._highlight(null);this.ui.onSelect?.({kind:'map_point',id:`${point.grid.x},${point.grid.z}`,payload:point})}
   }
   _highlight(node){this._disposeRoot(this.selectionRoot);if(!node)return;try{const box=new THREE.BoxHelper(node,0x62d0ff);box.material.depthTest=false;box.renderOrder=999;this.selectionRoot.add(box)}catch{}}

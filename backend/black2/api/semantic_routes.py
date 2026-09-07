@@ -15,6 +15,7 @@ from ..world.gen5_rom_map import Gen5RomMap
 from ..world.map_graph import RomMapGraphService
 from ..world.observed_navigation import NavNode, observed_navigation_graph
 from ..world.semantic_world import SemanticWorldService
+from ..world.npc_classifier import npc_classifier
 from ..state.memory_goals import goal_memory_manager
 
 
@@ -807,9 +808,13 @@ def _scene_static_actors(zone_id: int, events: dict[str, Any] | None) -> list[di
         if not isinstance(record, dict):
             continue
         identity = record.get("record_index", record.get("id", index))
+        classification = npc_classifier.classify_entity(record, zone_id)
         rows.append({
             "id": f"zone:{zone_id}:npc:{identity}",
             "kind": "npc",
+            "semantic_kind": classification["semantic_kind"],
+            "name": classification["name"],
+            "category_label": classification["category_label"],
             "live": False,
             "coordinate": _event_coordinate(zone_id, record),
             "sprite_id": record.get("sprite_id"),
@@ -817,8 +822,10 @@ def _scene_static_actors(zone_id: int, events: dict[str, Any] | None) -> list[di
             "facing_id": record.get("facing_id"),
             "script_id": record.get("script_id"),
             "flag_id": record.get("flag_id"),
-            "availability": {"status": "unknown", "present": None,
-                              "reason": "Static spawn record does not decode runtime flags or actor occupancy."},
+            "interaction": classification["interaction"],
+            "trainer": classification["trainer"],
+            "lifecycle": classification["lifecycle"],
+            "availability": classification["lifecycle"],
             "source": "rom:/a/1/2/6",
         })
     return rows
@@ -946,9 +953,25 @@ def _scene_projection(snap: dict[str, Any], map_data: dict[str, Any], *, include
         doors_status = {"status": "unavailable", "reason": f"{type(error).__name__}: {error}"}
     static_actors = _scene_static_actors(zone_id, map_data.get("events"))
     runtime_actors = _scene_runtime_actors(snap)
-    actors = {"runtime": runtime_actors, "rom_static_npcs": static_actors,
-              "count": len(runtime_actors) + len(static_actors),
-              "runtime_positions_status": "sampled" if runtime_actors else "not_sampled"}
+
+    # Semantic categorization
+    items = [a for a in static_actors if a.get("semantic_kind") == "OVERWORLD_ITEM"]
+    trainers = [a for a in static_actors if a.get("semantic_kind") == "NPC_TRAINER"]
+    talkers = [a for a in static_actors if a.get("semantic_kind") == "NPC_TALKER"]
+    legendaries = [a for a in static_actors if a.get("semantic_kind") == "LEGENDARY_OVERWORLD"]
+    obstacles = [a for a in static_actors if a.get("semantic_kind") == "DYNAMIC_OBSTACLE"]
+
+    actors = {
+        "runtime": runtime_actors,
+        "rom_static_npcs": static_actors,
+        "items": items,
+        "trainers": trainers,
+        "talkers": talkers,
+        "legendaries": legendaries,
+        "obstacles": obstacles,
+        "count": len(runtime_actors) + len(static_actors),
+        "runtime_positions_status": "sampled" if runtime_actors else "not_sampled",
+    }
     geometry = _scene_geometry(zone_id, map_data, doors)
     collision = _scene_collision(map_data)
     normalized = {"portals": portals, "doors": doors, "actors": actors, "geometry": geometry, "collision": collision}
@@ -1185,19 +1208,21 @@ def _interaction_records(
 async def game_capabilities() -> dict:
     return {"format": "black2-game-capabilities/v1",
             "coordinate_contract": {"space": "gen5-field-grid-v1", "zone_id": "Zone header id", "x": "east", "y": "elevation/floor", "z": "south", "world_units_per_tile": 16},
-            "read": {"state": "/api/v1/game/state", "party": "/api/v1/game/party", "inventory": "/api/v1/game/inventory",
+            "read": {"current": "/api/v1/game/current", "layers": "/api/v1/game/layers", "state": "/api/v1/game/state", "party": "/api/v1/game/party", "inventory": "/api/v1/game/inventory",
                      "map": "/api/v1/ai/map", "scene": "/api/v1/ai/map/scene", "tile": "/api/v1/ai/map/tile?zone_id=&x=&y=&z=", "window": "/api/v1/ai/map/window",
                      "warps": "/api/v1/ai/map/warps", "doors": "/api/v1/ai/map/doors", "zone": "/api/v1/ai/map/zone/{zone_id}", "materials": "/api/v1/ai/materials",
                      "map_interactions": "/api/v1/ai/map/interactions", "static_scene": "/api/v1/map/v6/scene/zone/{zone_id}",
                      "context": "/api/v1/ai/context", "actions": "/api/v1/game/actions", "dialogue": "/api/dialogue/history",
                      "tasks": "/api/v1/game/tasks", "task": "/api/v1/game/tasks/{task_id}", "objectives": "/api/v1/game/objectives",
                      "flags": "/api/v1/game/flags", "cutscene": "/api/v1/game/cutscene",
-                     "interactions": "/api/v1/game/interactions"},
+                     "interactions": "/api/v1/game/interactions", "battle": "/api/v1/battle/state",
+                     "battle_request": "/api/v1/battle/request", "battle_evidence": "/api/v1/battle/evidence"},
             "write": {"navigation_plan": "/api/v1/navigation/plans", "navigation_task": "/api/v1/navigation/tasks",
                       "press": "/api/actions/press", "touch": "/api/actions/touch", "dialogue_advance": "/api/actions/dialogue/advance", "dialogue_choice": "/api/actions/dialogue/choice"},
             "support": {"terrain": "ROM decoded", "warp_targets": "ROM referenced candidates", "interaction_index": "ROM static candidates", "static_scene_preview": "ROM-only read-only scene with synthetic camera anchor",
                         "cross_zone_execution": False,
-                        "party_contents": False, "inventory_contents": False, "battle_semantic_actions": False},
+                        "party_contents": False, "inventory_contents": False, "battle_presence_candidate": True,
+                        "layered_game_state": True, "battle_semantic_actions": False},
             "evidence_policy": "Decoded source facts and runtime traversal are distinct. Unknown is null, never an empty-game assertion."}
 
 
@@ -1518,3 +1543,60 @@ async def ai_context(include_raw: bool = False, radius: Radius = 4) -> dict:
             "navigation": {"capabilities": "/api/v1/navigation/capabilities", "plan": "/api/v1/navigation/plans", "task": "/api/v1/navigation/tasks"},
             "actions_url": "/api/v1/game/actions", "limitations": ["Bag/party contents and battle actions are not decoded.",
                 "ROM connectors do not authorize cross-Zone execution.", "Current NPC positions and event flags may change static walkability."]}
+
+
+@router.get("/ai/npcs")
+async def ai_npcs(
+    zone_id: Zone | None = None,
+    kind: str | None = None,
+) -> dict[str, Any]:
+    """Expose classified, human-readable NPC/entity semantics for the scene."""
+    snap = _snapshot()
+    selected_zone = zone_id
+    if selected_zone is None:
+        selected_zone = (snap.get("player") or {}).get("zone_id")
+    if selected_zone is None:
+        raise HTTPException(503, detail="Current Zone is unavailable; specify zone_id.")
+
+    source = await _rom_call(lambda: _world().zone(int(selected_zone)))
+    static_actors = _scene_static_actors(int(selected_zone), source.get("events"))
+
+    if kind:
+        kind_upper = kind.strip().upper()
+        filtered = [a for a in static_actors if a.get("semantic_kind") == kind_upper]
+    else:
+        filtered = static_actors
+
+    return {
+        "format": "black2-ai-npcs/v1",
+        "zone_id": int(selected_zone),
+        "total_count": len(static_actors),
+        "count": len(filtered),
+        "filter_kind": kind,
+        "npcs": filtered,
+    }
+
+
+@router.get("/ai/items")
+async def ai_items(zone_id: Zone | None = None) -> dict[str, Any]:
+    """Direct lookup of all overworld item balls and pickup candidates in the scene."""
+    res = await ai_npcs(zone_id=zone_id, kind="OVERWORLD_ITEM")
+    return {
+        "format": "black2-ai-items/v1",
+        "zone_id": res["zone_id"],
+        "count": res["count"],
+        "items": res["npcs"],
+    }
+
+
+@router.get("/ai/trainers")
+async def ai_trainers(zone_id: Zone | None = None) -> dict[str, Any]:
+    """Direct lookup of all battle trainers and line-of-sight actors in the scene."""
+    res = await ai_npcs(zone_id=zone_id, kind="NPC_TRAINER")
+    return {
+        "format": "black2-ai-trainers/v1",
+        "zone_id": res["zone_id"],
+        "count": res["count"],
+        "trainers": res["npcs"],
+    }
+

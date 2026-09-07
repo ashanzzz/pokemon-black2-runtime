@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pokémon Black 2 · AI Runtime</title>
+  <link rel="stylesheet" href="/assets/home.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <div class="eyebrow">POKÉMON BLACK 2 · IREJ REV.1</div>
+      <h1>AI 游戏状态与战斗控制台</h1>
+    </div>
+    <nav>
+      <a href="/workbench">逆向工作台</a>
+      <a href="/docs">API 文档</a>
+    </nav>
+  </header>
+
+  <main class="shell">
+    <section class="hero panel">
+      <div class="hero-main">
+        <div class="section-label">当前状态</div>
+        <div class="status-line">
+          <span id="primaryContext" class="primary">读取中</span>
+          <span id="frameText" class="muted">Frame —</span>
+        </div>
+        <div id="layerChips" class="chips"></div>
+        <p id="inputSummary" class="summary">正在读取当前状态…</p>
+      </div>
+      <div class="health-grid">
+        <div class="metric"><span>Backend</span><strong id="backendHealth">●</strong></div>
+        <div class="metric"><span>BizHawk</span><strong id="bridgeHealth">—</strong></div>
+        <div class="metric"><span>RAM 状态</span><strong id="ramStatus">—</strong></div>
+        <div class="metric"><span>输入归属</span><strong id="inputOwner">—</strong></div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <article class="panel" id="explorationPanel">
+        <div class="panel-title"><span>探索</span><span id="explorationBadge" class="badge">—</span></div>
+        <div class="kv"><span>Zone</span><strong id="zoneText">—</strong></div>
+        <div class="kv"><span>GPos</span><strong id="posText">—</strong></div>
+        <div class="kv"><span>移动</span><strong id="moveText">—</strong></div>
+        <div class="actions-row">
+          <a class="button ghost" href="/#player">玩家状态</a>
+          <a class="button ghost" href="/#world">地图 / 导航</a>
+        </div>
+      </article>
+
+      <article class="panel overlay-panel" id="dialoguePanel">
+        <div class="panel-title"><span>对话叠加层</span><span id="dialogueBadge" class="badge">—</span></div>
+        <div id="speakerText" class="speaker">—</div>
+        <div id="dialogueText" class="dialogue-text">当前没有已解析对话。</div>
+        <div id="choiceList" class="choices"></div>
+        <div class="hint" id="dialogueHint">—</div>
+      </article>
+    </section>
+
+    <section class="panel battle-panel" id="battlePanel">
+      <div class="battle-header">
+        <div>
+          <div class="section-label">战斗</div>
+          <div class="battle-title"><span id="battleTitle">战斗状态未解析</span><span id="battleBadge" class="badge">—</span></div>
+        </div>
+        <div class="battle-meta">
+          <span id="battleFormat">形式 未解析</span>
+          <span id="battlePhase">阶段 未解析</span>
+          <span id="battleExecution" class="danger">执行关闭</span>
+        </div>
+      </div>
+
+      <div class="battle-stage">
+        <div class="mon-card opponent">
+          <div class="side-label">对手</div>
+          <div class="mon-name" id="opponentName">未解析</div>
+          <div class="hp"><i style="width:0%"></i></div>
+          <div class="muted">对手 BattleMon 结构尚未验证</div>
+        </div>
+        <div class="versus">VS</div>
+        <div class="mon-card player">
+          <div class="side-label">我方</div>
+          <div class="mon-name" id="playerName">Party header</div>
+          <div class="hp"><i id="playerHp" style="width:0%"></i></div>
+          <div class="muted" id="partySummary">队伍内容未解析</div>
+        </div>
+      </div>
+
+      <div class="command-area">
+        <div class="command-tabs" role="tablist">
+          <button class="cmd active" data-tab="moves">战斗</button>
+          <button class="cmd" data-tab="items">背包</button>
+          <button class="cmd" data-tab="party">宝可梦</button>
+          <button class="cmd" data-tab="run">逃跑</button>
+        </div>
+        <div id="commandContent" class="command-content"></div>
+      </div>
+    </section>
+
+    <section class="grid two">
+      <article class="panel">
+        <div class="panel-title"><span>下一次决策 Request</span><span class="badge neutral">只读</span></div>
+        <div class="kv"><span>Battle ID</span><strong id="battleId">—</strong></div>
+        <div class="kv"><span>Request ID</span><strong id="requestId">—</strong></div>
+        <div class="kv"><span>等待玩家</span><strong id="waitingPlayer">—</strong></div>
+        <div class="kv"><span>阻塞层</span><strong id="blockingOverlay">—</strong></div>
+        <p id="requestReason" class="muted small">—</p>
+      </article>
+
+      <article class="panel evidence-panel">
+        <div class="panel-title"><span>RAM 证据</span><span id="evidenceBadge" class="badge candidate">candidate</span></div>
+        <div class="kv"><span>GameData</span><code id="gameDataPtr">—</code></div>
+        <div class="kv"><span>FieldStatus</span><code id="fieldStatusPtr">—</code></div>
+        <div class="kv"><span>Party</span><code id="partyPtr">—</code></div>
+        <div class="kv"><span>BusyFlag</span><strong id="busyFlag">—</strong></div>
+        <div class="kv"><span>置信度</span><strong id="confidence">—</strong></div>
+        <p id="evidenceReason" class="muted small">—</p>
+      </article>
+    </section>
+
+    <section class="panel api-panel">
+      <div class="panel-title"><span>面向 AI 的核心接口</span><span class="badge neutral">v2</span></div>
+      <div class="api-grid">
+        <code>GET /api/v1/game/current</code>
+        <code>GET /api/v1/game/layers</code>
+        <code>GET /api/v1/battle/state</code>
+        <code>GET /api/v1/battle/request</code>
+        <code>GET /api/v1/battle/moves</code>
+        <code>GET /api/v1/battle/items</code>
+        <code>GET /api/v1/battle/party</code>
+        <code>POST /api/v1/battle/decisions</code>
+      </div>
+    </section>
+  </main>
+
+  <script src="/assets/home.js"></script>
+</body>
+</html>
