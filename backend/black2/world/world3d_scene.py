@@ -326,6 +326,234 @@ class World3DSceneService:
             },
         }
 
+    def connected_zone_cluster(self, zone_id: int, *, matrix_id: int | None = None, max_zones: int = 24) -> dict[str, Any]:
+        """Return the exact spatial component around an exterior Zone.
+
+        Only Zones that own cardinally adjacent cells in the *same* ROM
+        MapMatrix are spatially stitched.  Warp-linked Zones on another Matrix
+        are intentionally not overlaid because they do not share a proven
+        canonical transform.
+        """
+        zone_id = int(zone_id)
+        max_zones = max(1, min(64, int(max_zones)))
+        anchor_header = self.original.rom.zone(zone_id)
+        anchor_area = self.original.rom.area(anchor_header.area_id)
+        selected_matrix_id = int(matrix_id if isinstance(matrix_id, int) else anchor_header.matrix_id)
+        matrix = self.original.rom.matrix(selected_matrix_id)
+        base = {
+            "format": "black2-connected-zone-cluster/v1",
+            "anchor_zone_id": zone_id,
+            "matrix_id": selected_matrix_id,
+            "matrix": {
+                "width": matrix.width, "height": matrix.height,
+                "has_zones": matrix.has_zones, "cell_count": matrix.cell_count,
+            },
+            "alignment": "shared_matrix_exact",
+            "cross_matrix_policy": "cross_matrix_connector_graph_only_until_runtime_landing_transform_is_verified",
+        }
+        if not anchor_area.is_exterior:
+            return {**base, "environment": "interior", "zone_ids": [zone_id], "zone_count": 1,
+                    "adjacency": [], "cells": [], "reason": "interior_zone_not_spatially_stitched"}
+        if not matrix.has_zones or matrix.zone_ids is None:
+            return {**base, "environment": "exterior", "zone_ids": [zone_id], "zone_count": 1,
+                    "adjacency": [], "cells": [], "reason": "matrix_has_no_zone_ownership_table"}
+
+        owners: dict[tuple[int, int], int] = {}
+        cells: list[dict[str, Any]] = []
+        for cell in matrix.cells():
+            chunk_id = int(cell.get("chunk_id", 0xFFFFFFFF))
+            owner = _int(cell.get("zone_id"))
+            if chunk_id == 0xFFFFFFFF or owner is None:
+                continue
+            try:
+                header = self.original.rom.zone(owner)
+                area = self.original.rom.area(header.area_id)
+            except (IndexError, ValueError):
+                continue
+            if not area.is_exterior or int(header.matrix_id) != selected_matrix_id:
+                continue
+            key = (int(cell["x"]), int(cell["y"]))
+            owners[key] = owner
+            cells.append({"x": key[0], "z": key[1], "chunk_id": chunk_id, "zone_id": owner})
+
+        adjacency_pairs: set[tuple[int, int]] = set()
+        graph: dict[int, set[int]] = {}
+        for (x, z), owner in owners.items():
+            graph.setdefault(owner, set())
+            for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                other = owners.get((x + dx, z + dz))
+                if other is None or other == owner:
+                    continue
+                a, b = sorted((owner, other))
+                adjacency_pairs.add((a, b))
+                graph.setdefault(owner, set()).add(other)
+                graph.setdefault(other, set()).add(owner)
+
+        selected: list[int] = []
+        pending = [zone_id]
+        seen: set[int] = set()
+        while pending and len(selected) < max_zones:
+            current = pending.pop(0)
+            if current in seen:
+                continue
+            seen.add(current)
+            selected.append(current)
+            pending.extend(sorted(graph.get(current, set()) - seen))
+        selected_set = set(selected)
+        selected_cells = [cell for cell in cells if int(cell["zone_id"]) in selected_set]
+        return {
+            **base,
+            "environment": "exterior",
+            "zone_ids": selected,
+            "zone_count": len(selected),
+            "adjacency": [{"zone_a": a, "zone_b": b} for a, b in sorted(adjacency_pairs)
+                          if a in selected_set and b in selected_set],
+            "cells": selected_cells,
+            "truncated": bool(pending),
+            "reason": "cardinally_adjacent_zone_ownership_cells_in_same_matrix",
+        }
+
+    def connected_static_scene(
+        self,
+        zone_id: int,
+        *,
+        live_span: float | None = None,
+        matrix_id: int | None = None,
+        anchor_static: dict[str, Any] | None = None,
+        max_zones: int = 24,
+    ) -> dict[str, Any]:
+        """Combine an exterior same-Matrix Zone component into one static scene."""
+        anchor = deepcopy(anchor_static) if isinstance(anchor_static, dict) else self.static_scene(
+            int(zone_id), live_span=live_span, runtime_matrix_id=matrix_id,
+        )
+        if anchor.get("environment") != "exterior":
+            anchor["connected_world"] = self.connected_zone_cluster(
+                int(zone_id), matrix_id=(anchor.get("matrix") or {}).get("matrix_id"), max_zones=max_zones,
+            )
+            return anchor
+        selected_matrix_id = _int((anchor.get("matrix") or {}).get("matrix_id"))
+        cluster = self.connected_zone_cluster(int(zone_id), matrix_id=selected_matrix_id, max_zones=max_zones)
+        zone_ids = [int(v) for v in cluster.get("zone_ids") or [int(zone_id)]]
+        span = float(anchor.get("chunk_span_world") or live_span or 512.0)
+
+        terrains: list[dict[str, Any]] = []
+        buildings: list[dict[str, Any]] = []
+        entities: dict[str, Any] = {"zones": {}}
+        terrain_seen: set[tuple[int, int, int]] = set()
+        building_seen: set[tuple[Any, ...]] = set()
+        zone_summaries: list[dict[str, Any]] = []
+        for current_zone in zone_ids:
+            st = anchor if current_zone == int(zone_id) else self.static_scene(current_zone, live_span=span)
+            if _int((st.get("matrix") or {}).get("matrix_id")) != selected_matrix_id:
+                continue
+            if current_zone != int(zone_id):
+                st = deepcopy(st)
+                self._attach_warp_world_positions(st, {})
+            label = ZONE_LABEL_OVERRIDES.get(current_zone) or {}
+            zone_meta = st.get("zone") or {}
+            zone_summaries.append({
+                "zone_id": current_zone,
+                "name_zh": label.get("name_zh") or f"Zone {current_zone}",
+                "name_en": label.get("name_en") or f"Zone {current_zone}",
+                "location_name_id": zone_meta.get("location_name_id"),
+                "parent_zone_id": zone_meta.get("parent_zone_id"),
+            })
+            for item in st.get("terrains") or []:
+                cell = item.get("cell") or {}
+                key = (int(cell.get("x", -1)), int(cell.get("z", -1)), int(item.get("chunk_id", -1)))
+                if key in terrain_seen:
+                    continue
+                terrain_seen.add(key)
+                terrains.append({**deepcopy(item), "source_zone_id": current_zone})
+            for item in st.get("buildings") or []:
+                world = item.get("world") or {}
+                key = (item.get("uid"), round(float(world.get("x") or 0), 4),
+                       round(float(world.get("y") or 0), 4), round(float(world.get("z") or 0), 4))
+                if key in building_seen:
+                    continue
+                building_seen.add(key)
+                buildings.append({**deepcopy(item), "source_zone_id": current_zone})
+            raw_entities = deepcopy(st.get("entities") or {})
+            entities["zones"][str(current_zone)] = raw_entities
+            for key, value in raw_entities.items():
+                if not isinstance(value, list):
+                    continue
+                merged = entities.setdefault(key, [])
+                for item in value:
+                    merged.append({**deepcopy(item), "source_zone_id": current_zone} if isinstance(item, dict) else item)
+
+        cluster_cells = cluster.get("cells") or []
+        if cluster_cells:
+            min_x = min(int(cell["x"]) for cell in cluster_cells) * span
+            max_x = (max(int(cell["x"]) for cell in cluster_cells) + 1) * span
+            min_z = min(int(cell["z"]) for cell in cluster_cells) * span
+            max_z = (max(int(cell["z"]) for cell in cluster_cells) + 1) * span
+        else:
+            positions = [item.get("world") or {} for item in terrains]
+            xs = [float(p["x"]) for p in positions if isinstance(p.get("x"), (int, float))]
+            zs = [float(p["z"]) for p in positions if isinstance(p.get("z"), (int, float))]
+            min_x = min(xs, default=0.0) - span / 2.0; max_x = max(xs, default=0.0) + span / 2.0
+            min_z = min(zs, default=0.0) - span / 2.0; max_z = max(zs, default=0.0) + span / 2.0
+        origin = {"x": (min_x + max_x) / 2.0, "y": 0.0, "z": (min_z + max_z) / 2.0,
+                  "source": "shared_matrix_cluster_center"}
+        cluster.update({
+            "bounds_world": {"min_x": min_x, "max_x": max_x, "min_z": min_z, "max_z": max_z},
+            "scene_origin": origin,
+            "zones": zone_summaries,
+        })
+        anchor["terrains"] = terrains
+        anchor["buildings"] = buildings
+        anchor["entities"] = entities
+        anchor["connected_world"] = cluster
+        anchor["source_policy"] = {
+            **(anchor.get("source_policy") or {}),
+            "connected_world": "same-Matrix exterior Zone ownership cells; no cross-Matrix transform invented",
+        }
+        return anchor
+
+    def connected_static_preview_scene(self, zone_id: int, *, max_zones: int = 24) -> dict[str, Any]:
+        base = self.static_preview_scene(int(zone_id))
+        connected = self.connected_static_scene(int(zone_id), anchor_static=base.get("static"), max_zones=max_zones)
+        cluster = connected.get("connected_world") or {}
+        origin = cluster.get("scene_origin") or base.get("scene_origin")
+        zone_ids = cluster.get("zone_ids") or [int(zone_id)]
+        key = f"cluster:matrix:{cluster.get('matrix_id')}:zones:{','.join(map(str, zone_ids))}:static-preview"
+        base.update({"static": connected, "scene_origin": origin, "scene_key": key, "render_key": key,
+                     "connected_world": cluster})
+        return base
+
+    async def connected_current_scene(
+        self,
+        reader: MemoryReader,
+        *,
+        force_identity: bool = False,
+        loaded_visual: dict[str, Any] | None = None,
+        max_zones: int = 24,
+    ) -> dict[str, Any]:
+        base = await self.current_scene(reader, force_identity=force_identity, loaded_visual=loaded_visual)
+        if base.get("status") == "unresolved" or not isinstance(base.get("zone_id"), int):
+            return base
+        connected = self.connected_static_scene(
+            int(base["zone_id"]), anchor_static=base.get("static"), max_zones=max_zones,
+        )
+        cluster = connected.get("connected_world") or {}
+        if connected.get("environment") != "exterior" or len(cluster.get("zone_ids") or []) <= 1:
+            return {**base, "static": connected, "connected_world": cluster}
+        zone_ids = cluster.get("zone_ids") or [int(base["zone_id"])]
+        key = f"cluster:matrix:{cluster.get('matrix_id')}:zones:{','.join(map(str, zone_ids))}"
+        return {
+            **base,
+            "scene_key": key,
+            "render_key": key,
+            "scene_origin": cluster.get("scene_origin") or base.get("scene_origin"),
+            "static": connected,
+            "connected_world": cluster,
+            "render_contract": {
+                **(base.get("render_contract") or {}),
+                "connected_world": "same-Matrix exterior Zones are spatially stitched; cross-Matrix links remain graph metadata",
+            },
+        }
+
     def static_preview_scene(self, zone_id: int) -> dict[str, Any]:
         """Build a self-contained, read-only scene envelope for a Zone.
 

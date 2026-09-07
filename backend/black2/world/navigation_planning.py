@@ -261,7 +261,12 @@ class NavigationPlanService:
             "format": "black2-navigation-capabilities/v1",
             "coordinate_spaces": ["gen5-field-grid-v1"],
             "destination_types": ["grid"],
-            "navigation_intents": ["route", "walk_to_tile", "interact"],
+            "navigation_intents": ["walk_to_tile", "interact", "route"],
+            "navigation_intent_semantics": {
+                "walk_to_tile": "pure movement to an exact walkable tile; never auto-interacts",
+                "route": "legacy pure-movement alias; never auto-interacts",
+                "interact": "explicit NPC approach/face/interact semantics only",
+            },
             "planning": {
                 "available": True,
                 "read_only": True,
@@ -276,8 +281,9 @@ class NavigationPlanService:
             "execution": {"available": False},
             "movement": {
                 "modes": ["auto", "walk", "run", "bike", "surf"],
-                "selection": "auto resolves to walk unless a requested mode is proven by ZoneHeader and runtime state",
+                "selection": "auto chooses the fastest already-active verified transport: bike/surf, then run, then walk",
                 "continuous_input": True,
+                "optimization": "shortest path; static fallback breaks equal-length ties by fewer turns",
             },
             "graph": {
                 "node_count": graph["node_count"],
@@ -343,35 +349,44 @@ class NavigationPlanService:
         transport = ((player or {}).get("locomotion") or {}).get("transport_mode")
         route_rules = evidence.get("route_rules") or {}
         bike_blockers = route_rules.get("bike_blockers") or []
+        # The executor does not currently own a verified mount/dismount or
+        # Surf-start primitive.  Movement modes therefore describe the
+        # transport that is already active in PlayerRuntime, except that
+        # OnFoot can freely choose walk/run when ZoneHeader allows running.
+        on_foot = transport in (None, "", "OnFoot")
         available = {
-            "walk": True,
-            "run": allow_running is True,
+            "walk": on_foot,
+            "run": on_foot and allow_running is True,
             "bike": allow_cycling is True and not bike_blockers and transport == "Cycling",
-            "surf": False,
+            "surf": transport == "Surf",
         }
         reasons = {
-            "walk": "normal on-foot movement",
-            "run": "ZoneHeader explicitly enables running" if allow_running is True else "ZoneHeader running permission is not verified or disabled",
+            "walk": "PlayerRuntime is on foot" if on_foot else f"current transport is {transport!r}; no verified dismount primitive is owned by navigation",
+            "run": "PlayerRuntime is on foot and ZoneHeader explicitly enables running" if available["run"] else "running requires OnFoot transport and ZoneHeader running permission",
             "bike": "ZoneHeader enables cycling, the runtime is Cycling, and every route tile permits cycling" if available["bike"] else "cycling requires ZoneHeader permission, a verified mounted bicycle, and a route without bike-blocking terrain",
-            "surf": "surf route requires water semantics and a verified Surf transport state",
+            "surf": "PlayerRuntime is already in Surf transport" if available["surf"] else "surf requires a verified active Surf transport; navigation does not auto-start Surf yet",
         }
         if mode == "auto":
-            # Keep indoor/short routes predictable.  The ROM rule, rather
-            # than an interior/exterior string, remains the authority for an
-            # explicit run request.
-            selected = "walk"
+            # Prefer the fastest mode that is already safe to execute.  This
+            # removes the previous artificial walk-only default while avoiding
+            # speculative item/menu actions to mount a bike or start Surf.
+            selected = next((candidate for candidate in ("bike", "surf", "run", "walk") if available[candidate]), None)
+            if selected is None:
+                raise NavigationPlanningError(
+                    "NAV_MOVEMENT_UNAVAILABLE",
+                    "No currently active verified movement mode can execute this route.",
+                    status_code=409,
+                    details={"requested_mode": mode, "available": available, "reasons": reasons, "evidence": evidence, "transport_mode": transport},
+                )
         else:
             selected = mode
         if not available.get(selected, False):
-            if mode == "auto":
-                selected = "walk"
-            else:
-                raise NavigationPlanningError(
-                    "NAV_MOVEMENT_UNAVAILABLE",
-                    f"Movement mode '{mode}' is not executable in this Zone.",
-                    status_code=409,
-                    details={"requested_mode": mode, "reason": reasons.get(mode), "evidence": evidence, "transport_mode": transport},
-                )
+            raise NavigationPlanningError(
+                "NAV_MOVEMENT_UNAVAILABLE",
+                f"Movement mode '{mode}' is not executable in this Zone.",
+                status_code=409,
+                details={"requested_mode": mode, "reason": reasons.get(mode), "evidence": evidence, "transport_mode": transport},
+            )
         return {
             "requested": mode,
             "selected": selected,
@@ -384,7 +399,7 @@ class NavigationPlanService:
     @staticmethod
     def _normalize_interaction(
         interaction: dict[str, Any] | None, *, start: NavNode, goal: NavNode,
-        navigation_intent: str = "route",
+        navigation_intent: str = "walk_to_tile",
     ) -> dict[str, Any] | None:
         """Validate interaction metadata without changing the walk goal."""
         if interaction is None:
@@ -465,7 +480,7 @@ class NavigationPlanService:
         occupied: Iterable[Any] = (),
         interaction: dict[str, Any] | None = None,
         movement_mode: str = "auto",
-        navigation_intent: str = "route",
+        navigation_intent: str = "walk_to_tile",
     ) -> dict[str, Any]:
         start_source = "player_runtime"
         if start_position is None:
@@ -526,10 +541,10 @@ class NavigationPlanService:
                 "navigation_intent must be route, walk_to_tile, or interact.",
                 status_code=422,
             )
-        if navigation_intent == "walk_to_tile" and interaction is not None:
+        if navigation_intent in {"route", "walk_to_tile"} and interaction is not None:
             raise NavigationPlanningError(
                 "NAV_INTENT_CONFLICT",
-                "walk_to_tile cannot include NPC interaction metadata.",
+                "Pure movement intents cannot include NPC interaction metadata; use navigation_intent='interact'.",
                 status_code=422,
             )
         if navigation_intent == "interact" and interaction is None:
@@ -551,7 +566,7 @@ class NavigationPlanService:
         normalized_occupied = normalize_occupancy(
             occupied, default_zone=start.zone_id, default_y=start.y,
         )
-        if navigation_intent == "walk_to_tile" and (goal.x, goal.z) in occupied_nodes:
+        if navigation_intent in {"route", "walk_to_tile"} and (goal.x, goal.z) in occupied_nodes:
             raise NavigationPlanningError(
                 "NAV_DESTINATION_OCCUPIED",
                 "The fixed destination tile is currently occupied by a runtime actor.",
@@ -660,6 +675,8 @@ class NavigationPlanService:
         ).hexdigest()[:16]
         steps = max(0, len(path) - 1)
         action_segments = _path_action_segments(path)
+        turns = int(result.get("turns")) if isinstance(result.get("turns"), int) else max(0, len(action_segments) - 1)
+        optimization = result.get("optimization") or "shortest_verified_path_with_continuous_direction_segments"
         response = {
             "format": "black2-navigation-plan/v1",
             "plan_id": f"plan_{uuid4().hex}",
@@ -688,6 +705,8 @@ class NavigationPlanService:
                 "nodes": path,
                 "actions": action_segments,
                 "continuous_input": True,
+                "turns": turns,
+                "optimization": optimization,
             },
             "segments": [
                 {
@@ -696,6 +715,8 @@ class NavigationPlanService:
                     "from": start.public(),
                     "to": goal.public(),
                     "steps": steps,
+                    "turns": turns,
+                    "optimization": optimization,
                     "cost": result.get("cost", float(steps)),
                     "confidence": route_confidence,
                     "source": route_source,
@@ -704,7 +725,7 @@ class NavigationPlanService:
                     "actions": action_segments,
                 }
             ],
-            "cost": {"steps": steps, "connectors": 0},
+            "cost": {"steps": steps, "turns": turns, "connectors": 0},
             "movement": movement,
             "warnings": warnings,
             "blockers": [],

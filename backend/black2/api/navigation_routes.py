@@ -163,7 +163,7 @@ class PlanRequest(BaseModel):
     occupancy: list[NavigationOccupancy] = Field(default_factory=list)
     interaction: NavigationInteraction | None = None
     movement_mode: Literal["auto", "walk", "run", "bike", "surf"] = "auto"
-    navigation_intent: Literal["route", "walk_to_tile", "interact"] = "route"
+    navigation_intent: Literal["route", "walk_to_tile", "interact"] = "walk_to_tile"
 
 
 _planner = NavigationPlanService(
@@ -214,7 +214,7 @@ class TaskRequest(BaseModel):
     occupancy: list[NavigationOccupancy] = Field(default_factory=list)
     interaction: NavigationInteraction | None = None
     movement_mode: Literal["auto", "walk", "run", "bike", "surf"] = "auto"
-    navigation_intent: Literal["route", "walk_to_tile", "interact"] = "route"
+    navigation_intent: Literal["route", "walk_to_tile", "interact"] = "walk_to_tile"
 
 
 def _actor_occupancy_payload(payload: Any, *, zone_id: int, y: int) -> list[dict[str, Any]]:
@@ -353,6 +353,7 @@ class SnapRequest(BaseModel):
     picked: SnapPickedObject | None = None
     occupancy: list[SnapOccupancyPoint] = Field(default_factory=list)
     max_radius: int = Field(default=12, ge=0, le=32)
+    navigation_intent: Literal["route", "walk_to_tile", "interact"] = "walk_to_tile"
 
 
 @router.get("/capabilities")
@@ -579,8 +580,20 @@ def _prepare_navigation_request(
     An interaction request may name either the NPC tile or its already
     resolved standing tile; both are normalized to the latter.
     """
-    if navigation_intent == "walk_to_tile":
-        return destination, interaction
+    # Movement and interaction are intentionally separate public intents.
+    # A coordinate-only move must never be upgraded into an NPC dialogue just
+    # because a transient actor happens to occupy the requested tile.  This
+    # was the source of NAV_DYNAMIC_TARGET_LOST for ordinary "go to X/Y/Z"
+    # requests: route silently became a moving-NPC interaction task.
+    if navigation_intent in {"route", "walk_to_tile"}:
+        if interaction is not None:
+            raise NavigationPlanningError(
+                "NAV_INTENT_CONFLICT",
+                "Movement intents cannot include NPC interaction metadata; use navigation_intent='interact'.",
+                status_code=422,
+            )
+        return destination, None
+
     if navigation_intent == "interact" and interaction is not None:
         target = interaction.get("target") or {}
         stand = interaction.get("stand_tile") or {}
@@ -596,11 +609,22 @@ def _prepare_navigation_request(
             )
         interaction = {**interaction, "execute": True}
         return destination, interaction
-    resolved, normalized = _auto_interaction_goal(
-        destination, provider=provider, player_sample=player_sample,
-        occupancy=occupancy, interaction=interaction,
-    )
-    return resolved, normalized
+
+    if navigation_intent == "interact":
+        resolved, normalized = _auto_interaction_goal(
+            destination, provider=provider, player_sample=player_sample,
+            occupancy=occupancy, interaction=None,
+        )
+        if normalized is None:
+            raise NavigationPlanningError(
+                "NAV_INTERACTION_TARGET_REQUIRED",
+                "interact requires a current NPC target or explicit interaction metadata.",
+                status_code=422,
+                details={"destination": destination},
+            )
+        return resolved, normalized
+
+    return destination, None
 
 
 @router.post("/snap")
@@ -656,7 +680,7 @@ async def snap_navigation_target(body: SnapRequest, request: Request):
         "building", "terrain_object", "furniture", "door", "npc", "actor",
     }
     try:
-        if str(picked_kind or "").lower() in {"npc", "actor"}:
+        if str(picked_kind or "").lower() in {"npc", "actor"} and body.navigation_intent == "interact":
             result = _snap_npc_interaction(
                 provider,
                 zone_id=zone_id,
@@ -667,6 +691,9 @@ async def snap_navigation_target(body: SnapRequest, request: Request):
                 actor_id=picked_id,
             )
         else:
+            # In movement mode an NPC/building click means "walk near this
+            # object", not "interact with it".  The actor tile remains an
+            # obstacle and provider.snap chooses a connected adjacent floor.
             result = provider.snap(
                 zone_id,
                 grid[0],
@@ -727,6 +754,7 @@ async def snap_navigation_target(body: SnapRequest, request: Request):
             "grid": {"x": requested_grid[0], "y": y, "z": requested_grid[1]},
             "world": body.world.model_dump(exclude_none=True) if body.world else None,
             "picked": {"kind": picked_kind, "id": picked_id},
+            "navigation_intent": body.navigation_intent,
         },
         "target": target,
         "resolved_goal": target,

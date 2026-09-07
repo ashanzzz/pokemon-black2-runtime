@@ -1,0 +1,7 @@
+Pokémon Black 2 Runtime Navigation / Connected World v11
+Generated: 2026-09-07
+Git baseline commit: 1a3ee2777e70e8b5d06c2b5002e9bc8dc74edb28 (normalized-text snapshot of user-uploaded v10.1 source package)
+Fix commit: see git log -1
+Upstream repository at analysis time: ashanzzz/pokemon-black2-runtime main 1112f975ea2a3ee7bc13d41529ccb55ef8701d72
+Note: this delivery Git history is locally reconstructed because the uploaded ZIP had no .git directory and the connected GitHub integration did not permit writes.
+Validation: python -m pytest -q => 262 passed, 6 skipped

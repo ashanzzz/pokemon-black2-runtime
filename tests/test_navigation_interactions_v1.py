@@ -104,7 +104,7 @@ def test_interaction_task_turns_in_place_after_reaching_stand_tile(tmp_path: Pat
 
             async def press_buttons(self, buttons, frames=4):
                 self.turns.append((buttons, frames))
-                assert buttons == ["Up"]
+                assert buttons in (["Up"], ["A"])
                 latest["orientation"] = {"face_dir_raw": 0, "facing": "North"}
                 latest["frame"] += frames
                 return {"queued": True}
@@ -126,13 +126,13 @@ def test_interaction_task_turns_in_place_after_reaching_stand_tile(tmp_path: Pat
             "facing": "North",
         }
         started = tasks.start(
-            interaction["stand_tile"], max_steps=1, interaction=interaction,
+            interaction["stand_tile"], max_steps=1, interaction=interaction, navigation_intent="interact",
         )
         await tasks._runners[started["task_id"]]
         finished = tasks.get(started["task_id"])
         assert finished["status"] == "succeeded", finished["stop_reason"]
         assert finished["arrival"]["interaction"]["facing"] == "North"
-        assert bridge.turns == [(["Up"], 1)]
+        assert bridge.turns == [(["Up"], 1), (["A"], 1)]
         assert bridge.clear_count == 1
 
     asyncio.run(scenario())

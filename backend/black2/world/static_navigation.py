@@ -493,40 +493,63 @@ class RomStaticNavigationGraph:
             return {"reachable": False, "reason": "goal is occupied by a runtime actor", "path": [], "confidence": "candidate_static"}
 
         start_key, goal_key = (start.x, start.z), (goal.x, goal.z)
-        queue: list[tuple[float, float, int, int]] = [(0.0, 0.0, start.x, start.z)]
-        costs: dict[tuple[int, int], float] = {start_key: 0.0}
-        parent: dict[tuple[int, int], tuple[int, int]] = {}
+        # Lexicographic A*: minimize tile count first, then turns among all
+        # shortest routes.  Fewer direction changes make the executor visibly
+        # smoother without ever taking a longer path merely for aesthetics.
+        # State includes the incoming direction because turn count depends on
+        # how a cell was reached.
+        start_state = (start.x, start.z, 0, 0)
+        queue: list[tuple[int, int, int, int, int, int]] = [
+            (abs(start.x - goal.x) + abs(start.z - goal.z), 0, 0, start.x, start.z, 0)
+        ]
+        costs: dict[tuple[int, int, int, int], tuple[int, int]] = {start_state: (0, 0)}
+        parent: dict[tuple[int, int, int, int], tuple[int, int, int, int]] = {}
+        goal_state: tuple[int, int, int, int] | None = None
         while queue:
-            _f, g, x, z = heapq.heappop(queue)
-            key = (x, z)
-            if g != costs.get(key):
+            _f_steps, turns, steps, x, z, packed_dir = heapq.heappop(queue)
+            dx = ((packed_dir >> 8) & 0xFF) - 128 if packed_dir else 0
+            dz = (packed_dir & 0xFF) - 128 if packed_dir else 0
+            state = (x, z, dx, dz)
+            if (steps, turns) != costs.get(state):
                 continue
-            if key == goal_key:
+            if (x, z) == goal_key:
+                goal_state = state
                 break
-            current = cells[key]
+            current = cells[(x, z)]
             for neighbor in self._neighbors(cells, current, occupied_xy):
-                nk = (neighbor.node.x, neighbor.node.z)
-                ng = g + 1.0
-                if ng >= costs.get(nk, float("inf")):
+                ndx = neighbor.node.x - x
+                ndz = neighbor.node.z - z
+                nsteps = steps + 1
+                nturns = turns + (1 if (dx or dz) and (ndx, ndz) != (dx, dz) else 0)
+                nstate = (neighbor.node.x, neighbor.node.z, ndx, ndz)
+                if (nsteps, nturns) >= costs.get(nstate, (10**9, 10**9)):
                     continue
-                costs[nk] = ng
-                parent[nk] = key
+                costs[nstate] = (nsteps, nturns)
+                parent[nstate] = state
                 heuristic = abs(neighbor.node.x - goal.x) + abs(neighbor.node.z - goal.z)
-                heapq.heappush(queue, (ng + heuristic, ng, neighbor.node.x, neighbor.node.z))
-        if goal_key not in costs:
+                packed = ((ndx + 128) << 8) | (ndz + 128)
+                heapq.heappush(
+                    queue,
+                    (nsteps + heuristic, nturns, nsteps, neighbor.node.x, neighbor.node.z, packed),
+                )
+        if goal_state is None:
             return {"reachable": False, "reason": "no connected flag-clear static path on this layer", "path": [], "confidence": "candidate_static"}
-        keys = [goal_key]
-        while keys[-1] != start_key:
-            keys.append(parent[keys[-1]])
-        keys.reverse()
+        states = [goal_state]
+        while states[-1] != start_state:
+            states.append(parent[states[-1]])
+        states.reverse()
+        keys = [(state[0], state[1]) for state in states]
         path = [cells[key].node.public() for key in keys]
+        turns = costs[goal_state][1]
         return {
             "reachable": True,
             "path": path,
             "steps": len(path) - 1,
+            "turns": turns,
             "cost": float(len(path) - 1),
+            "optimization": "shortest_steps_then_fewest_turns",
             "confidence": "candidate_static",
-            "reason": "route uses ROM flag-clear terrain candidates; each landing requires live verification",
+            "reason": "route uses ROM flag-clear terrain candidates; shortest steps are preferred, then fewer turns; each landing requires live verification",
             "source": "rom_static_collision_candidate",
             "world_revision": self.revision,
         }

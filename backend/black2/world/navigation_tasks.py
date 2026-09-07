@@ -81,7 +81,7 @@ class NavigationTaskService:
         occupied: Any = (),
         interaction: dict[str, Any] | None = None,
         movement_mode: str = "auto",
-        navigation_intent: str = "route",
+        navigation_intent: str = "walk_to_tile",
     ) -> dict[str, Any]:
         # Terminal status is published after input clear, so active status also
         # covers the preceding owner's cleanup interval.
@@ -215,6 +215,10 @@ class NavigationTaskService:
     @staticmethod
     def _facing_button(name: str | None) -> str | None:
         return {"North": "Up", "South": "Down", "West": "Left", "East": "Right"}.get(name)
+
+    @staticmethod
+    def _button_facing(button: str | None) -> str | None:
+        return {"Up": "North", "Down": "South", "Left": "West", "Right": "East"}.get(button)
 
     @staticmethod
     def _actor_grid(actor: dict[str, Any]) -> NavNode | None:
@@ -563,7 +567,12 @@ class NavigationTaskService:
         occupied = record.get("_occupied") or ()
         movement = plan.get("movement") or {"selected": "walk"}
         selected_mode = str(movement.get("selected") or "walk")
-        frames_per_tile = {"walk": self.continuous_hold_frames, "run": 6, "bike": 6, "surf": 10}.get(
+        # These are maximum hold budgets, not assumed movement durations.
+        # _wait_for_landing clears the queue as soon as the verified endpoint
+        # is reached.  A generous budget therefore handles a turn/startup
+        # animation without causing overshoot, while still ending early from
+        # live GPos feedback.
+        frames_per_tile = {"walk": self.continuous_hold_frames, "run": 10, "bike": 8, "surf": 14}.get(
             selected_mode, self.hold_frames,
         )
 
@@ -643,16 +652,20 @@ class NavigationTaskService:
             # transports have their own bounded one-tile budgets; reusing the
             # walk budget for Run would skip a tile (observed as a safe
             # NAV_POSITION_DIVERGED stop in the live room).
+            facing_now = self._facing_name(self.player_sample())
+            turn_overhead = 0
+            if facing_now is not None and self._button_facing(button) not in (None, facing_now):
+                turn_overhead = {"walk": 6, "run": 8, "bike": 6, "surf": 8}.get(selected_mode, 6)
             frames = (
                 self.hold_frames
-                if selected_mode == "walk" and step_count == 1
-                else frames_per_tile
-            ) * step_count
+                if selected_mode == "walk" and step_count == 1 and turn_overhead == 0
+                else frames_per_tile * step_count + turn_overhead
+            )
             navigation_audit_log.record(
                 "execution", "segment_started", task_id=record["task_id"], plan_id=record["plan_id"],
                 segment=segment_index, button=button, buttons=buttons,
                 start=previous.public(), expected=expected.public(), steps=step_count,
-                frames=frames, movement_mode=selected_mode,
+                frames=frames, movement_mode=selected_mode, facing_before=facing_now, turn_overhead_frames=turn_overhead,
             )
             await self.client.press_buttons(buttons, frames=frames)
             landing_timeout = max(
@@ -685,6 +698,7 @@ class NavigationTaskService:
                 "segment": segment_index, "button": button, "buttons": buttons,
                 "from": previous.public(), "to": expected.public(), "steps": step_count,
                 "frames": frames, "verified_landing": True,
+                "facing_before": facing_now, "turn_overhead_frames": turn_overhead,
             })
             record["updated_at"] = _now()
             navigation_audit_log.record(

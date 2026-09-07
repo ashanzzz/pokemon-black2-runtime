@@ -316,6 +316,90 @@ async def v6_scene_current(
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 
+@router.get("/api/v1/map/v6/scene/connected/current")
+async def v6_scene_connected_current(
+    force_identity: bool = False,
+    refresh_visual: bool = False,
+    max_zones: int = 24,
+    reader: MemoryReader = Depends(_map_reader),
+) -> dict[str, Any]:
+    """Render the exact same-Matrix exterior Zone component around the player."""
+    *_prefix, scene = _services()
+    try:
+        loaded_visual = None
+        if refresh_visual:
+            from .map_routes import _native_maps
+            loaded_visual = await _native_maps().build_live(reader)
+        if force_identity:
+            import asyncio
+            return await asyncio.wait_for(
+                scene.connected_current_scene(
+                    reader, force_identity=True, loaded_visual=loaded_visual, max_zones=max_zones,
+                ), timeout=3.0,
+            )
+        return await scene.connected_current_scene(
+            reader, force_identity=False, loaded_visual=loaded_visual, max_zones=max_zones,
+        )
+    except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError, IndexError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.get("/api/v1/map/v6/scene/connected/zone/{zone_id}")
+async def v6_scene_connected_zone(zone_id: int, max_zones: int = 24) -> dict[str, Any]:
+    """Read-only stitched preview for one exterior same-Matrix Zone component."""
+    *_prefix, scene = _services()
+    try:
+        preview = scene.connected_static_preview_scene(zone_id, max_zones=max_zones)
+        static = preview.get("static") or {}
+        return {
+            **static,
+            "format": preview.get("format"),
+            "status": preview.get("status"),
+            "confidence": preview.get("confidence"),
+            "preview_only": True,
+            "zone_id": preview.get("zone_id", zone_id),
+            "scene_key": preview.get("scene_key"),
+            "render_key": preview.get("render_key"),
+            "scene_origin": preview.get("scene_origin"),
+            "player": preview.get("player"),
+            "identity": preview.get("identity"),
+            "connected_world": preview.get("connected_world"),
+            "static": static,
+            "render_contract": preview.get("render_contract"),
+        }
+    except (IndexError, ValueError, OSError, RuntimeError) as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@router.get("/api/v1/map/v6/world/cluster/{zone_id}")
+async def v6_world_cluster(zone_id: int, max_zones: int = 24) -> dict[str, Any]:
+    """Machine-readable whole-map bundle: stitched static scene plus connector graph."""
+    *_prefix, scene = _services()
+    graph_service = _graph_service()
+    try:
+        static = scene.connected_static_scene(zone_id, max_zones=max_zones)
+        cluster = static.get("connected_world") or {}
+        selected = {int(z) for z in cluster.get("zone_ids") or [zone_id]}
+        graph = graph_service.build()
+        nodes = [node for node in graph.get("nodes") or [] if node.get("zone_id") in selected]
+        edges = [edge for edge in graph.get("edges") or [] if edge.get("source_zone_id") in selected]
+        return {
+            "format": "black2-connected-world-api/v1",
+            "status": "resolved",
+            "coordinate_space": "gen5-field-world-v1",
+            "anchor_zone_id": zone_id,
+            "connected_world": cluster,
+            "static": static,
+            "connectors": {
+                "nodes": nodes,
+                "outgoing_edges": edges,
+                "spatial_policy": "same-Matrix adjacency is stitched; Warp targets on other matrices remain graph links",
+            },
+        }
+    except (IndexError, ValueError, OSError, RuntimeError) as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
 @router.get("/api/v1/map/v6/scene/zone/{zone_id}")
 async def v6_scene_zone(zone_id: int) -> dict[str, Any]:
     *_prefix, scene = _services()
