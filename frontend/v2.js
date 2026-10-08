@@ -53,7 +53,8 @@ function switchTab(paneId) {
     document.querySelectorAll('.ds-rail-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.ds-pane').forEach(p => p.classList.remove('active'));
     
-    const targetBtn = Array.from(document.querySelectorAll('.ds-rail-btn')).find(b => b.getAttribute('onclick')?.includes(paneId));
+    const targetBtn = document.querySelector(`.ds-rail-btn[data-pane="${paneId}"]`) ||
+                      Array.from(document.querySelectorAll('.ds-rail-btn')).find(b => (b.getAttribute('onclick') || '').includes(paneId));
     if (targetBtn) targetBtn.classList.add('active');
     
     const targetPane = document.getElementById(paneId);
@@ -64,7 +65,13 @@ function switchTab(paneId) {
       history.replaceState(null, '', '#' + hashKey);
     }
 
-    onTabSwitched(paneId);
+    try {
+      if (typeof onTabSwitched === 'function') {
+        onTabSwitched(paneId);
+      }
+    } catch (cbErr) {
+      console.warn('onTabSwitched non-fatal:', cbErr);
+    }
   } catch (e) {
     console.error('switchTab error:', e);
   }
@@ -110,7 +117,10 @@ function appendLog(msg) {
 }
 
 // 轮询玩家实时物理状态与坐标自愈
+let isPollingPlayerRuntime = false;
 async function pollPlayerRuntime() {
+  if (isPollingPlayerRuntime) return;
+  isPollingPlayerRuntime = true;
   try {
     const res = await fetch('/api/v1/player/runtime');
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -168,6 +178,8 @@ async function pollPlayerRuntime() {
       bridgeBadge.className = 'ds-badge ds-badge-amber';
       bridgeBadge.innerHTML = '<span class="ds-dot"></span>模拟器网桥: 轮询中...';
     }
+  } finally {
+    isPollingPlayerRuntime = false;
   }
 }
 
@@ -180,7 +192,10 @@ function handleRadiusChange(val) {
   pollRadar();
 }
 
+let isPollingRadar = false;
 async function pollRadar() {
+  if (isPollingRadar) return;
+  isPollingRadar = true;
   const loading = document.getElementById('mapSliceLoading');
   try {
     const res = await fetch(`/api/v1/navigation/radar/slices?radius=${currentRadarRadius}`);
@@ -202,6 +217,8 @@ async function pollRadar() {
     if (loading) {
       loading.innerHTML = `<span class="ds-badge ds-badge-amber">[地图切片读取提示: ${e.message}]</span> <button class="ds-btn ds-btn-sm" onclick="pollRadar()">[点击重试]</button>`;
     }
+  } finally {
+    isPollingRadar = false;
   }
 }
 
@@ -2113,6 +2130,13 @@ async function handleDirectInput(button) {
 
 // 定时轮询驱动与 URL Hash 恢复
 function initV2() {
+  document.querySelectorAll('.ds-rail-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pane = btn.getAttribute('data-pane') || (btn.getAttribute('onclick') || '').match(/switchTab\('([^']+)'\)/)?.[1];
+      if (pane) switchTab(pane);
+    });
+  });
+
   const hash = window.location.hash.replace('#', '');
   if (hash && ['overview', 'radar', 'combat', 'roster', 'memory', '3d', 'pc'].includes(hash)) {
     switchTab("pane-" + hash);

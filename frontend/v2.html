@@ -15,9 +15,10 @@
         document.querySelectorAll('.ds-pane').forEach(function(p) {
           p.classList.remove('active');
         });
-        var targetBtn = Array.from(document.querySelectorAll('.ds-rail-btn')).find(function(b) {
-          return (b.getAttribute('onclick') || '').indexOf(paneId) !== -1;
-        });
+        var targetBtn = document.querySelector('.ds-rail-btn[data-pane="' + paneId + '"]') ||
+                        Array.from(document.querySelectorAll('.ds-rail-btn')).find(function(b) {
+                          return (b.getAttribute('onclick') || '').indexOf(paneId) !== -1;
+                        });
         if (targetBtn) targetBtn.classList.add('active');
         var targetPane = document.getElementById(paneId);
         if (targetPane) targetPane.classList.add('active');
@@ -25,8 +26,12 @@
         if (window.location.hash !== '#' + hashKey) {
           history.replaceState(null, '', '#' + hashKey);
         }
-        if (typeof onTabSwitched === 'function') {
-          onTabSwitched(paneId);
+        try {
+          if (typeof onTabSwitched === 'function') {
+            onTabSwitched(paneId);
+          }
+        } catch (cbErr) {
+          console.warn('onTabSwitched non-fatal:', cbErr);
         }
       } catch (err) {
         console.error('switchTab error:', err);
@@ -97,27 +102,27 @@
 
     <!-- 左侧导航导轨 -->
     <nav class="ds-rail">
-      <button class="ds-rail-btn active" onclick="switchTab('pane-overview')">
+      <button class="ds-rail-btn active" id="tab-overview" data-pane="pane-overview" onclick="switchTab('pane-overview')">
         <span>主线</span>
         <span>总览</span>
       </button>
-      <button class="ds-rail-btn" onclick="switchTab('pane-radar')">
+      <button class="ds-rail-btn" id="tab-radar" data-pane="pane-radar" onclick="switchTab('pane-radar')">
         <span>空间</span>
         <span>地图</span>
       </button>
-      <button class="ds-rail-btn" onclick="switchTab('pane-combat')">
+      <button class="ds-rail-btn" id="tab-combat" data-pane="pane-combat" onclick="switchTab('pane-combat')">
         <span>战斗</span>
         <span>队伍</span>
       </button>
-      <button class="ds-rail-btn" onclick="switchTab('pane-roster')">
+      <button class="ds-rail-btn" id="tab-roster" data-pane="pane-roster" onclick="switchTab('pane-roster')">
         <span>背包</span>
         <span>物资</span>
       </button>
-      <button class="ds-rail-btn" onclick="switchTab('pane-memory')">
+      <button class="ds-rail-btn" id="tab-memory" data-pane="pane-memory" onclick="switchTab('pane-memory')">
         <span>底层</span>
         <span>内存</span>
       </button>
-      <button class="ds-rail-btn" onclick="switchTab('pane-3d')">
+      <button class="ds-rail-btn" id="tab-3d" data-pane="pane-3d" onclick="switchTab('pane-3d')">
         <span>场景</span>
         <span>实景</span>
       </button>
