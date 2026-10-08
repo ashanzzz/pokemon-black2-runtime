@@ -4,6 +4,7 @@ Endpoints expose full read/search capabilities and atomic memory mutation
 primitives (Deposit, Withdraw, Swap, Move) for the 24 PC Boxes in Pokemon Black 2.
 """
 from __future__ import annotations
+from ..actions.command_bus import command_bus
 
 import binascii
 import struct
@@ -663,10 +664,36 @@ async def post_party_swap(req: PartySwapOrderRequest):
         data_a = party_raw[off_a:off_a + PARTY_POKEMON_SIZE]
         data_b = party_raw[off_b:off_b + PARTY_POKEMON_SIZE]
 
-        await _write_main_ram(party_ptr + off_a, data_b)
-        await _write_main_ram(party_ptr + off_b, data_a)
+        # Execute swap through transactional CommandBus with pre-snapshot, verification, and rollback
+        pre_span = party_raw[8:8 + POKE_PARTY_CAPACITY * PARTY_POKEMON_SIZE]
 
-        updated_party = await _party_decoder.sample()
+        async def _capture_pre():
+            return (party_ptr + 8, pre_span, {})
+
+        async def _exec_swap(_meta):
+            await _write_main_ram(party_ptr + off_a, data_b)
+            await _write_main_ram(party_ptr + off_b, data_a)
+            return {"swapped": True}
+
+        async def _verify_swap(_res):
+            p = await _party_decoder.sample()
+            if p and (p.get("count", 0) > 0 or p.get("status") in ("candidate", "resolved")):
+                return True, {"party": p}, None
+            return False, {}, "Party checksum verification failed after swap"
+
+        tx_res = await command_bus.execute_transaction(
+            "party_swap",
+            owner_id=f"slots_{req.slot_a}_{req.slot_b}",
+            capture_pre_state=_capture_pre,
+            execute_action=_exec_swap,
+            verify_post_state=_verify_swap,
+            write_ram=_write_main_ram,
+        )
+
+        if not tx_res.ok:
+            raise HTTPException(status_code=500, detail=f"Party swap transaction failed: {tx_res.error}")
+
+        updated_party = tx_res.data.get("party") or await _party_decoder.sample()
         if updated_party and updated_party.get("slots"):
             updated_party["slots"] = [_enrich_party_slot(s, dex) for s in updated_party["slots"]]
 

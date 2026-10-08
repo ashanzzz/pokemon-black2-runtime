@@ -1,10 +1,16 @@
 """Gen 5 battle AI move evaluator and decision planner for Pokémon Black 2.
 
-Evaluates type effectiveness, STAB, accuracy, and expected damage for each move
-against the opponent, and emits prioritized battle action recommendations.
+Comprehensive Gen V calculation oracle:
+- Gen V physical/special damage formulas with min/max random variance (0.85 .. 1.00)
+- Stat stage scaling (-6 .. +6)
+- Weather modifiers (Rain Water 1.5x / Fire 0.5x, Sun Fire 1.5x / Water 0.5x)
+- Status ailments (Burn physical 0.5x, Paralysis speed 0.25x)
+- Speed tier calculation and move priority (-6 .. +5)
+- Lethal damage knockout assessment
 """
 from __future__ import annotations
 
+import math
 from typing import Any, Dict, List, Optional
 from ..dex.store import DexStore
 
@@ -16,6 +22,14 @@ def _get_dex() -> DexStore:
     if _shared_dex is None:
         _shared_dex = DexStore()
     return _shared_dex
+
+
+def stage_multiplier(stage: int) -> float:
+    """Gen V stat stage modifier for Attack, Defense, Sp. Atk, Sp. Def, Speed."""
+    s = max(-6, min(6, int(stage or 0)))
+    if s >= 0:
+        return (2 + s) / 2.0
+    return 2.0 / (2 - s)
 
 
 def compute_type_effectiveness(move_type_id: int, target_type_ids: list[int]) -> float:
@@ -31,16 +45,126 @@ def compute_type_effectiveness(move_type_id: int, target_type_ids: list[int]) ->
     return multiplier
 
 
+def compute_gen5_damage(
+    attacker_level: int,
+    base_power: int,
+    attacker_stat: int,
+    defender_stat: int,
+    *,
+    is_stab: bool = False,
+    type_mult: float = 1.0,
+    weather: str | None = None,
+    move_type_id: int = 1,
+    is_burned: bool = False,
+    damage_class: str = "physical",
+) -> dict[str, Any]:
+    """Compute Gen V standard damage roll [0.85, 1.00] with weather and burn modifiers."""
+    if base_power <= 0 or type_mult == 0.0 or defender_stat <= 0:
+        return {
+            "min": 0, "max": 0, "avg": 0,
+            "weather_factor": 1.0, "burn_factor": 1.0, "stab_factor": 1.0,
+        }
+
+    lvl = max(1, attacker_level)
+    atk = max(1, attacker_stat)
+    dfn = max(1, defender_stat)
+
+    # Base damage
+    level_factor = math.floor(2 * lvl / 5) + 2
+    base_dmg = math.floor(math.floor(level_factor * base_power * atk / dfn) / 50) + 2
+
+    # Weather modifier: Water=11, Fire=10
+    weather_factor = 1.0
+    if weather == "rain":
+        if move_type_id == 11:
+            weather_factor = 1.5
+        elif move_type_id == 10:
+            weather_factor = 0.5
+    elif weather == "sun":
+        if move_type_id == 10:
+            weather_factor = 1.5
+        elif move_type_id == 11:
+            weather_factor = 0.5
+
+    # Burn penalty (physical moves do half damage)
+    burn_factor = 0.5 if (is_burned and damage_class == "physical") else 1.0
+
+    # STAB modifier
+    stab_factor = 1.5 if is_stab else 1.0
+
+    # Multiplied damage before random roll
+    dmg_pre = base_dmg * weather_factor
+    dmg_pre = math.floor(dmg_pre)
+    dmg_pre = dmg_pre * burn_factor
+    dmg_pre = math.floor(dmg_pre)
+
+    dmg_max = math.floor(dmg_pre * stab_factor * type_mult)
+    dmg_min = math.floor(dmg_max * 0.85)
+    dmg_avg = math.floor((dmg_min + dmg_max) / 2)
+
+    return {
+        "min": max(1 if type_mult > 0 else 0, dmg_min),
+        "max": max(1 if type_mult > 0 else 0, dmg_max),
+        "avg": max(1 if type_mult > 0 else 0, dmg_avg),
+        "weather_factor": weather_factor,
+        "burn_factor": burn_factor,
+        "stab_factor": stab_factor,
+    }
+
+
+def compute_turn_speed(
+    user_base_speed: int,
+    user_speed_stage: int,
+    user_status: str | None,
+    opp_base_speed: int,
+    opp_speed_stage: int,
+    opp_status: str | None,
+    move_priority: int,
+) -> dict[str, Any]:
+    """Determine effective speed and priority turn order."""
+    user_eff_speed = user_base_speed * stage_multiplier(user_speed_stage)
+    if user_status == "paralysis":
+        user_eff_speed *= 0.25
+
+    opp_eff_speed = opp_base_speed * stage_multiplier(opp_speed_stage)
+    if opp_status == "paralysis":
+        opp_eff_speed *= 0.25
+
+    # Positive priority always goes first; negative priority goes last
+    if move_priority > 0:
+        moves_first = True
+    elif move_priority < 0:
+        moves_first = False
+    else:
+        moves_first = user_eff_speed >= opp_eff_speed
+
+    return {
+        "user_speed": round(user_eff_speed, 1),
+        "opp_speed": round(opp_eff_speed, 1),
+        "priority": move_priority,
+        "user_moves_first": moves_first,
+    }
+
+
 def evaluate_move(
     move_id: int,
     current_pp: int,
     max_pp: int,
     *,
     slot: int,
+    user_level: int = 50,
+    user_stats: dict[str, Any] | None = None,
+    user_stages: dict[str, Any] | None = None,
+    user_status: str | None = None,
     user_type_ids: list[int] | None = None,
-    opponent_type_ids: list[int] | None = None,
+    opp_hp: dict[str, Any] | None = None,
+    opp_stats: dict[str, Any] | None = None,
+    opp_stages: dict[str, Any] | None = None,
+    opp_status: str | None = None,
+    opp_type_ids: list[int] | None = None,
+    weather: str | None = None,
 ) -> dict[str, Any]:
-    """Score a single move against the active opponent."""
+    """Score a single move against the active opponent with full Gen V mechanics."""
     dex = _get_dex()
     move_data = dex.get("moves", move_id) or {}
     move_type = move_data.get("type", {})
@@ -48,30 +172,81 @@ def evaluate_move(
     move_name_zh = (move_data.get("names") or {}).get("zh-Hans") or move_data.get("identifier") or f"Move {move_id}"
     move_name_en = (move_data.get("names") or {}).get("en") or move_data.get("identifier") or f"Move {move_id}"
 
-    base_power = move_data.get("power")
+    base_power = move_data.get("power") or 0
     accuracy = move_data.get("accuracy") or 100
     damage_class = (move_data.get("damage_class") or {}).get("identifier", "status")
+    priority = move_data.get("priority") or 0
 
-    opp_types = opponent_type_ids or []
+    opp_types = opp_type_ids or []
     usr_types = user_type_ids or []
 
     # Type effectiveness
     type_mult = compute_type_effectiveness(move_type_id, opp_types) if damage_class != "status" else 1.0
 
-    # STAB (Same-Type Attack Bonus): 1.5x in Gen 5
+    # STAB: 1.5x in Gen 5
     is_stab = move_type_id in usr_types
-    stab_mult = 1.5 if (is_stab and damage_class != "status") else 1.0
 
-    # Score calculation
+    u_stats = user_stats or {}
+    u_stages = user_stages or {}
+    o_stats = opp_stats or {}
+    o_stages = opp_stages or {}
+    o_hp = opp_hp or {}
+
+    # Damage computation
+    if damage_class == "physical":
+        atk = int(u_stats.get("attack", 50)) * stage_multiplier(u_stages.get("attack", 0))
+        dfn = int(o_stats.get("defense", 50)) * stage_multiplier(o_stages.get("defense", 0))
+    elif damage_class == "special":
+        atk = int(u_stats.get("special_attack", 50)) * stage_multiplier(u_stages.get("special_attack", 0))
+        dfn = int(o_stats.get("special_defense", 50)) * stage_multiplier(o_stages.get("special_defense", 0))
+    else:
+        atk = 1
+        dfn = 1
+
+    dmg_calc = compute_gen5_damage(
+        attacker_level=user_level,
+        base_power=base_power,
+        attacker_stat=int(atk),
+        defender_stat=int(dfn),
+        is_stab=is_stab,
+        type_mult=type_mult,
+        weather=weather,
+        move_type_id=move_type_id,
+        is_burned=(user_status == "burn"),
+        damage_class=damage_class,
+    )
+
+    opp_cur_hp = o_hp.get("current", 1) or 1
+    opp_max_hp = o_hp.get("max", 1) or 1
+    lethal = dmg_calc["min"] >= opp_cur_hp
+    possible_lethal = dmg_calc["max"] >= opp_cur_hp
+
+    # Speed & Priority check
+    user_spd = int(u_stats.get("speed", 50))
+    opp_spd = int(o_stats.get("speed", 50))
+    speed_info = compute_turn_speed(
+        user_base_speed=user_spd,
+        user_speed_stage=u_stages.get("speed", 0),
+        user_status=user_status,
+        opp_base_speed=opp_spd,
+        opp_speed_stage=o_stages.get("speed", 0),
+        opp_status=opp_status,
+        move_priority=priority,
+    )
+
     usable = current_pp > 0
-    effective_power = (base_power if base_power is not None else (40 if damage_class == "status" else 50))
-    expected_score = round(effective_power * type_mult * stab_mult * (accuracy / 100.0), 2) if usable else 0.0
+    # Expected score based on average damage and accuracy
+    expected_score = round(dmg_calc["avg"] * (accuracy / 100.0), 2) if usable else 0.0
 
     # Verdict
     if not usable:
         verdict = "no_pp"
     elif type_mult == 0.0:
         verdict = "immune"
+    elif lethal:
+        verdict = "guaranteed_knockout"
+    elif possible_lethal:
+        verdict = "possible_knockout"
     elif type_mult >= 2.0:
         verdict = "super_effective"
     elif type_mult <= 0.5:
@@ -89,11 +264,22 @@ def evaluate_move(
         "damage_class": damage_class,
         "base_power": base_power,
         "accuracy": accuracy,
+        "priority": priority,
         "current_pp": current_pp,
         "max_pp": max_pp,
         "usable": usable,
         "type_multiplier": type_mult,
         "is_stab": is_stab,
+        "damage": {
+            "min": dmg_calc["min"],
+            "max": dmg_calc["max"],
+            "avg": dmg_calc["avg"],
+            "percent_min": round(dmg_calc["min"] / opp_max_hp * 100, 1),
+            "percent_max": round(dmg_calc["max"] / opp_max_hp * 100, 1),
+            "lethal": lethal,
+            "possible_lethal": possible_lethal,
+        },
+        "turn_speed": speed_info,
         "expected_score": expected_score,
         "verdict": verdict,
     }
@@ -105,6 +291,7 @@ def plan_battle_decision(
     opponent_mon: dict[str, Any] | None = None,
     battle_kind: str = "wild",
     capture_eval: dict[str, Any] | None = None,
+    weather: str | None = None,
 ) -> dict[str, Any]:
     """Formulate an AI battle decision recommendation from live combatant facts."""
     dex = _get_dex()
@@ -117,6 +304,16 @@ def plan_battle_decision(
 
     user_type_ids = [t["id"] for t in (player_pkm.get("types") or []) if "id" in t] if player_pkm else []
     opp_type_ids = [t["id"] for t in (opp_pkm.get("types") or []) if "id" in t] if opp_pkm else []
+
+    user_level = int((player_mon or {}).get("level", 50) or 50)
+    user_stats = (player_mon or {}).get("stats") or {}
+    user_stages = (player_mon or {}).get("stages") or (player_mon or {}).get("stat_stages") or {}
+    user_status = ((player_mon or {}).get("status") or {}).get("major")
+
+    opp_hp = (opponent_mon or {}).get("hp") or {}
+    opp_stats = (opponent_mon or {}).get("stats") or {}
+    opp_stages = (opponent_mon or {}).get("stages") or (opponent_mon or {}).get("stat_stages") or {}
+    opp_status = ((opponent_mon or {}).get("status") or {}).get("major")
 
     moves_raw = (player_mon or {}).get("moves") or []
     scored_moves = []
@@ -132,14 +329,23 @@ def plan_battle_decision(
         scored = evaluate_move(
             mid, cpp, mpp,
             slot=m.get("slot", idx),
+            user_level=user_level,
+            user_stats=user_stats,
+            user_stages=user_stages,
+            user_status=user_status,
             user_type_ids=user_type_ids,
-            opponent_type_ids=opp_type_ids,
+            opp_hp=opp_hp,
+            opp_stats=opp_stats,
+            opp_stages=opp_stages,
+            opp_status=opp_status,
+            opp_type_ids=opp_type_ids,
+            weather=weather,
         )
         scored_moves.append(scored)
 
-    # Sort moves by expected_score descending
+    # Sort moves: prioritize lethal knockout moves, then expected_score descending
     usable_moves = [m for m in scored_moves if m["usable"]]
-    usable_moves.sort(key=lambda x: x["expected_score"], reverse=True)
+    usable_moves.sort(key=lambda x: (x["damage"]["lethal"], x["damage"]["possible_lethal"], x["expected_score"]), reverse=True)
 
     best_move = usable_moves[0] if usable_moves else None
 
@@ -161,10 +367,9 @@ def plan_battle_decision(
     elif best_move is not None:
         reason = (
             f"使用「{best_move['name_zh']}」({best_move['name_en']}): "
-            f"威力 {best_move['base_power'] or '变化'}, "
-            f"克制倍率 {best_move['type_multiplier']}x"
-            f"{' (本系加成 STAB)' if best_move['is_stab'] else ''}, "
-            f"预估评分 {best_move['expected_score']}"
+            f"威力 {best_move['base_power']}, 克制 {best_move['type_multiplier']}x, "
+            f"预估伤害 {best_move['damage']['min']}~{best_move['damage']['max']} ({best_move['damage']['percent_min']}%~{best_move['damage']['percent_max']}%), "
+            f"先手: {best_move['turn_speed']['user_moves_first']}"
         )
         recommended_action = {
             "type": "use_move",
@@ -174,35 +379,26 @@ def plan_battle_decision(
             "move_name": best_move["name_zh"],
             "reason": reason,
         }
-    # 3. If no usable moves and wild, run:
+    # 3. Fallback: Flee if wild, else struggle/unresolved
     elif battle_kind == "wild":
         recommended_action = {
             "type": "run",
             "actor": "player:0",
-            "reason": "当前无可用招式 PP，在野外战斗中优先脱离",
+            "reason": "PP exhausted for all moves. Fleeing wild battle.",
         }
     else:
         recommended_action = {
-            "type": "switch",
+            "type": "use_move",
             "actor": "player:0",
-            "party_slot": 2,
-            "reason": "首发宝可梦招式 PP 耗尽，建议切换下一位出战宝可梦",
+            "move_slot": 1,
+            "move_id": 165,  # Struggle
+            "move_name": "拼命 (Struggle)",
+            "reason": "All move PP exhausted in trainer battle. Using Struggle.",
         }
 
     return {
-        "format": "black2-battle-decision-plan/v1",
-        "battle_kind": battle_kind,
-        "player_combatant": {
-            "species_id": player_species,
-            "species_name": (player_pkm or {}).get("name"),
-            "types": user_type_ids,
-        },
-        "opponent_combatant": {
-            "species_id": opp_species,
-            "species_name": (opp_pkm or {}).get("name"),
-            "types": opp_type_ids,
-        },
-        "moves_evaluated": scored_moves,
+        "status": "ready" if best_move else "exhausted",
         "best_move": best_move,
         "recommended_action": recommended_action,
+        "moves_evaluated": scored_moves,
     }

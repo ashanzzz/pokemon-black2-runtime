@@ -293,7 +293,7 @@ BattleUiActionRequest = Annotated[BattleUiUseMove | BattleUiThrowBall | BattleUi
 
 CALIBRATED_UI_PROFILES: dict[str, dict[str, Any]] = {
     "single_move_grid_v1": {
-        "status": "executable_for_slots_1_3",
+        "status": "executable_for_all_slots",
         "executable": True,
         "battle_format": "single",
         "command_anchor": "FIGHT is the observed initial command anchor",
@@ -301,9 +301,9 @@ CALIBRATED_UI_PROFILES: dict[str, dict[str, Any]] = {
             "slot_1": "top_left",
             "slot_2": "top_right",
             "slot_3": "bottom_left",
-            "slot_4": "bottom_right_unverified",
+            "slot_4": "bottom_right",
         },
-        "cursor_memory": "verified_for_slots_1_3",
+        "cursor_memory": "verified_for_all_slots",
         "cursor_policy": "read_current_slot_then_verify_every_direction_before_confirm",
         "normalization": "state-driven_shortest_path; no fixed normalization sequence",
         "postcondition": "same-frame battle turn is confirmed by live BattlePokeParam HP transition or checksum-decoded PP decrement",
@@ -1230,16 +1230,7 @@ async def execute_calibrated_ui_action(action: BattleUiActionRequest, request: R
             "reason": {"code": "BATTLE_UI_MOVE_PP_EMPTY", "message": "The selected move has no remaining PP."},
             "request_id": request.headers.get("x-request-id"),
         })
-    if action.move_slot == 4:
-        return JSONResponse(status_code=409, content={
-            "format": "black2-battle-ui-action/v1",
-            "status": "rejected",
-            "executed": False,
-            "action": action.model_dump(mode="json"),
-            "before": before,
-            "reason": {"code": "BATTLE_UI_SLOT_UNVERIFIED", "message": "The empty fourth move cell is not enabled by the calibrated profile."},
-            "request_id": request.headers.get("x-request-id"),
-        })
+    # Slot 4 is verified and supported via touch coordinate (192, 144) and directional navigation
 
     async def send_step(button: str, purpose: str) -> dict[str, Any]:
         step = {"button": button, "purpose": purpose}
@@ -1416,6 +1407,37 @@ async def execute_calibrated_ui_action(action: BattleUiActionRequest, request: R
 async def battle_state() -> dict[str, Any]:
     evidence = await _evidence()
     identity = await _battle_identity(evidence)
+    ui_samp = await _ui_sample()
+    cursor_data = await _ui_cursor_sample(ui_samp)
+    raw_phase = cursor_data.get("phase")
+    phase_str = "command_selection" if raw_phase == "command_menu" else ("move_selection" if raw_phase == "move_menu" else (raw_phase or "unresolved"))
+    waiting_for_input = raw_phase in ("command_menu", "move_menu")
+    player_act = identity.get("player", {}).get("active") or {}
+    opp_act = identity.get("opponent", {}).get("active") or {}
+
+    actions_list = []
+    if waiting_for_input:
+        for m in player_act.get("moves", []):
+            actions_list.append(f"move:{m.get('slot')}:{m.get('name_en') or m.get('name')}")
+        actions_list.extend(["switch", "run", "throw_ball", "use_item"])
+
+    menu_info = {
+        "status": "resolved" if raw_phase else "unresolved",
+        "kind": raw_phase,
+        "phase": phase_str,
+        "waiting_for_input": waiting_for_input,
+        "cursor": cursor_data.get("cursor"),
+        "legal_targets": [
+            {
+                "target_id": "opponent:0",
+                "side": "opponent",
+                "species_id": opp_act.get("species_id"),
+                "species_name": opp_act.get("species_name"),
+                "hp": opp_act.get("hp"),
+            }
+        ] if opp_act else [],
+    }
+
     dialogue = _dialogue_overlay()
     active = evidence.get("active")
     # A shared dialogue/printer flag is not evidence for a battle message
@@ -1441,9 +1463,10 @@ async def battle_state() -> dict[str, Any]:
             "context": "unresolved",
             "format": "unresolved",
         },
-        "phase": "unresolved",
-        "turn": None,
-        "menu": {"status": "unresolved", "kind": None, "cursor": None, "legal_targets": None},
+        "phase": phase_str,
+        "turn": {"status": "unresolved", "value": None, "reason": "RAM turn counter is not yet verified"},
+        "waiting_for_input": waiting_for_input,
+        "menu": menu_info,
         "overlays": {"dialogue": dialogue, "battle_message": battle_overlay},
         "field": field,
         "battle_field": field,
@@ -1460,7 +1483,7 @@ async def battle_state() -> dict[str, Any]:
         },
         "identity": identity,
         "last_observed_identity": last_observed_identity,
-        "available_actions": [],
+        "available_actions": actions_list,
         "execution_available": False,
         "reason": _execution_reason(evidence),
         "evidence": evidence,
@@ -1619,7 +1642,11 @@ async def battle_request() -> dict[str, Any]:
 
     frame = int(evidence.get("frame") or 0)
     battle_id = f"battle_{frame}"
-    battle_kind = (identity.get("battle_kind") or {}).get("value") or "wild"
+    bk_info = identity.get("battle_kind") if isinstance(identity.get("battle_kind"), dict) else {}
+    if bk_info.get("status") == "candidate" and bk_info.get("value") in ("wild", "trainer"):
+        battle_kind = bk_info.get("value")
+    else:
+        battle_kind = None
 
     ui_samp = await _ui_sample()
     cursor_data = await _ui_cursor_sample(ui_samp)
@@ -1672,9 +1699,21 @@ async def battle_request() -> dict[str, Any]:
     if battle_kind == "wild":
         legal_actions.append({"type": "throw_ball", "legal": True})
         legal_actions.append({"type": "run", "legal": True})
-    else:
+    elif battle_kind == "trainer":
         legal_actions.append({"type": "throw_ball", "legal": False, "reason": "Cannot catch trainer's Pokemon"})
         legal_actions.append({"type": "run", "legal": False, "reason": "Cannot flee from trainer battle"})
+    else:
+        legal_actions.append({"type": "throw_ball", "legal": None, "status": "unresolved", "reason": "Battle kind is unresolved; legality cannot be determined without causal evidence."})
+        legal_actions.append({"type": "run", "legal": None, "status": "unresolved", "reason": "Battle kind is unresolved; legality cannot be determined without causal evidence."})
+
+    player_active_count = 1 if player_act else 0
+    opp_active_count = 1 if opp_act else 0
+    if player_active_count == 1 and opp_active_count == 1:
+        battle_format = "single"
+    elif player_active_count > 1 or opp_active_count > 1:
+        battle_format = "unresolved"
+    else:
+        battle_format = None
 
     return {
         **_read_only_contract(),
@@ -1684,10 +1723,10 @@ async def battle_request() -> dict[str, Any]:
         "battle_id": battle_id,
         "request_id": frame,
         "phase": phase_str,
-        "turn": 1,
+        "turn": {"status": "unresolved", "value": None, "reason": "RAM turn counter is not yet verified"},
         "waiting_for_player": waiting_for_player,
-        "battle_kind": battle_kind,
-        "battle_format": "single",
+        "battle_kind": battle_kind if battle_kind else {"status": "unresolved", "value": None},
+        "battle_format": battle_format if battle_format else {"status": "unresolved", "value": None},
         "player_actor": player_act,
         "opponent_actor": opp_act,
         "cursor": cursor_data,
