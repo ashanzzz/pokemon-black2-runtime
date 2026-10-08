@@ -141,10 +141,9 @@ def _decode_live_map_state(results: dict[str, Any]) -> LiveMapState:
     map_vote = Counter(plausible_maps).most_common(1)
     map_id = map_vote[0][0] if map_vote and map_vote[0][1] >= 2 else None
 
-    # The former 0x0223DE00 candidate and three 0x02143620 mirrors were
-    # rejected by the controlled EXP_015 input sequence.  They remain absent
-    # here until a GameSystem -> Field -> FieldPlayer -> Core -> PlayerActor
-    # chain is resolved and lifecycle-validated for this ROM/session.
+    # The former 0x0223DE00 candidate and three 0x02143620 mirrors are
+    # historical diagnostic evidence only. Runtime must use the discovered
+    # GameSystem -> Field -> FieldPlayer -> Core -> PlayerActor chain.
     return LiveMapState(
         map_id=map_id,
         x=None,

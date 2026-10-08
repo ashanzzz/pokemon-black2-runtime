@@ -50,3 +50,6 @@ runtime/calibration_reports/
 temp_catalog.json
 temp_graph.json
 temp_z441.json
+
+# External reference repositories
+references/

@@ -185,6 +185,27 @@ class TestWorld3DSceneV6(unittest.TestCase):
         self.assertEqual(result["static"]["entities"]["warps"][0]["world"]["z"], 32.0)
         self.assertEqual(result["static"]["location"]["name_source"], "zone_id_fallback")
 
+    def test_static_entities_have_canonical_coordinates_without_mutating_cached_world(self):
+        entity = {"id": 4, "x": 110, "y": 695, "z": 1}
+
+        class Exported:
+            @staticmethod
+            def zone(_zone_id):
+                return {
+                    "matrix": {"matrix_id": 0},
+                    "render_coordinate_system": {"chunk_span_world": 512},
+                    "cells": [], "buildings": [],
+                    "entities": {"npcs": [entity]}, "zone": {}, "area": {"is_exterior": True},
+                }
+
+        static = World3DSceneService(original=None, truth=None, exported=Exported()).static_scene(446)
+        npc = static["entities"]["npcs"][0]
+        self.assertEqual(npc["source_zone_id"], 446)
+        self.assertEqual(npc["grid"], {"x": 110, "y": 1, "z": 695})
+        self.assertEqual(npc["world"], {"x": 1768.0, "y": 16.0, "z": 11128.0})
+        self.assertNotIn("grid", entity)
+        self.assertNotIn("world", entity)
+
     def test_warp_exports_raw_anchor_and_display_center_separately(self):
         class Exported:
             @staticmethod

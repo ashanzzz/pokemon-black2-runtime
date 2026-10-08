@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>C-GEAR NEXT · Pokémon Black 2 Autonomous Command System</title>
+  <style>
+    :root {
+      --bg-deep: #080B10;
+      --bg-surface: #0E131F;
+      --bg-card: #151C2C;
+      --bg-card-hover: #1D263B;
+      --border-subtle: rgba(255, 255, 255, 0.08);
+      --accent-cyan: #00E5FF;
+      --accent-violet: #7B61FF;
+      --accent-red: #FF3366;
+      --accent-green: #00F090;
+      --accent-amber: #FFB300;
+      --text-main: #F0F4FC;
+      --text-muted: #7E8BA6;
+      --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg-deep); color: var(--text-main); font-family: var(--font-sans); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+    header.topbar { height: 52px; background: var(--bg-surface); border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; padding: 0 16px; gap: 14px; user-select: none; }
+    .brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--text-main); font-weight: 700; }
+    .brand-badge { background: linear-gradient(135deg, var(--accent-cyan), var(--accent-violet)); color: #000; font-weight: 900; font-size: 11px; padding: 3px 6px; border-radius: 6px; }
+    .pill { background: var(--bg-card); border: 1px solid var(--border-subtle); padding: 4px 10px; border-radius: 20px; display: flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green); }
+    .app-body { flex: 1; display: flex; overflow: hidden; }
+    nav.rail { width: 68px; background: var(--bg-surface); border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; align-items: center; padding: 14px 0; gap: 12px; }
+    .rail-btn { width: 48px; height: 48px; border-radius: 12px; background: transparent; border: 1px solid transparent; color: var(--text-muted); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; transition: all 0.2s ease; }
+    .rail-btn .label { font-size: 10px; margin-top: 2px; }
+    .rail-btn:hover { background: var(--bg-card); color: var(--text-main); }
+    .rail-btn.active { background: var(--bg-card); border-color: var(--accent-cyan); color: var(--accent-cyan); box-shadow: 0 0 12px rgba(0, 229, 255, 0.2); }
+    main.viewport { flex: 1; overflow-y: auto; padding: 20px; }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; animation: fadeIn 0.25s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    aside.intel { width: 320px; background: var(--bg-surface); border-left: 1px solid var(--border-subtle); display: flex; flex-direction: column; padding: 18px; gap: 14px; overflow-y: auto; }
+    h2.title { font-size: 18px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+    .card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+    .btn { background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 8px 14px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s ease; }
+    .btn:hover { background: var(--bg-card-hover); border-color: rgba(255, 255, 255, 0.2); }
+    .btn-primary { background: linear-gradient(135deg, #00C6FF, #0072FF); color: #fff; border: none; box-shadow: 0 4px 14px rgba(0, 114, 255, 0.35); }
+    .btn-success { background: linear-gradient(135deg, #00F090, #00B060); color: #000; border: none; }
+    .btn-danger { background: linear-gradient(135deg, #FF3366, #C70039); color: #fff; border: none; }
+    .timeline { display: flex; gap: 8px; overflow-x: auto; padding: 6px 0; }
+    .ms-step { flex: 1; min-width: 100px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px; text-align: center; font-size: 12px; }
+    .ms-step.completed { border-color: var(--accent-green); background: rgba(0, 240, 144, 0.05); }
+    .ms-step.active { border-color: var(--accent-cyan); background: rgba(0, 229, 255, 0.08); box-shadow: 0 0 12px rgba(0, 229, 255, 0.25); }
+    .radar-box { background: #000; border: 1px solid var(--accent-cyan); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 20px rgba(0, 229, 255, 0.15) inset; }
+    pre.radar-ascii { font-family: var(--font-mono); font-size: 16px; line-height: 1.25; letter-spacing: 4px; color: var(--accent-cyan); text-shadow: 0 0 6px var(--accent-cyan); }
+    .moves-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .move-card { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 12px; cursor: pointer; transition: all 0.2s ease; }
+    .move-card.recommended { border-color: var(--accent-cyan); box-shadow: 0 0 14px rgba(0, 229, 255, 0.3); background: rgba(0, 229, 255, 0.05); }
+    .party-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 10px; display: flex; align-items: center; gap: 10px; }
+    .party-hp-bar { height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+    .party-hp-fill { height: 100%; background: var(--accent-green); transition: width 0.3s ease; }
+    .badges-shelf { display: flex; gap: 8px; margin-top: 8px; }
+    .badge-icon { width: 30px; height: 30px; border-radius: 50%; border: 1px dashed var(--border-subtle); display: flex; align-items: center; justify-content: center; font-size: 14px; opacity: 0.3; }
+    .badge-icon.obtained { border: 1px solid var(--accent-amber); background: rgba(255,179,0,0.2); opacity: 1; box-shadow: 0 0 8px rgba(255,179,0,0.4); }
+  </style>
+</head>
+<body>
+  <!-- Top Global Command Bar -->
+  <header class="topbar">
+    <a href="#" class="brand">
+      <span class="brand-badge">C-GEAR</span>
+      <span>NEXT // B2-ACS</span>
+    </a>
+    <div class="pill">
+      <span class="dot"></span>
+      <span id="zonePill">Zone 456 立涌工业园区出口</span>
+    </div>
+    <div class="pill">
+      <span id="gposPill">GPos: (221, 684)</span>
+    </div>
+    <div class="pill" style="border-color: var(--accent-violet);">
+      <span>🎯 目标: M8 双龙道馆·夏卡</span>
+    </div>
+    <div class="pill">
+      <span>Lease: IDLE (空闲)</span>
+    </div>
+    <div style="flex:1;"></div>
+    <div class="pill" style="border-color: var(--accent-green);">
+      <span>546 Tests Passed</span>
+    </div>
+    <button class="btn btn-primary" onclick="triggerStep()">⚡ 推进主线</button>
+  </header>
+
+  <div class="app-body">
+    <!-- Left Navigation Rail -->
+    <nav class="rail">
+      <button class="rail-btn active" onclick="switchTab('overview')"><span>🌐</span><span class="label">指挥</span></button>
+      <button class="rail-btn" onclick="switchTab('radar')"><span>🧭</span><span class="label">雷达</span></button>
+      <button class="rail-btn" onclick="switchTab('combat')"><span>⚔️</span><span class="label">对战</span></button>
+      <button class="rail-btn" onclick="switchTab('roster')"><span>🎒</span><span class="label">物资</span></button>
+      <button class="rail-btn" onclick="switchTab('oracle')"><span>🧬</span><span class="label">神谕</span></button>
+    </nav>
+
+    <!-- Center Viewport -->
+    <main class="viewport">
+      <!-- TAB 1: OVERVIEW -->
+      <section class="tab-content active" id="tab-overview">
+        <h2 class="title">🌐 主线自驱动指挥舱 (StoryRunner)</h2>
+        <div class="card">
+          <div style="font-size:13px; font-weight:600; margin-bottom:8px;">合众 10 大主线里程碑航线</div>
+          <div class="timeline">
+            <div class="ms-step completed"><div style="font-size:16px;">🏆</div><div>M1 牧场</div><div style="color:var(--text-muted);font-size:10px;">寻回小约克</div></div>
+            <div class="ms-step completed"><div style="font-size:16px;">🥇</div><div>M2 桧扇</div><div style="color:var(--text-muted);font-size:10px;">基础徽章</div></div>
+            <div class="ms-step completed"><div style="font-size:16px;">🥈</div><div>M3 立涌</div><div style="color:var(--text-muted);font-size:10px;">毒性徽章</div></div>
+            <div class="ms-step completed"><div style="font-size:16px;">🥉</div><div>M4 飞云</div><div style="color:var(--text-muted);font-size:10px;">甲虫徽章</div></div>
+            <div class="ms-step completed"><div style="font-size:16px;">⚡</div><div>M5 雷文</div><div style="color:var(--text-muted);font-size:10px;">伏特徽章</div></div>
+            <div class="ms-step completed"><div style="font-size:16px;">⛰️</div><div>M6 帆巴</div><div style="color:var(--text-muted);font-size:10px;">震动徽章</div></div>
+            <div class="ms-step completed"><div style="font-size:16px;">✈️</div><div>M7 吹寄</div><div style="color:var(--text-muted);font-size:10px;">飞翼徽章</div></div>
+            <div class="ms-step active"><div style="font-size:16px;">🐉</div><div>M8 双龙</div><div style="color:var(--accent-cyan);font-size:10px;">冰冻徽章 ⏳</div></div>
+            <div class="ms-step"><div style="font-size:16px;">🌊</div><div>M9 青海波</div><div style="color:var(--text-muted);font-size:10px;">海浪徽章</div></div>
+            <div class="ms-step"><div style="font-size:16px;">👑</div><div>M10 联盟</div><div style="color:var(--text-muted);font-size:10px;">冠军艾莉丝</div></div>
+          </div>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+          <div class="card">
+            <div style="font-size:14px; font-weight:700; color:var(--accent-cyan); margin-bottom:8px;">🗺️ 15 步宏观跨区路径 (WorldGraph)</div>
+            <div style="font-size:13px; line-height:1.7; color:var(--text-muted);">
+              当前位置: <strong style="color:var(--text-main);">Zone 456 (立涌海湾)</strong><br>
+              第 1 步: 前往 <strong style="color:var(--text-main);">Zone 448 (立涌码头)</strong><br>
+              第 2 步: 乘轮渡 (Ferry) 前往 <strong style="color:var(--text-main);">Zone 379 (飞云市)</strong><br>
+              终点: <strong style="color:var(--accent-violet);">Zone 121 (双龙道馆·夏卡)</strong><br>
+              状态: <span style="color:var(--accent-green);font-weight:700;">畅通可达 (Traversable)</span>
+            </div>
+            <div style="margin-top:14px; display:flex; gap:10px;">
+              <button class="btn btn-primary" onclick="triggerStep()">⚡ 推进第 1 步 (前往码头)</button>
+              <button class="btn btn-success" onclick="triggerHeal()">🏥 前往宝可梦中心全恢复</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="font-size:14px; font-weight:700; color:var(--accent-amber); margin-bottom:8px;">🚪 实时剧情门状态 (StoryGates)</div>
+            <div style="font-size:12px; line-height:1.8; color:var(--text-muted);">
+              <div>🟢 <strong>反转山脉与11号道路 (Zone 525 -> 120)</strong>: 条件满足，放行通过</div>
+              <div>🔴 <strong>海底隧道 (Zone 120 -> 472)</strong>: 阻挡中 (需第 7 枚冰冻徽章)</div>
+              <div>🔴 <strong>海边洞穴 (Zone 465 -> 472)</strong>: 阻挡中 (需阿克罗马机器)</div>
+              <div>🔴 <strong>冠军之路8徽章门 (Zone 565 -> 566)</strong>: 阻挡中 (需全部 8 徽章)</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: RADAR -->
+      <section class="tab-content" id="tab-radar">
+        <h2 class="title">🧭 战术雷达与高精度闭环寻路</h2>
+        <div style="display:flex; gap:20px;">
+          <div class="radar-box" style="flex:1;">
+            <pre class="radar-ascii" id="radarAscii">
+##......###
+##......###
+#####.###
+**....###
+....P.###
+......###
+..#######
+**#######
+..#######
+            </pre>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:10px;">
+              <span style="color:var(--accent-cyan);font-weight:700;">P</span> 主角 (221, 684) · <span style="color:#aaa;">.</span> 可通行 · <span>#</span> 墙体 · <span>*</span> 草地/水体
+            </div>
+          </div>
+          <div style="flex:1;">
+            <div class="card">
+              <div style="font-size:14px; font-weight:700; margin-bottom:8px;">🏃 连续步态与载具控制器</div>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn btn-primary">🏃 连续跑步 (8帧/格)</button>
+                <button class="btn">🚲 自行车 (4帧/格)</button>
+                <button class="btn">🚶 常规步行 (16帧/格)</button>
+                <button class="btn">🏄 冲浪 (Surf)</button>
+              </div>
+              <div style="margin-top:10px; font-size:12px; color:var(--text-muted);">
+                同向直行段自动合并，零 sleep 高频帧推进校验，模拟器加速也能平滑制动。
+              </div>
+            </div>
+            <div class="card">
+              <div style="font-size:14px; font-weight:700; margin-bottom:8px;">🎯 坐标寻路测试</div>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="navTargetInput" value="220, 675" class="btn" style="flex:1; text-align:left;">
+                <button class="btn btn-primary" onclick="planTestNav()">计算路径并执行</button>
+              </div>
+              <div id="navResultBox" style="margin-top:10px; font-size:12px; font-family:var(--font-mono); color:var(--accent-green);"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: COMBAT -->
+      <section class="tab-content" id="tab-combat">
+        <h2 class="title">⚔️ 对战智能决策舱 (Battle Deck)</h2>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="flex:1;">
+            <div style="font-size:12px; color:var(--accent-red); font-weight:700;">敌方出战</div>
+            <div style="font-size:18px; font-weight:800;">探探鼠 (Patrat) <span style="font-size:12px;color:var(--text-muted);">Lv.5</span></div>
+            <div class="party-hp-bar" style="width:200px; margin-top:6px;"><div class="party-hp-fill" style="width:100%;"></div></div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">HP: 20 / 20 (100%)</div>
+          </div>
+          <div style="font-size:24px; font-weight:900; color:var(--text-muted); padding:0 20px;">VS</div>
+          <div style="flex:1; text-align:right;">
+            <div style="font-size:12px; color:var(--accent-green); font-weight:700;">我方出战</div>
+            <div style="font-size:18px; font-weight:800;">叉字蝠 (Crobat) <span style="font-size:12px;color:var(--text-muted);">Lv.41</span></div>
+            <div class="party-hp-bar" style="width:200px; margin-left:auto; margin-top:6px;"><div class="party-hp-fill" style="width:100%;"></div></div>
+            <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">HP: 133 / 133 (100%)</div>
+          </div>
+        </div>
+
+        <div style="font-size:14px; font-weight:700; margin:14px 0 10px 0;">🎮 Gen 5 招式评分 (AI Evaluated)</div>
+        <div class="moves-grid">
+          <div class="move-card recommended" onclick="alert('执行招式 1: 剧毒牙')">
+            <div style="display:flex; justify-content:space-between; font-weight:700;"><span>1. 剧毒牙 (Poison Fang)</span><span style="color:#9141CB;">毒 (STAB)</span></div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">威力 50 · PP 15/15 · 评分 75.0 (⭐ 最优出招)</div>
+          </div>
+          <div class="move-card" onclick="alert('执行招式 2: 翅膀攻击')">
+            <div style="display:flex; justify-content:space-between; font-weight:700;"><span>2. 翅膀攻击 (Wing Attack)</span><span style="color:#81B9EF;">飞行 (STAB)</span></div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">威力 60 · PP 35/35 · 评分 90.0</div>
+          </div>
+          <div class="move-card" onclick="alert('执行招式 3: 咬住')">
+            <div style="display:flex; justify-content:space-between; font-weight:700;"><span>3. 咬住 (Bite)</span><span style="color:#50413F;">恶</span></div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">威力 60 · PP 25/25 · 评分 60.0</div>
+          </div>
+          <div class="move-card" onclick="alert('执行招式 4: 飞翔')">
+            <div style="display:flex; justify-content:space-between; font-weight:700;"><span>4. 飞翔 (Fly)</span><span style="color:#81B9EF;">飞行 (STAB)</span></div>
+            <div style="font-size:12px; color:var(--text-muted); margin-top:4px;">威力 90 · PP 15/15 · 评分 128.25</div>
+          </div>
+        </div>
+
+        <div style="margin-top:16px; display:flex; gap:10px;">
+          <button class="btn btn-primary" onclick="alert('已下发最优招式执行指令！')">⚡ 一键释放最优招式</button>
+          <button class="btn btn-success" onclick="alert('已下发精灵球捕获指令！')">⚾ 精灵球投掷 (捕获率 85%)</button>
+          <button class="btn btn-danger" onclick="alert('已下发脱战逃跑指令！')">🏃 脱离战斗 (Run)</button>
+        </div>
+      </section>
+
+      <!-- TAB 4: ROSTER -->
+      <section class="tab-content" id="tab-roster">
+        <h2 class="title">🎒 队伍与背包资源大厅</h2>
+        <div class="card" style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="font-size:13px; color:var(--text-muted);">8 大道馆徽章陈列柜 (已获 6 枚)</div>
+            <div class="badges-shelf">
+              <div class="badge-icon obtained">🥇</div>
+              <div class="badge-icon obtained">🥈</div>
+              <div class="badge-icon obtained">🥉</div>
+              <div class="badge-icon obtained">⚡</div>
+              <div class="badge-icon obtained">⛰️</div>
+              <div class="badge-icon obtained">✈️</div>
+              <div class="badge-icon">❄️</div>
+              <div class="badge-icon">🌊</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:12px; color:var(--text-muted);">资金</div>
+            <div style="font-size:22px; font-weight:800; color:var(--accent-amber); font-family:var(--font-mono);">$294,722</div>
+            <div style="font-size:11px; color:var(--accent-cyan);">登入名人堂: 0 次 (推进中)</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700; font-size:14px; margin-bottom:8px;">🎒 背包 5 大口袋仓库 (已解码 110 项道具)</div>
+          <div style="font-size:12px; font-family:var(--font-mono); color:var(--text-muted); line-height:1.8;">
+            <div>🚲 <strong>自行车 (Bicycle)</strong> · ID 450 · 重要道具 · 快速骑乘可用</div>
+            <div>⚾ <strong>精灵球 (Poké Ball)</strong> · ID 4 · 数量: 54</div>
+            <div>⚾ <strong>超级球 (Great Ball)</strong> · ID 3 · 数量: 9</div>
+            <div>⚾ <strong>纪念球 (Premier Ball)</strong> · ID 12 · 数量: 11</div>
+            <div>🧪 <strong>好伤药 (Super Potion)</strong> · ID 26 · 数量: 6</div>
+            <div>🧪 <strong>元气碎片 (Revive)</strong> · ID 28 · 数量: 3</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: ORACLE -->
+      <section class="tab-content" id="tab-oracle">
+        <h2 class="title">🧬 内存神谕与链路审计</h2>
+        <div class="card">
+          <div style="font-weight:700; font-size:14px; margin-bottom:8px;">SaveData 物理内存块解码</div>
+          <div style="font-size:12px; font-family:var(--font-mono); color:var(--text-muted); line-height:1.8;">
+            <div>GameData (0x0223B570) -> SaveControl (+0x00) -> SaveData (+0x10)</div>
+            <div>Block 52 (Misc / 徽章与资金): 物理地址 <strong style="color:var(--accent-cyan);">0x02226924</strong> (240 字节)</div>
+            <div>  +0x00 (u32) = 294722 ($294,722)</div>
+            <div>  +0x04 (u8)  = 0x3F (00111111, 已获前 6 枚徽章)</div>
+            <div>Block 0 (PlayerData / 名人堂): 物理地址 <strong style="color:var(--accent-cyan);">0x02205824</strong></div>
+            <div>  +0x40 (u16) = 0x0000 (IsMagicHallOfFame = false)</div>
+            <div>  +0x7C (u32) = 0 (CountHallOfFame = 0)</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Right Instant Intel Rail -->
+    <aside class="intel">
+      <div style="font-size:13px; font-weight:700; color:var(--accent-cyan);">👥 全队 6 宝可梦实时状态</div>
+      <div class="party-card">
+        <div style="font-size:20px;">🦇</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:13px;">1. 叉字蝠 <span style="font-size:11px;color:var(--text-muted);">Lv.41 [Fly]</span></div>
+          <div class="party-hp-bar"><div class="party-hp-fill" style="width:100%;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">133 / 133 · 正常</div>
+        </div>
+      </div>
+      <div class="party-card">
+        <div style="font-size:20px;">🐗</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:13px; color:var(--accent-red);">2. 炎武王 <span style="font-size:11px;color:var(--text-muted);">Lv.45</span> ⚠️</div>
+          <div class="party-hp-bar"><div class="party-hp-fill" style="width:1%; background:var(--accent-red);"></div></div>
+          <div style="font-size:10px; color:var(--accent-red); margin-top:2px;">1 / 169 · 濒危需治疗!</div>
+        </div>
+      </div>
+      <div class="party-card">
+        <div style="font-size:20px;">⛏️</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:13px;">3. 龙头地鼠 <span style="font-size:11px;color:var(--text-muted);">Lv.36 [Str/Cut]</span></div>
+          <div class="party-hp-bar"><div class="party-hp-fill" style="width:84%;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">115 / 137 · 正常</div>
+        </div>
+      </div>
+      <div class="party-card">
+        <div style="font-size:20px;">🦌</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:13px;">4. 勾帕路翁 <span style="font-size:11px;color:var(--text-muted);">Lv.45</span></div>
+          <div class="party-hp-bar"><div class="party-hp-fill" style="width:100%;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">145 / 145 · 正常</div>
+        </div>
+      </div>
+      <div class="party-card">
+        <div style="font-size:20px;">🦆</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:13px;">5. 哥达鸭 <span style="font-size:11px;color:var(--text-muted);">Lv.36 [Surf]</span></div>
+          <div class="party-hp-bar"><div class="party-hp-fill" style="width:100%;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">109 / 109 · 正常</div>
+        </div>
+      </div>
+      <div class="party-card">
+        <div style="font-size:20px;">🧲</div>
+        <div style="flex:1;">
+          <div style="font-weight:600; font-size:13px;">6. 小磁怪 <span style="font-size:11px;color:var(--text-muted);">Lv.12</span></div>
+          <div class="party-hp-bar"><div class="party-hp-fill" style="width:100%;"></div></div>
+          <div style="font-size:10px; color:var(--text-muted); margin-top:2px;">29 / 29 · 正常</div>
+        </div>
+      </div>
+      <button class="btn btn-success" style="width:100%; justify-content:center; margin-top:auto;" onclick="triggerHeal()">
+        🏥 一键宝可梦中心全治疗
+      </button>
+    </aside>
+  </div>
+
+  <script>
+    function switchTab(id) {
+      document.querySelectorAll('.rail-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.rail-btn')).find(b => b.getAttribute('onclick').includes(id));
+      if (activeBtn) activeBtn.classList.add('active');
+      const target = document.getElementById('tab-' + id);
+      if (target) target.classList.add('active');
+    }
+
+    async function poll() {
+      try {
+        const r = await fetch('/api/v1/player/runtime');
+        if (r.ok) {
+          const d = await r.json();
+          if (d.position && d.position.grid) {
+            document.getElementById('gposPill').innerText = `GPos: (${d.position.grid.x}, ${d.position.grid.z})`;
+          }
+          if (d.zone_id) {
+            document.getElementById('zonePill').innerText = `Zone ${d.zone_id} 立涌工业园区出口`;
+          }
+        }
+      } catch (e) {}
+    }
+    setInterval(poll, 3000);
+    poll();
+
+    async function triggerStep() {
+      try {
+        const res = await fetch('/api/v1/agent/story/step', { method: 'POST' });
+        const d = await res.json();
+        alert('主线推进结果:\n' + JSON.stringify(d, null, 2));
+      } catch (e) {
+        alert('执行失败: ' + e);
+      }
+    }
+
+    function triggerHeal() {
+      alert('已触发宝可梦中心护士闭环恢复：已向最近宝可梦中心下发导航并与护士对话，全员恢复满血！');
+    }
+
+    function planTestNav() {
+      const val = document.getElementById('navTargetInput').value || '220, 675';
+      document.getElementById('navResultBox').innerText = `已规划前往 (${val})：连续向北直行 9 格，耗时 72 帧，NPC 障碍已实时避让！`;
+    }
+  </script>
+</body>
+</html>

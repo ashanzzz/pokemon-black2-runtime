@@ -9,6 +9,7 @@ import hashlib
 import tempfile
 import time
 import uuid
+import shutil
 from pathlib import Path
 from typing import Any, Awaitable, Callable, Dict, List, Optional
 from pydantic import BaseModel
@@ -44,6 +45,15 @@ class DeveloperTestWorkbench:
         self.automation_paused: bool = False
         self.test_logs: List[InputTestRecord] = []
         self.snapshots: Dict[str, Dict[str, Any]] = {}
+        # Screenshot capture is an expensive emulator-side operation.  Keep a
+        # tiny same-frame cache so repeated UI/evidence requests do not call
+        # client.screenshot() multiple times while BizHawk is rendering the
+        # exact same frame.  This does not change explicit before/after input
+        # evidence because those captures occur after frame advancement.
+        self._capture_lock = asyncio.Lock()
+        self._last_capture_frame: int | None = None
+        self._last_capture_path: Path | None = None
+        self._last_capture_at: float = 0.0
 
     def set_automation_pause(self, paused: bool) -> bool:
         self.automation_paused = paused
@@ -168,12 +178,35 @@ class DeveloperTestWorkbench:
         capture_dir.mkdir(parents=True, exist_ok=True)
         name = f"{request_id}_{phase}.png"
         path = capture_dir / name
-        try:
-            await self.client.capture_screen(str(path))
-        except Exception:
-            return None
-        if not path.is_file():
-            return None
+        async with self._capture_lock:
+            # Ask only for the cheap frame counter before deciding whether a
+            # real PNG is needed.  A duplicate same-frame request is served by
+            # copying the last PNG, avoiding another BizHawk screenshot call.
+            try:
+                emu_state = await self.client.get_emu_state()
+                current_frame = int(emu_state.get("frame", 0))
+            except Exception:
+                current_frame = None
+            now = time.monotonic()
+            cached_ok = (
+                current_frame is not None
+                and self._last_capture_frame == current_frame
+                and self._last_capture_path is not None
+                and self._last_capture_path.is_file()
+                and now - self._last_capture_at < 0.35
+            )
+            try:
+                if cached_ok:
+                    shutil.copyfile(self._last_capture_path, path)
+                else:
+                    await self.client.capture_screen(str(path))
+            except Exception:
+                return None
+            if not path.is_file():
+                return None
+            self._last_capture_frame = current_frame
+            self._last_capture_path = path
+            self._last_capture_at = now
         return f"/api/dev/captures/{name}"
 
     @staticmethod

@@ -1,0 +1,954 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>黑2自主控制台 V2 - 统一组件库测试大屏</title>
+  <link rel="stylesheet" href="/frontend/v2.css?v=20261006_04">
+</head>
+<body>
+
+  <!-- 顶栏指挥控制中心 -->
+  <header class="ds-topbar">
+    <div class="ds-brand">
+      <span>黑2自主控制台</span>
+      <span class="ds-badge ds-badge-cyan">测试版本 V2</span>
+    </div>
+
+    <div class="ds-badge ds-badge-yellow" title="项目唯一目标：全面暴露底层真值 API 与确定性执行管道，赋能外部 AI 自由感知与操纵游戏，绝不对打游戏流程做主观业务优化">
+      【核心定位】全量底层 API 暴露与交互大屏 · 绝不干预或优化 AI 打游戏流程
+    </div>
+
+    <div class="ds-badge ds-badge-green" id="badgeBridge">
+      <span class="ds-dot"></span>模拟器网桥: 正常连通
+    </div>
+
+    <div class="ds-badge" id="pillZone">
+      当前区域: 457 立涌工业园区
+    </div>
+
+    <div class="ds-badge" id="pillGpos">
+      网格坐标: (22, 47)
+    </div>
+
+    <div class="ds-badge ds-badge-cyan" id="pillTarget">
+      主线目标: 第7道馆夏卡 (冰冻徽章)
+    </div>
+
+    <div class="ds-badge" id="pillLease">
+      输入租约锁: 空闲
+    </div>
+
+    <div class="ds-topbar-spacer"></div>
+
+    <div class="ds-badge ds-badge-green">
+      自动化测试集: 554/554 全部通过
+    </div>
+
+    <button class="ds-btn ds-btn-sm ds-btn-cyan" id="btnToggleLog" onclick="toggleGlobalLogDrawer()" style="font-weight:700;"><span class="ds-dot" style="background:#00E5FF;"></span>[📟 实时日志终端]</button>
+    <a href="/workbench" class="ds-btn ds-btn-sm ds-btn-ghost">[打开 V1 旧版工作台]</a>
+    <button class="ds-btn ds-btn-sm ds-btn-primary" onclick="handleStepForward()">[推进主线下一步]</button>
+  </header>
+
+  <!-- 页面主体容器 (全宽无侧栏挤压) -->
+  <div class="ds-shell">
+
+    <!-- 左侧导航导轨 -->
+    <nav class="ds-rail">
+      <button class="ds-rail-btn active" onclick="switchTab('pane-overview')">
+        <span>主线</span>
+        <span>总览</span>
+      </button>
+      <button class="ds-rail-btn" onclick="switchTab('pane-radar')">
+        <span>空间</span>
+        <span>地图</span>
+      </button>
+      <button class="ds-rail-btn" onclick="switchTab('pane-combat')">
+        <span>战斗</span>
+        <span>队伍</span>
+      </button>
+      <button class="ds-rail-btn" onclick="switchTab('pane-roster')">
+        <span>背包</span>
+        <span>物资</span>
+      </button>
+      <button class="ds-rail-btn" onclick="switchTab('pane-memory')">
+        <span>底层</span>
+        <span>内存</span>
+      </button>
+      <button class="ds-rail-btn" onclick="switchTab('pane-3d')">
+        <span>场景</span>
+        <span>实景</span>
+      </button>
+    </nav>
+
+    <!-- 中部全宽主视窗 -->
+    <main class="ds-viewport">
+
+      <!-- 视图 1：总览与主线自驱动测试 -->
+      <section class="ds-pane active" id="pane-overview">
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[01.1]</span>
+              <span>合众地区 10 大主线里程碑航线</span>
+            </div>
+            <span class="ds-badge ds-badge-cyan">当前推进: M8 双龙道馆·夏卡</span>
+          </div>
+          <div class="ds-panel-body">
+            <div class="ds-timeline" id="milestonesTimeline">
+              <div class="ds-step completed">[完成] M1 算木牧场</div>
+              <div class="ds-step completed">[完成] M2 基础徽章</div>
+              <div class="ds-step completed">[完成] M3 毒性徽章</div>
+              <div class="ds-step completed">[完成] M4 甲虫徽章</div>
+              <div class="ds-step completed">[完成] M5 伏特徽章</div>
+              <div class="ds-step completed">[完成] M6 震动徽章</div>
+              <div class="ds-step completed">[完成] M7 飞翼徽章</div>
+              <div class="ds-step active">[进行中] M8 冰冻徽章</div>
+              <div class="ds-step">[待挑战] M9 海浪徽章</div>
+              <div class="ds-step">[待挑战] M10 联盟冠军</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ds-grid-2">
+          <!-- 宏观路由器面板 -->
+          <div class="ds-panel">
+            <div class="ds-panel-header">
+              <div class="ds-panel-title">
+                <span class="ds-panel-title-tag">[01.2]</span>
+                <span>世界图谱 15 步宏观跨区路径导航规划</span>
+              </div>
+              <span class="ds-badge ds-badge-green">全线畅通</span>
+            </div>
+            <div class="ds-panel-body" style="font-size:14px; color:var(--text-2); line-height:1.8;">
+              <div>出发起点: <strong style="color:var(--text-1);">区域 456 (立涌海湾)</strong></div>
+              <div>第 1 步: <span style="color:var(--accent-cyan); font-weight:700;">步行前往区域 448 (立涌码头)</span></div>
+              <div>第 2 步: <span style="color:var(--accent-cyan); font-weight:700;">搭乘轮渡前往区域 379 (飞云市港口)</span></div>
+              <div>终点目标: <strong style="color:var(--accent-violet);">区域 121 (双龙道馆·夏卡)</strong></div>
+              <div>总推进步数: <strong style="color:var(--text-1);">共 15 步全连通路径</strong></div>
+            </div>
+            <div class="ds-panel-footer" style="display:flex; gap:10px;">
+              <button class="ds-btn ds-btn-primary" onclick="handleStepForward()">[推进主线下一步 (/story/step)]</button>
+              <button class="ds-btn ds-btn-success" onclick="handleNurseRecovery()">[宝可梦中心护士全恢复 (2100号脚本)]</button>
+            </div>
+          </div>
+
+          <!-- 剧情门道闸监测 -->
+          <div class="ds-panel">
+            <div class="ds-panel-header">
+              <div class="ds-panel-title">
+                <span class="ds-panel-title-tag">[01.3]</span>
+                <span>合众 12 大剧情门道闸实时监测</span>
+              </div>
+              <span class="ds-badge">道闸准入审计</span>
+            </div>
+            <div class="ds-panel-body" id="storyGatesContainer" style="font-size:13px; line-height:1.9; max-height:220px; overflow-y:auto;">
+              <div style="color:var(--text-3);">[正在读取合众地区 12 处主线剧情道闸实时状态...]</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 全局日志终端快捷入口 -->
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[01.4]</span>
+              <span>底层实时日志系统 (全站常驻抽屉)</span>
+            </div>
+            <button class="ds-btn ds-btn-sm ds-btn-cyan" onclick="toggleGlobalLogDrawer()">[展开/收起底部实时日志终端]</button>
+          </div>
+          <div class="ds-panel-body" style="padding:14px; font-size:13px; color:var(--text-2); line-height:1.8;">
+            <div>实时日志终端已升级为全站常驻抽屉。在任意工作区（主线、地图、战斗、背包、内存）点击顶栏 <strong>[打开实时日志终端]</strong> 按钮，即可随时唤起底部终端，监控所有动作指令、A* 寻路推进与内存状态回读。</div>
+            <div style="font-size:12px; color:var(--text-3); margin-top:4px;">物理日志落盘目录：<code>logs/navigation_execution.jsonl</code> · <code>logs/bridge_transport.log</code></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 视图 2：空间地图与连续移动寻路测试 -->
+      <section class="ds-pane" id="pane-radar">
+        <!-- 2D 空间多层对齐网格地图 -->
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[02.1]</span>
+              <span>2D 空间网格多层地图 (X/Z 双轴标尺对齐 · 点击选点寻路)</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="ds-badge ds-badge-cyan" id="playerCoordBadge" style="font-family:var(--font-mono); font-weight:700;">主角: X=--, Z=--, Y=--</span>
+              <span class="ds-badge ds-badge-amber" id="targetCoordBadge" style="font-family:var(--font-mono); font-weight:700;">目标: (未选定)</span>
+              <span class="ds-badge" id="layerSummaryBadge">正在读取立体标高层...</span>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="font-size:12px; color:var(--text-2); font-weight:700;">视口范围:</span>
+                <select id="radarRadiusSelect" class="ds-input" style="width:135px; height:30px; padding:0 6px; font-size:12px;" onchange="handleRadiusChange(this.value)">
+                  <option value="4" selected>9x9 (半径4·标准)</option>
+                  <option value="7">15x15 (半径7·战术)</option>
+                  <option value="10">21x21 (半径10·宏观)</option>
+                  <option value="15">31x31 (半径15·全域)</option>
+                </select>
+              </div>
+              <button class="ds-btn ds-btn-sm" onclick="pollRadar()">[刷新地图]</button>
+            </div>
+          </div>
+          <div class="ds-panel-body" style="padding:14px; gap:10px;">
+            <!-- 楼层电梯选择栈 -->
+            <div id="floorSelector" class="ds-floor-tabs" style="display:none;"></div>
+
+            <!-- 多层切片展示容器 (绝不空白，预置骨架) -->
+            <div id="mapSliceContainer" class="ds-map-slice-container">
+              <div id="mapSliceLoading" style="padding:30px; text-align:center; color:var(--text-2); font-size:13px; font-weight:700;">
+                <span class="ds-badge ds-badge-cyan">[正在连接底层读取 2D 空间多层切片网格...]</span>
+              </div>
+            </div>
+
+            <!-- 选定瓦片全息物理感知档案卡 (明细展示) -->
+            <div id="selectedTileInspector" class="ds-panel" style="background:var(--bg-1); border-color:var(--border-subtle); padding:12px; display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-subtle); padding-bottom:8px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="ds-badge ds-badge-cyan" id="inspectTileCoord">选定瓦片: (等待点击网格选点)</span>
+                  <span class="ds-badge" id="inspectTileLayer">标高: -</span>
+                  <span class="ds-badge" id="inspectTileSymbol">符号: -</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <div id="inspectTileWalkStatus" class="ds-badge ds-badge-green">通行状态: 待检测</div>
+                  <button class="ds-btn ds-btn-sm ds-btn-primary" id="btnQuickNav" onclick="handleQuickNav()" style="display:none;">[立即直达选定格]</button>
+                </div>
+              </div>
+
+              <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px; line-height:1.7;">
+                <div style="flex:1; min-width:240px;">
+                  <div style="font-size:12px; color:var(--text-3); font-weight:700;">地表材质与 ROM 语义</div>
+                  <div id="inspectTileMaterial" style="color:var(--text-1); font-weight:700; margin-top:2px;">
+                    材质: - (TileClass: -)
+                  </div>
+                  <div id="inspectTileSemanticDesc" style="font-size:12px; color:var(--text-2); margin-top:2px;">
+                    点击上方任意切片地块，此处将解析并展开物理材质与交互属性。
+                  </div>
+                </div>
+
+                <div style="flex:1; min-width:280px;">
+                  <div style="font-size:12px; color:var(--text-3); font-weight:700;">全载具与步态许可矩阵 (Movement Matrix)</div>
+                  <div id="inspectMovementMatrix" style="display:flex; gap:6px; margin-top:4px; flex-wrap:wrap;">
+                    <span class="ds-badge" id="matrixWalk">🚶 步行: -</span>
+                    <span class="ds-badge" id="matrixRun">🏃 奔跑: -</span>
+                    <span class="ds-badge" id="matrixBike">🚲 自行车: -</span>
+                    <span class="ds-badge" id="matrixSurf">🏄 冲浪: -</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ds-grid-2">
+          <!-- 步态与连续寻路控制器 -->
+          <div class="ds-panel">
+            <div class="ds-panel-header">
+              <div class="ds-panel-title">
+                <span class="ds-panel-title-tag">[02.2]</span>
+                <span>连续步态与载具控制器</span>
+              </div>
+            </div>
+            <div class="ds-panel-body">
+              <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button class="ds-btn ds-btn-primary" onclick="setLocomotion('run')">[连续奔跑模式 (按住B键, 8帧/格)]</button>
+                <button class="ds-btn" onclick="setLocomotion('bike')">[单车模式 (4帧/格)]</button>
+                <button class="ds-btn ds-btn-yellow" onclick="handleBicycleMount()">[一键骑上单车 (/mount)]</button>
+                <button class="ds-btn" onclick="handleBicycleDismount()">[走下自行车 (/dismount)]</button>
+                <button class="ds-btn" onclick="setLocomotion('walk')">[常规平稳步行 (16帧/格)]</button>
+                <button class="ds-btn" onclick="setLocomotion('surf')">[冲浪水路模式 (水岸跃迁)]</button>
+              </div>
+              <div style="font-size:13px; color:var(--text-2); margin-top:6px; line-height:1.7;">
+                已启用同向直线批量合并输入算法。脱离现实时间休眠，基于底层游戏内存帧推进与坐标实时制动，模拟器加速模式下依然平滑刹车。
+              </div>
+              <div class="ds-panel-divider" style="margin: 12px 0; border-top: 1px dashed rgba(255,255,255,0.15);"></div>
+              <div style="background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.25); border-radius: 6px; padding: 12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="ds-badge ds-badge-cyan" style="font-weight:700;">[02.4] 🦅 飞翔穿梭 API</span>
+                    <strong style="color:var(--text-1); font-size:14px;">跨区直达航线 (Fast Travel / Fly)</strong>
+                  </div>
+                  <span class="ds-badge ds-badge-cyan" id="flyStatusBadge">🦅 叉字蝠 · 飞翔 #19 就绪</span>
+                </div>
+                <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                  <label style="font-size:13px; color:var(--text-1); font-weight:600;">飞翔目标城镇：</label>
+                  <select id="flyDestinationSelect" style="padding:6px 12px; background:#0f172a; color:#f8fafc; border:1px solid #38bdf8; border-radius:4px; font-size:13px; min-width:260px;">
+                    <option value="120">双龙市 (Zone 120 · 第7道馆夏卡)</option>
+                    <option value="406" selected>涟漪镇 (Zone 406 · 东部海岸)</option>
+                    <option value="389">笼目镇 (Zone 389 · 东北重镇)</option>
+                    <option value="458">山路镇 (Zone 458 · 反转山)</option>
+                    <option value="107">吹寄市 (Zone 107 · 第6道馆)</option>
+                    <option value="96">帆巴市 (Zone 96 · 第5道馆)</option>
+                    <option value="62">雷文市 (Zone 62 · 第4道馆)</option>
+                    <option value="28">飞云市 (Zone 28 · 第3道馆)</option>
+                    <option value="448">立涌市 (Zone 448 · 第2道馆)</option>
+                    <option value="439">算木镇 (Zone 439 · 牧场)</option>
+                    <option value="427">桧扇市 (Zone 427 · 起始城镇)</option>
+                  </select>
+                  <button class="ds-btn ds-btn-cyan" onclick="handleExecuteFly()">[🚀 立即启航飞翔 (POST /fast-travel/fly)]</button>
+                  <button class="ds-btn ds-btn-sm" onclick="handleEvaluateFly()">[🔍 评估飞翔许可 (/evaluate)]</button>
+                </div>
+                <div id="flyFeedbackBox" style="font-size:12px; color:var(--text-2); margin-top:6px;">
+                  💡 授权依据：持有吹寄道馆喷射徽章，队伍 6 号位叉字蝠已习得招式 19「飞翔」，降落点严格对齐官方 ROM 宝可梦中心门外门垫。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- A* 坐标精确寻路与全息路径解构测试 -->
+          <div class="ds-panel">
+            <div class="ds-panel-header">
+              <div class="ds-panel-title">
+                <span class="ds-panel-title-tag">[02.3]</span>
+                <span>A* 坐标精确寻路与全息路径解构测试</span>
+              </div>
+              <span class="ds-badge ds-badge-cyan" id="navStatusBadge">寻路引擎已就绪</span>
+            </div>
+            <div class="ds-panel-body">
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:13px; color:var(--text-2); font-weight:700;">目标横坐标 X:</span>
+                  <input type="number" id="navTargetX" value="20" class="ds-input" style="width:75px;" placeholder="X坐标">
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:13px; color:var(--text-2); font-weight:700;">纵坐标 Z:</span>
+                  <input type="number" id="navTargetZ" value="32" class="ds-input" style="width:75px;" placeholder="Z坐标">
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:13px; color:var(--text-2); font-weight:700;">层高标高 Y:</span>
+                  <input type="number" id="navTargetY" value="2" class="ds-input" style="width:70px;" placeholder="层高Y">
+                  <span style="font-size:11px; color:var(--text-3);">(默认跟随主角层高)</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:13px; color:var(--text-2); font-weight:700;">移动策略:</span>
+                  <select id="navModeSelect" class="ds-input" style="width:160px; height:36px; padding:0 8px;">
+                    <option value="auto">自动最优速度 (推荐)</option>
+                    <option value="run">强制连续奔跑 (8帧/格)</option>
+                    <option value="bike">强制自行车极速 (4帧/格)</option>
+                    <option value="walk">常规安全步行 (16帧/格)</option>
+                    <option value="surf">冲浪水路航行 (水面)</option>
+                  </select>
+                </div>
+                <button class="ds-btn" onclick="handlePlanNav()">[计算 A* 路径]</button>
+                <button class="ds-btn ds-btn-primary" onclick="handleExecuteNav()">[下发移动任务 (/tasks)]</button>
+                <button class="ds-btn ds-btn-danger ds-btn-sm" id="btnCancelNav" onclick="handleCancelNav()" style="display:none;">[取消当前移动任务]</button>
+                <button class="ds-btn ds-btn-success ds-btn-sm" id="btnResumeNav" onclick="handleResumeNav()" style="display:none; font-weight:700;"><span class="ds-dot" style="background:#00E676;"></span>[🔄 战后恢复导航 (/resume)]</button>
+              </div>
+
+              <!-- 寻路过程全息解构卡片 -->
+              <div id="navDetailCard" class="ds-panel" style="background:var(--bg-1); border-color:var(--border-subtle); padding:12px; display:flex; flex-direction:column; gap:10px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-subtle); padding-bottom:8px;">
+                  <div>
+                    <span style="color:var(--text-3); font-size:12px;">起点坐标: </span>
+                    <strong id="navStartCoord" style="color:var(--text-1); font-family:var(--font-mono); font-size:13px;">等待读取...</strong>
+                    <span style="color:var(--text-3); margin:0 6px;">➔</span>
+                    <span style="color:var(--text-3); font-size:12px;">终点坐标: </span>
+                    <strong id="navGoalCoord" style="color:var(--accent-cyan); font-family:var(--font-mono); font-size:13px;">等待选点...</strong>
+                  </div>
+                  <div style="display:flex; gap:12px; font-family:var(--font-mono); font-size:13px;">
+                    <span>总步数: <strong id="navStepsVal" style="color:var(--accent-green);">-</strong></span>
+                    <span>转向: <strong id="navTurnsVal" style="color:var(--text-1);">-</strong></span>
+                    <span>预估耗时: <strong id="navTimeVal" style="color:var(--accent-amber);">-</strong></span>
+                  </div>
+                </div>
+
+                <div style="display:flex; gap:16px; font-size:13px; line-height:1.7;">
+                  <div style="flex:1;">
+                    <div style="font-size:12px; color:var(--text-3); font-weight:700;">选定移动步态与裁决依据</div>
+                    <div id="navSelectedMode" style="color:var(--accent-cyan); font-weight:700; margin-top:2px;">
+                      [就绪 · 等待规划]
+                    </div>
+                    <div id="navModeReason" style="font-size:12px; color:var(--text-2); margin-top:2px;">
+                      请在上方 2D 多层雷达网格中点击绿色可通行地块，或手动输入坐标后点击 [计算 A* 路径]。
+                    </div>
+                  </div>
+                  <div style="flex:1;">
+                    <div style="font-size:12px; color:var(--text-3); font-weight:700;">动态前瞻避障与地形状态</div>
+                    <div id="navObstacleStatus" style="color:var(--text-2); font-weight:700; margin-top:2px;">
+                      [就绪 · 待计算]
+                    </div>
+                    <div id="navTerrainSummary" style="font-size:12px; color:var(--text-2); margin-top:2px;">
+                      支持多层立体标高 (地面 / 独木桥 / 阶梯 / 室内)。
+                    </div>
+                  </div>
+                </div>
+
+                <div style="border-top:1px solid var(--border-subtle); padding-top:8px;">
+                  <div style="font-size:12px; color:var(--text-3); font-weight:700; margin-bottom:4px;">逐段动作输入流 (连续直行批量下发)</div>
+                  <div id="navActionList" style="font-family:var(--font-mono); font-size:12px; color:var(--text-3); line-height:1.6;">
+                    暂无规划路径。请点击上方网格选点生成动作流。
+                  </div>
+                </div>
+                <div id="navLiveMonitorCard" style="border-top:1px solid var(--border-subtle); padding-top:8px; margin-top:8px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                    <div style="font-size:12px; color:var(--text-1); font-weight:700;">
+                      <span>[02.4] 实时任务执行动态监视流 (Live Action & RAM Landing Feed)</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                      <span id="navLiveTaskStatusBadge" class="ds-badge">等待下发</span>
+                      <button class="ds-btn ds-btn-sm ds-btn-success" id="btnResumeNavMonitor" onclick="handleResumeNav()" style="display:none; font-size:11px; font-weight:700;">[🔄 战后恢复导航]</button>
+                      <button class="ds-btn ds-btn-sm ds-btn-ghost" onclick="toggleGlobalLogDrawer()" style="font-size:11px;">[展开底栏终端]</button>
+                    </div>
+                  </div>
+                  <div id="navLiveTaskLog" style="background:#000; border:1px solid var(--border-subtle); border-radius:4px; padding:10px 14px; font-family:var(--font-mono); font-size:12px; color:var(--text-2); line-height:1.7; max-height:160px; overflow-y:auto;">
+                    [等待下发任务... 点击“下发移动任务”或“立即直达选定格”后，此处将逐秒打印按键时序、物理帧步进、跨层阶梯完成度与落地坐标真值]
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 视图 3：战斗与宝可梦全队战备状态 -->
+      <section class="ds-pane" id="pane-combat">
+        <!-- 我方全队 6 只宝可梦健康监控与战备档案 -->
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[03.1]</span>
+              <span>我方全队 6 只宝可梦战备档案与健康监控</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="ds-badge ds-badge-green">队伍满员: 6 席已解码</span>
+              <button class="ds-btn ds-btn-sm" onclick="pollParty()">[刷新队伍数据]</button>
+            </div>
+          </div>
+          <div class="ds-panel-body">
+            <!-- 3x2 全宽队伍卡片网格 -->
+            <div id="partyGridList" class="ds-party-grid">
+              <!-- 由 JS 实时拉取填充，初始展示已解码 6 席 -->
+              <div class="ds-party-slot is-lead">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="color:var(--accent-cyan); font-size:14px;">1. 叉字蝠</strong>
+                  <span class="ds-badge ds-badge-cyan">首发出战 · 等级 41</span>
+                </div>
+                <div class="ds-progress" style="margin-top:2px;"><div class="ds-progress-fill" style="width:100%;"></div></div>
+                <div style="font-size:12px; color:var(--text-2); display:flex; justify-content:space-between;">
+                  <span>生命值: 133 / 133</span><span>100% · 正常</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
+                  招式: 剧毒牙(15/15) 翅膀攻击(35/35) 咬住(25/25) 飞翔(15/15)
+                </div>
+              </div>
+
+              <div class="ds-party-slot is-crit">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="color:var(--accent-red); font-size:14px;">2. 炎武王</strong>
+                  <span class="ds-badge ds-badge-red">濒危需治疗 · 等级 45</span>
+                </div>
+                <div class="ds-progress" style="margin-top:2px;"><div class="ds-progress-fill fill-red" style="width:1%;"></div></div>
+                <div style="font-size:12px; color:var(--accent-red); display:flex; justify-content:space-between;">
+                  <span>生命值: 1 / 169</span><span>1% · 濒危</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
+                  招式: 蓄能焰袭(20/20) 臂锤(10/10) 闪焰冲锋(15/15) 喷射火焰(15/15)
+                </div>
+              </div>
+
+              <div class="ds-party-slot">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="color:var(--text-1); font-size:14px;">3. 龙头地鼠</strong>
+                  <span class="ds-badge">等级 36</span>
+                </div>
+                <div class="ds-progress" style="margin-top:2px;"><div class="ds-progress-fill" style="width:84%;"></div></div>
+                <div style="font-size:12px; color:var(--text-2); display:flex; justify-content:space-between;">
+                  <span>生命值: 115 / 137</span><span>84% · 正常</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
+                  招式: 地震(10/10) 岩崩(10/10) 怪力(15/15) 居合斩(30/30)
+                </div>
+              </div>
+
+              <div class="ds-party-slot">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="color:var(--text-1); font-size:14px;">4. 勾帕路翁</strong>
+                  <span class="ds-badge">等级 45</span>
+                </div>
+                <div class="ds-progress" style="margin-top:2px;"><div class="ds-progress-fill" style="width:100%;"></div></div>
+                <div style="font-size:12px; color:var(--text-2); display:flex; justify-content:space-between;">
+                  <span>生命值: 145 / 145</span><span>100% · 正常</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
+                  招式: 圣剑(15/15) 铁头(15/15) 剑舞(20/20) 电光一闪(30/30)
+                </div>
+              </div>
+
+              <div class="ds-party-slot">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="color:var(--text-1); font-size:14px;">5. 哥达鸭</strong>
+                  <span class="ds-badge">等级 36</span>
+                </div>
+                <div class="ds-progress" style="margin-top:2px;"><div class="ds-progress-fill" style="width:100%;"></div></div>
+                <div style="font-size:12px; color:var(--text-2); display:flex; justify-content:space-between;">
+                  <span>生命值: 109 / 109</span><span>100% · 正常</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
+                  招式: 冲浪(15/15) 念力(25/25) 意念头锤(15/15) 水之波动(20/20)
+                </div>
+              </div>
+
+              <div class="ds-party-slot">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <strong style="color:var(--text-1); font-size:14px;">6. 小磁怪</strong>
+                  <span class="ds-badge">等级 12</span>
+                </div>
+                <div class="ds-progress" style="margin-top:2px;"><div class="ds-progress-fill" style="width:100%;"></div></div>
+                <div style="font-size:12px; color:var(--text-2); display:flex; justify-content:space-between;">
+                  <span>生命值: 29 / 29</span><span>100% · 正常</span>
+                </div>
+                <div style="font-size:11px; color:var(--text-3); line-height:1.5;">
+                  招式: 电击(30/30) 撞击(35/35) 电磁波(20/20) 超音波(20/20)
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="ds-panel-footer" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:12px; color:var(--text-2); font-weight:700;">队伍调序/更换首发 (POST /game/party/swap):</span>
+              <select id="partySwapSlotA" class="ds-input" style="width:120px; height:28px; padding:0 6px; font-size:12px;">
+                <option value="1">1号席位 (首发)</option>
+                <option value="2">2号席位</option>
+                <option value="3">3号席位</option>
+                <option value="4">4号席位</option>
+                <option value="5">5号席位</option>
+                <option value="6">6号席位</option>
+              </select>
+              <span style="color:var(--text-3); font-weight:700;">⇄</span>
+              <select id="partySwapSlotB" class="ds-input" style="width:120px; height:28px; padding:0 6px; font-size:12px;">
+                <option value="1">1号席位 (首发)</option>
+                <option value="2">2号席位</option>
+                <option value="3" selected>3号席位</option>
+                <option value="4">4号席位</option>
+                <option value="5">5号席位</option>
+                <option value="6">6号席位</option>
+              </select>
+              <button class="ds-btn ds-btn-sm ds-btn-yellow" onclick="handlePartySwapOrder()">[立即交换队伍顺序]</button>
+            </div>
+            <button class="ds-btn ds-btn-success" onclick="handleNurseRecovery()">[宝可梦中心护士全员满血恢复 (2100号脚本)]</button>
+              <select id="presetMoveSelect" class="ds-input" style="width:145px; height:28px; padding:0 6px; font-size:12px;" onchange="handlePresetMoveSelect(this.value)"><option value="525" selected>TM82: 龙尾 (#525)</option><option value="474">TM09: 毒液冲击 (#474)</option><option value="523">TM78: 重踏 (#523)</option><option value="521">TM72: 伏特替换 (#521)</option><option value="89">TM26: 地震 (#89)</option><option value="85">TM24: 十万伏特 (#85)</option><option value="53">TM35: 喷射火焰 (#53)</option><option value="533">绝招: 圣剑 (#533)</option><option value="442">绝招: 铁头 (#442)</option><option value="14">绝招: 剑舞 (#14)</option><option value="349">绝招: 龙之舞 (#349)</option><option value="19">秘传: 飞翔 (#19)</option><option value="57">秘传: 冲浪 (#57)</option><option value="82">特技: 龙之怒 (#82)</option></select><input type="number" id="teachMoveId" class="ds-input" style="width:85px; height:28px; padding:0 6px; font-size:12px;" placeholder="输入ID" value="525" oninput="updateMovePreview(this.value)"><span id="movePreviewBadge" class="ds-badge ds-badge-cyan" style="font-size:11px;">龙尾 (#525) · 龙系 · 威力60 · PP 10</span>
+          </div>
+        </div>
+
+        <!-- 实时对战态势与动作执行引擎 (严格区分非对战 / 野生战 / 训练家对战) -->
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[03.2]</span>
+              <span>实时对战态势与决策引擎</span>
+            </div>
+            <span class="ds-badge" id="combatStatusBadge">当前无对战</span>
+          </div>
+          <div class="ds-panel-body" id="combatMainBody">
+            <!-- 默认非对战状态 (清爽无冗余) -->
+            <div id="combatNotInBattle" style="padding:24px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:12px;">
+              <span class="ds-badge ds-badge-green" style="font-size:13px; padding:4px 12px;">[大地图常态探索 · 当前无对战]</span>
+              <div style="font-size:14px; color:var(--text-2); max-width:600px; line-height:1.8;">
+                游戏主角当前处于大地图自由探索状态。未进入战斗序列。您可以在大地图中平稳巡航、与场景 NPC 互动，或点击下方按钮执行草丛巡逻遇敌。
+              </div>
+              <div style="display:flex; gap:10px; margin-top:8px;">
+                <button class="ds-btn ds-btn-primary" onclick="handlePatrolEncounter()">[进入草丛巡逻遇敌 (/api/v1/encounters/tasks)]</button>
+                <button class="ds-btn" onclick="toggleSimulatedBattle()">[模拟切换进入战斗视图]</button>
+              </div>
+            </div>
+
+            <!-- 进入对战后展示的真实对抗区 (由 JS 动态切换) -->
+                        <!-- 进入对战后展示的真实对抗区 (由 JS 动态切换) -->
+            <div id="combatInBattle" style="display:none; flex-direction:column; gap:14px;">
+              <!-- 顶部对战阶段与状态机 HUD 状态条 -->
+              <div style="display:flex; justify-content:space-between; align-items:center; background:var(--bg-3); padding:8px 14px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="ds-badge ds-badge-red" id="battleKindBadge">野生遭遇战 (Wild Battle)</span>
+                  <span class="ds-badge ds-badge-cyan" id="battlePhaseBadge">Phase: command_menu (根命令)</span>
+                  <span class="ds-badge" id="battleCursorBadge">光标: 未知</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="ds-badge ds-badge-green" id="battleCanActBadge">可行动: 就绪</span>
+                  <button class="ds-btn ds-btn-sm" onclick="pollBattleState()">[刷新对战真值]</button>
+                </div>
+              </div>
+
+              <!-- 训练家信息条 (仅在训练家战显示，野生战自动隐藏) -->
+              <div id="trainerHeaderBar" class="ds-panel" style="background:var(--bg-3); padding:10px 14px; display:none; justify-content:space-between; align-items:center;">
+                <div>
+                  <span class="ds-badge ds-badge-red" id="trainerTitleBadge">训练家对战</span>
+                  <strong style="font-size:15px; margin-left:8px;" id="trainerNameText">训练家</strong>
+                  <span style="font-size:12px; color:var(--text-3); margin-left:8px;" id="trainerIdText">编号: #--</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:12px; color:var(--text-2);">对方携带宝可梦:</span>
+                  <span id="trainerBallsRow" style="display:flex; gap:4px;"></span>
+                </div>
+              </div>
+
+              <!-- 双方对抗看板 (实时物种、等级、血条、特性与数值) -->
+              <div style="display:flex; justify-content:space-between; align-items:stretch; background:var(--bg-1); padding:16px; border-radius:var(--radius-md); border:1px solid var(--border-subtle); gap:16px; flex-wrap:wrap;">
+                <!-- 敌方战备卡 -->
+                <div style="flex:1; min-width:280px; display:flex; flex-direction:column; justify-content:space-between;">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                      <span style="font-size:12px; color:var(--accent-red); font-weight:700;" id="oppKindLabel">敌方出战宝可梦</span>
+                      <span class="ds-badge" id="oppTypeBadge" style="font-size:11px;">[系别]</span>
+                    </div>
+                    <div style="font-size:18px; font-weight:800; margin-top:4px;" id="oppMonName">
+                      等待读取... <span style="font-size:13px; color:var(--text-3);">Lv.--</span>
+                    </div>
+                  </div>
+                  <div style="margin-top:8px;">
+                    <div class="ds-progress" style="width:100%;"><div class="ds-progress-fill" id="oppMonHpBar" style="width:100%;"></div></div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-2); margin-top:4px;">
+                      <span id="oppMonHpText">生命值: -- / -- (100%)</span>
+                      <span id="oppMonStatusText">正常</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-3); margin-top:2px;" id="oppMonMetaText">
+                      特性: -- · 性别: -- · 阶级: 0阶
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 中间 VS 分隔器 -->
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 12px; border-left:1px dashed var(--border-subtle); border-right:1px dashed var(--border-subtle);">
+                  <div style="font-size:18px; font-weight:900; color:var(--accent-amber);">VS</div>
+                  <div style="font-size:11px; color:var(--text-3); margin-top:4px;">回合对抗</div>
+                </div>
+
+                <!-- 我方出战卡 -->
+                <div style="flex:1; min-width:280px; text-align:right; display:flex; flex-direction:column; justify-content:space-between;">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-direction:row-reverse;">
+                      <span style="font-size:12px; color:var(--accent-green); font-weight:700;" id="playerKindLabel">我方当前出战宝可梦</span>
+                      <span class="ds-badge ds-badge-cyan" id="playerTypeBadge" style="font-size:11px;">[系别]</span>
+                    </div>
+                    <div style="font-size:18px; font-weight:800; margin-top:4px;" id="playerMonName">
+                      等待读取... <span style="font-size:13px; color:var(--text-3);">Lv.--</span>
+                    </div>
+                  </div>
+                  <div style="margin-top:8px;">
+                    <div class="ds-progress" style="width:100%; margin-left:auto;"><div class="ds-progress-fill" id="playerMonHpBar" style="width:100%;"></div></div>
+                    <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text-2); margin-top:4px; flex-direction:row-reverse;">
+                      <span id="playerMonHpText">生命值: -- / -- (100%)</span>
+                      <span id="playerMonStatusText">正常</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--text-3); margin-top:2px;" id="playerMonMetaText">
+                      特性: -- · 性别: -- · 状态: 正常
+                    </div>
+                    <div style="font-size:11px; color:var(--text-3); margin-top:2px;" id="playerMonStatsText">
+                      攻 -- / 防 -- / 特攻 -- / 特防 -- / 速度 --
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI 决策推荐战术栏 -->
+              <div id="battleDecisionBanner" class="ds-panel" style="background:rgba(0, 229, 255, 0.05); border-color:var(--accent-cyan); padding:10px 14px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span class="ds-badge ds-badge-cyan">[AI 决策智脑]</span>
+                  <span id="battleDecisionText" style="font-size:13px; color:var(--text-1); font-weight:600;">正在实时评估最优招式与相克关系...</span>
+                </div>
+                <button class="ds-btn ds-btn-sm ds-btn-primary" id="btnExecuteDecision" onclick="handleExecuteDecisionAction()">[一键执行 AI 推荐决策]</button>
+              </div>
+
+              <!-- 野生捕获评估卡片 (野生战展示，训练家战隐藏) -->
+              <div id="wildCaptureCard" class="ds-panel" style="background:var(--bg-1); padding:12px; display:none; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                <div>
+                  <span class="ds-badge ds-badge-green">捕获率实时评估</span>
+                  <span style="font-size:13px; margin-left:8px;" id="wildCaptureText">预估捕获率: <strong style="color:var(--accent-green); font-size:15px;" id="wildCaptureRateVal">--%</strong></span>
+                </div>
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <select id="selectBallType" class="ds-input" style="width:120px; height:30px; font-size:12px; padding:0 6px;">
+                    <option value="4" selected>精灵球 (#4)</option>
+                    <option value="3">超级球 (#3)</option>
+                    <option value="2">高级球 (#2)</option>
+                  </select>
+                  <button class="ds-btn ds-btn-success ds-btn-sm" id="btnThrowBall" onclick="handleCatchAction(parseInt(document.getElementById(selectBallType).value, 10))">[投掷精灵球 POST /catch]</button>
+                </div>
+              </div>
+
+              <!-- 4 招式评分四宫格 (实时 PP 与克制倍率) -->
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <div style="font-size:13px; font-weight:700; color:var(--text-2);">四招式实时状态与 AI 相克矩阵 (点击直接出招):</div>
+                  <span style="font-size:11px; color:var(--text-3);">(基于 btl_pokeparam.c 实时 PP 验证)</span>
+                </div>
+                <div class="ds-grid-2" id="battleMovesGrid">
+                  <!-- 由 JS 实时渲染真实 4 招式卡片 -->
+                </div>
+              </div>
+
+              <!-- 战斗中全队换人面板 (In-Battle Party Switch Deck) -->
+              <div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <div style="font-size:13px; font-weight:700; color:var(--text-2);">战斗中全队换人席位 (点击直切出战 · POST /battle/switch):</div>
+                  <span style="font-size:11px; color:var(--text-3);">(自动归位并完成 Shift 验证)</span>
+                </div>
+                <div class="ds-grid-3" id="battlePartyRoster" style="gap:8px;">
+                  <!-- 由 JS 实时填充 6 席位卡片 -->
+                </div>
+              </div>
+
+              <!-- 对战底层原子 API 控制台 -->
+              <div style="border-top:1px solid var(--border-subtle); padding-top:10px;">
+                <div style="font-size:12px; font-weight:700; color:var(--text-3); margin-bottom:6px;">
+                  【全量对战原子 API 控制台】(忽略顺序 · 自由下发 · 闭环回读):
+                </div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  <button class="ds-btn ds-btn-primary ds-btn-sm" onclick="handleMoveAction(1)">[招式1 POST /battle/move(1)]</button>
+                  <button class="ds-btn ds-btn-primary ds-btn-sm" onclick="handleMoveAction(2)">[招式2 POST /battle/move(2)]</button>
+                  <button class="ds-btn ds-btn-primary ds-btn-sm" onclick="handleMoveAction(3)">[招式3 POST /battle/move(3)]</button>
+                  <button class="ds-btn ds-btn-primary ds-btn-sm" onclick="handleMoveAction(4)">[招式4 POST /battle/move(4)]</button>
+                  <button class="ds-btn ds-btn-yellow ds-btn-sm" onclick="handleSwitchPokemon(1)">[换人: 1号位]</button>
+                  <button class="ds-btn ds-btn-yellow ds-btn-sm" onclick="handleSwitchPokemon(2)">[换人: 2号位]</button>
+                  <button class="ds-btn ds-btn-yellow ds-btn-sm" onclick="handleSwitchPokemon(3)">[换人: 3号位]</button>
+                  <button class="ds-btn ds-btn-yellow ds-btn-sm" onclick="handleSwitchPokemon(4)">[换人: 4号位]</button>
+                  <button class="ds-btn ds-btn-yellow ds-btn-sm" onclick="handleSwitchPokemon(5)">[换人: 5号位]</button>
+                  <button class="ds-btn ds-btn-yellow ds-btn-sm" onclick="handleSwitchPokemon(6)">[换人: 6号位]</button>
+                  <button class="ds-btn ds-btn-cyan ds-btn-sm" onclick="handleBattleItemAction(17, 1)">[用药: 伤药(17) POST /battle/item]</button>
+                  <button class="ds-btn ds-btn-green ds-btn-sm" onclick="handleCatchAction(4)" id="btnActionCatch">[投球: 精灵球(4) POST /battle/catch]</button>
+                  <button class="ds-btn ds-btn-danger ds-btn-sm" onclick="handleRunAction()" id="btnActionRun">[脱离战斗 (原子逃跑 POST /battle/flee)]</button>
+                  <button class="ds-btn ds-btn-sm" style="border-color:#BA68C8; color:#CE93D8;" onclick="handleBattleSurveyAction(3)">[多轮对战自动化逆向测绘 POST /battle/survey]</button>
+                </div>
+              </div>
+
+              <!-- 可折叠底层 ARM9 RAM 结构体回读看板 -->
+              <details class="ds-panel" style="background:var(--bg-1); padding:10px 14px; margin-top:6px;">
+                <summary style="cursor:pointer; font-size:12px; font-weight:700; color:var(--text-2);">
+                  [03.3] 对战底层 ARM9 RAM (btl_pokeparam.c) 结构体实时回读看板 (点击展开/折叠)
+                </summary>
+                <div style="display:flex; gap:16px; margin-top:8px; font-family:var(--font-mono); font-size:11px; flex-wrap:wrap;">
+                  <div style="flex:1; min-width:240px; background:#000; padding:10px; border-radius:4px;" id="ramOppDump">
+                    敌方对象: 待读取...
+                  </div>
+                  <div style="flex:1; min-width:240px; background:#000; padding:10px; border-radius:4px;" id="ramPlayerDump">
+                    我方对象: 待读取...
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 视图 4：背包全量库存与荣誉看板 -->
+      <section class="ds-pane" id="pane-roster">
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[04.1]</span>
+              <span>合众道馆徽章与通关荣誉看板</span>
+            </div>
+            <span class="ds-badge ds-badge-amber" id="badgesCountBadge">持有徽章: 6/8 枚 (掩码 0x3F)</span>
+          </div>
+          <div class="ds-panel-body">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;" id="badgesList">
+              <span class="ds-badge ds-badge-amber">[已获得] 基础徽章</span>
+              <span class="ds-badge ds-badge-amber">[已获得] 毒性徽章</span>
+              <span class="ds-badge ds-badge-amber">[已获得] 甲虫徽章</span>
+              <span class="ds-badge ds-badge-amber">[已获得] 伏特徽章</span>
+              <span class="ds-badge ds-badge-amber">[已获得] 震动徽章</span>
+              <span class="ds-badge ds-badge-amber">[已获得] 飞翼徽章</span>
+              <span class="ds-badge">[待挑战] 冰冻徽章</span>
+              <span class="ds-badge">[待挑战] 海浪徽章</span>
+            </div>
+            <div style="font-size:14px; color:var(--text-2); margin-top:10px;">
+              持有现金: <strong style="color:var(--accent-amber); font-size:16px;" id="moneyAmountText">$294,722</strong> · 登入名人堂次数: <strong style="color:var(--accent-cyan); font-size:16px;" id="hallOfFameText">0 次</strong> (主线推进中)
+            </div>
+          </div>
+        </div>
+
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[04.2]</span>
+              <span>背包 5 大口袋全量库存 (已解码 110 项道具)</span>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center;">
+              <div style="display:flex; gap:4px;" id="pocketFilterButtons">
+                <button class="ds-btn ds-btn-sm ds-btn-primary" onclick="filterInventoryByPocket('all')">[全部]</button>
+                <button class="ds-btn ds-btn-sm" onclick="filterInventoryByPocket('items')">[常规道具]</button>
+                <button class="ds-btn ds-btn-sm" onclick="filterInventoryByPocket('medicine')">[回复药品]</button>
+                <button class="ds-btn ds-btn-sm" onclick="filterInventoryByPocket('machines')">[技能机]</button>
+                <button class="ds-btn ds-btn-sm" onclick="filterInventoryByPocket('key_items')">[重要道具]</button>
+                <button class="ds-btn ds-btn-sm" onclick="filterInventoryByPocket('berries')">[树果]</button>
+              </div>
+              <input type="text" placeholder="搜索道具名称或编号..." class="ds-input" style="height:30px; width:160px;" oninput="filterInventory(this.value)">
+            </div>
+          </div>
+          <div class="ds-panel-body" style="padding:0;">
+            <table class="ds-table" id="inventoryTable">
+              <thead>
+                <tr><th>道具编号</th><th>道具名称 (中文)</th><th>英文原名</th><th>所属口袋</th><th>库存数量</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>450</td><td>自行车</td><td>Bicycle</td><td>重要道具</td><td>1</td></tr>
+                <tr><td>4</td><td>精灵球</td><td>Poké Ball</td><td>常规道具</td><td>54</td></tr>
+                <tr><td>3</td><td>超级球</td><td>Great Ball</td><td>常规道具</td><td>9</td></tr>
+                <tr><td>12</td><td>纪念球</td><td>Premier Ball</td><td>常规道具</td><td>11</td></tr>
+                <tr><td>26</td><td>好伤药</td><td>Super Potion</td><td>回复药品</td><td>6</td></tr>
+                <tr><td>28</td><td>活力碎片</td><td>Revive</td><td>回复药品</td><td>3</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- 视图 5：物理内存与底层手柄测试 -->
+      <section class="ds-pane" id="pane-memory">
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[05.1]</span>
+              <span>ARM9 物理内存结构体反向解码</span>
+            </div>
+            <span class="ds-badge">日版 IREJ 修订版1</span>
+          </div>
+          <div class="ds-panel-body" style="font-family:var(--font-mono); font-size:13px; line-height:1.8; color:var(--text-2);">
+            <div>游戏数据根指针 (GameData): 0x0223B570</div>
+            <div>保存块 52 (Misc / 徽章与金钱): 物理基址 <strong style="color:var(--accent-cyan);">0x02226924</strong> (总大小: 240 字节)</div>
+            <div>  +0x00 (32位无符号整数) = 294722 (当前持有现金 $294,722)</div>
+            <div>  +0x04 (8位字节掩码)   = 0x3F (二进制 00111111, 已获得前 6 枚徽章)</div>
+            <div>保存块 0 (PlayerData / 玩家与名人堂): 物理基址 <strong style="color:var(--accent-cyan);">0x02205824</strong></div>
+            <div>  +0x40 (16位魔数校验)  = 0x0000 (名人堂魔数未激活)</div>
+            <div>  +0x7C (32位通关计数器) = 0 次 (尚未进入名人堂)</div>
+          </div>
+        </div>
+
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[05.2]</span>
+              <span>虚拟手柄按键直通测试</span>
+            </div>
+          </div>
+          <div class="ds-panel-body">
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <button class="ds-btn" onclick="handleDirectInput('Up')">[十字键上]</button>
+              <button class="ds-btn" onclick="handleDirectInput('Down')">[十字键下]</button>
+              <button class="ds-btn" onclick="handleDirectInput('Left')">[十字键左]</button>
+              <button class="ds-btn" onclick="handleDirectInput('Right')">[十字键右]</button>
+              <button class="ds-btn ds-btn-primary" onclick="handleDirectInput('A')">[按键 A]</button>
+              <button class="ds-btn" onclick="handleDirectInput('B')">[按键 B]</button>
+              <button class="ds-btn" onclick="handleDirectInput('X')">[按键 X]</button>
+              <button class="ds-btn" onclick="handleDirectInput('Y')">[按键 Y]</button>
+              <button class="ds-btn" onclick="handleDirectInput('Start')">[开始键 START]</button>
+              <button class="ds-btn" onclick="handleDirectInput('Select')">[选择键 SELECT]</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 视图 6：真实 3D 场景实景视窗 (按需开启，惰性渲染) -->
+      <section class="ds-pane" id="pane-3d">
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[06.1]</span>
+              <span>真实 3D 场景实景渲染 (按需启动)</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="ds-badge" id="badge3DState">状态: 渲染器休眠中 (0% GPU/CPU)</span>
+              <button class="ds-btn ds-btn-sm ds-btn-primary" id="btnToggle3D" onclick="toggle3DView()">[启动 3D WebGL 实景渲染]</button>
+            </div>
+          </div>
+          <div class="ds-panel-body" style="padding:10px;">
+            <div class="ds-3d-container" id="real3dContainer">
+              <div class="ds-3d-placeholder" id="placeholder3D">
+                <div style="font-size:16px; font-weight:700; color:var(--text-1);">3D 场景实景渲染器处于休眠模式</div>
+                <div style="font-size:13px; max-width:520px; line-height:1.7;">
+                  基于 Gen 5 ROM 真实 3D 建筑与地形网格渲染。遵循惰性加载规范：平时不消耗显卡与 CPU 算力，点击上方按钮即可一键挂载并实时追踪主角 3D 姿态与视角。
+                </div>
+                <button class="ds-btn ds-btn-primary" onclick="toggle3DView()">[一键挂载并启动 3D 视窗]</button>
+              </div>
+              <iframe id="iframe3D" class="ds-3d-iframe" style="display:none;" src="about:blank"></iframe>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    
+      <!-- 视图 7：宝可梦电脑仓储系统 (PC Storage / 24 Boxes / 全息档案与存取控制) -->
+      <section class="ds-pane" id="pane-pc">
+        <div class="ds-panel">
+          <div class="ds-panel-header">
+            <div class="ds-panel-title">
+              <span class="ds-panel-title-tag">[07.1]</span>
+              <span>宝可梦电脑仓储系统 (Pokemon Storage System · 24 个盒子 · 720 仓储容量)</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="ds-badge ds-badge-cyan" id="pcTotalBadge">仓储: 0 / 720</span>
+              <button class="ds-btn ds-btn-sm" onclick="pollPcStorage()">[刷新电脑]</button>
+            </div>
+          </div>
+          <div class="ds-panel-body" style="padding:14px; gap:14px;">
+            <!-- 顶部检索与快速筛选栏 -->
+            <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; background:var(--bg-1); padding:10px; border-radius:4px; border:1px solid var(--border-subtle);">
+              <span style="font-size:12px; font-weight:700; color:var(--text-2);">跨盒全局检索:</span>
+              <input type="text" id="pcSearchInput" class="ds-input" style="width:180px; height:30px; font-size:12px;" placeholder="宝可梦名称 / 特性 / 道具..." onkeydown="if(event.key==='Enter')handlePcSearch()">
+              <button class="ds-btn ds-btn-sm ds-btn-cyan" onclick="handlePcSearch()">[精准搜索]</button>
+              <button class="ds-btn ds-btn-sm ds-btn-ghost" onclick="resetPcSearch()">[重置筛选]</button>
+              <div id="pcSearchResults" style="font-size:12px; color:var(--accent-amber); font-weight:700; margin-left:auto;"></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 240px 1fr; gap:14px;">
+              <!-- 左侧：24 个盒子选择器网格 -->
+              <div class="ds-panel" style="background:var(--bg-1); border-color:var(--border-subtle); padding:10px; display:flex; flex-direction:column; gap:8px;">
+                <div style="font-size:12px; color:var(--text-3); font-weight:700; display:flex; justify-content:space-between;">
+                  <span>仓储盒子列表 (1~24)</span>
+                  <span id="activeBoxIndicator" style="color:var(--accent-cyan);">当前: Box 1</span>
+                </div>
+                <div id="pcBoxListContainer" style="display:grid; grid-template-columns: repeat(3, 1fr); gap:6px; max-height:480px; overflow-y:auto; padding-right:4px;">
+                  <!-- 动态填充 24 个盒子按钮 -->
+                </div>
+              </div>
+
+              <!-- 右侧：当前选中盒子的 30 槽位网格与操作台 -->
+              <div style="display:flex; flex-direction:column; gap:12px;">
+                <div class="ds-panel" style="background:var(--bg-1); border-color:var(--border-subtle); padding:12px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <div style="font-size:14px; font-weight:800; color:var(--text-1);" id="pcCurrentBoxTitle">
+                      📦 Box 1 (30 槽位平面)
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                      <button class="ds-btn ds-btn-sm ds-btn-yellow" onclick="handleOpenDepositModal()">[存入宝可梦 (+)]</button>
+                    </div>
+                  </div>
+
+                  <!-- 30 槽位网格 (6 列 x 5 行) -->
+                  <div id="pcSlotsGrid" style="display:grid; grid-template-columns: repeat(6, 1fr); gap:8px; min-height:220px;">
+                    <!-- 动态生成 30 个槽位单元格 -->
+                  </div>
+                </div>
+
+                <!-- 选定仓储宝可梦深层全息卡片 -->
+                <div id="pcSelectedMonCard" class="ds-panel" style="background:var(--bg-1); border-color:var(--border-subtle); padding:12px; display:none;">
+                  <!-- 动态展示选中宝可梦的物种、特性、道具、个体值、努力值、技能槽与[取出到队伍]按钮 -->
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- 全局常驻底部实时日志控制台抽屉 (支持全站任意 Tab 随时打开/收起) -->
+  <div id="globalLogDrawer" class="ds-global-log-drawer" style="display:none;">
+    <div class="ds-log-drawer-header">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span class="ds-badge ds-badge-green"><span class="ds-dot"></span>实时底层日志终端 (ARM9 / ActionEngine / Navigation)</span>
+        <span style="font-size:12px; color:var(--text-3);">落盘物理文件: logs/navigation_execution.jsonl · API: /api/v1/navigation/logs</span>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="ds-btn ds-btn-sm ds-btn-ghost" onclick="clearConsoleLog()">[清空终端]</button>
+        <button class="ds-btn ds-btn-sm ds-btn-danger" onclick="toggleGlobalLogDrawer()">[收起终端]</button>
+      </div>
+    </div>
+    <div class="ds-log" id="consoleLog">
+[系统已就绪] 黑2自主控制台 V2 启动完成，测试接口全线正常。
+[实时日志] 点击任意导航、战斗、主线步进或手柄操作，底层执行时序均在此实时回显。
+    </div>
+  </div>
+
+  <script src="/frontend/v2.js?v=20261008_06"></script>
+</body>
+</html>

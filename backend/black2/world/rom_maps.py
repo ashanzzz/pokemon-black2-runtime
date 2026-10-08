@@ -48,10 +48,21 @@ class NativeMapEngine:
         selected = next((path for path in candidates if path and os.path.isfile(path)), None)
         if not selected:
             raise FileNotFoundError(f"ROM not found in paths: {candidates}")
-        self.rom = NitroRom(selected)
-        self.zone_data = self.rom.read_file("a/0/1/2")
-        self.matrix_narc = NarcArchive(self.rom.read_file("a/0/0/9"))
-        self.model_narc = NarcArchive(self.rom.read_file("a/0/0/8"))
+        self.rom = NitroRom.shared(selected)
+        zone_data = self.rom.read_file("a/0/1/2")
+        # ZoneData is stored as a one-member NARC in the retail ROM.  The
+        # legacy map service used to index the NARC header as if it were the
+        # first 0x30-byte record, shifting every map header after it.  Keep a
+        # plain-table fallback for extracted development assets, but never
+        # expose the container header as map data.
+        if zone_data[:4] == b"NARC":
+            container = NarcArchive(zone_data)
+            if len(container.files) != 1:
+                raise ValueError("ZoneData NARC must contain exactly one record table")
+            zone_data = container.files[0]
+        self.zone_data = zone_data
+        self.matrix_narc = self.rom.archive("a/0/0/9")
+        self.model_narc = self.rom.archive("a/0/0/8")
         self.models = {
             model_id: model
             for model_id, payload in enumerate(self.model_narc.files)

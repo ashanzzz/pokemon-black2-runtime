@@ -56,7 +56,9 @@ def _entry(kind: str, label: str, *, status: str = "verified", **extra: Any) -> 
 
 # Known TileClass values, not raw permission-plane bytes or texture IDs.
 _CLASSES: dict[int, dict[str, Any]] = {
+    0x00: _entry("paved_road", "Paved concrete/asphalt road", status="probable"),
     0x01: _entry("obstacle", "Collision surface", status="probable"),
+    0x02: _entry("dirt_path", "Yellow dirt/soil path (no encounter)", status="probable"),
     0x03: _entry("ground_path", "Ground path", status="probable"),
     0x04: _entry("tall_grass", "Tall grass", encounter="single"),
     0x05: _entry("tall_grass", "Tall grass variant", encounter="single"),

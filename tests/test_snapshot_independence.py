@@ -7,6 +7,7 @@ No host-side state, no frame replay, no external caching.
 """
 
 from __future__ import annotations
+import os
 
 import json
 import sys
@@ -82,6 +83,8 @@ def parse_snapshot_with_fresh_decoder(
 
 
 def test_exp021_all():
+    if not os.getenv("RUN_LIVE_SAVESTATE_TESTS"):
+        pytest.skip("EXP-021 is a live fixture savestate test; skipped to preserve active game state")
     try:
         health_response = requests.get(f"{API_BASE}/health", timeout=0.5)
         health_response.raise_for_status()

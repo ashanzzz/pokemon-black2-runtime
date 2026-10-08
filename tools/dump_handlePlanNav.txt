@@ -1,0 +1,67 @@
+function handlePlanNav() {
+  const tx = parseInt(document.getElementById('navTargetX')?.value || String(livePlayerGrid.x), 10);
+  const tz = parseInt(document.getElementById('navTargetZ')?.value || String(livePlayerGrid.z >= 2 ? livePlayerGrid.z - 2 : livePlayerGrid.z + 2), 10);
+  const rawY = document.getElementById('navTargetY')?.value;
+  const ty = (rawY !== undefined && rawY !== '') ? parseInt(rawY, 10) : (livePlayerGrid.y ?? 0);
+  const mode = document.getElementById('navModeSelect')?.value || 'auto';
+
+  appendLog(`[路径规划] 正在计算前往网格 (${tx}, ${tz}, 层高Y=${ty}) 模式=${mode} 的最优 A* 路径...`);
+
+  const destPayload = {
+    type: "grid",
+    space: "gen5-field-grid-v1",
+    zone_id: livePlayerZone || 457,
+    x: tx,
+    y: ty,
+    z: tz
+  };
+
+  try {
+    const res = await fetch('/api/v1/navigation/plans', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        destination: destPayload,
+        movement_mode: mode
+      })
+    });
+    const d = await res.json();
+    if (res.ok) {
+      appendLog(`[规划成功] 状态: ${d.status}, 选定模式: ${d.movement?.selected}, 步数: ${d.cost?.steps || 0}`);
+      
+      // 提取路径节点并在网格切片上点亮连通路径
+      activePlannedPathMap.clear();
+      activePlannedMovementMode = d.movement?.selected || mode || "run";
+      const nodes = d.route_detail?.nodes || d.segments?.[0]?.path || [];
+      nodes.forEach((n, idx) => {
+        const isGoal = (idx === nodes.length - 1);
+        const nodeY = (n.y !== undefined && n.y !== null) ? n.y : ty;
+        const stepNum = idx; // 1st step along path is 1, 2nd is 2...
+        if (idx > 0 || isGoal) {
+          activePlannedPathMap.set(`${n.x},${n.z},${nodeY}`, { step: stepNum, total: nodes.length - 1, isGoal: isGoal, y: nodeY, isRealFloor: true });
+          activePlannedPathMap.set(`${n.x},${n.z}`, { step: stepNum, total: nodes.length - 1, isGoal: isGoal, y: nodeY, isProjection: true });
+        }
+      });
+      if (activeSlicesData) {
+        renderMultiLayerGrid(activeSlicesData);
+      }
+
+      renderNavPlanDetail(d);
+    } else {
+      activePlannedPathMap.clear();
+      if (activeSlicesData) {
+        renderMultiLayerGrid(activeSlicesData);
+      }
+      renderNavPlanFailure(tx, ty, tz, d.error || {});
+      appendNavTaskLog(`[规划受阻] 寻路未通过 (${d.error?.code || 'NAV_NO_ROUTE'}): ${d.error?.message || '目标不可达'}`, 'var(--accent-red)');
+      appendLog(`[规划受阻] ${d.error?.code || '错误'}: ${d.error?.message || '不可达'}`);
+      const obs = document.getElementById('navObstacleStatus');
+      if (obs) {
+        obs.innerText = `[寻路未通过: ${d.error?.code || 'NAV_NO_ROUTE'}] ${d.error?.message || '不可达'}`;
+        obs.style.color = 'var(--accent-red)';
+      }
+    }
+  } catch (e) {
+    appendLog(`[规划异常] ${e}`);
+  }
+}

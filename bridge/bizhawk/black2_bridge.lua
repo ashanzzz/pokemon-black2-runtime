@@ -251,6 +251,7 @@ local state = {
     input_queue = {},
     sock = nil,
     last_retry_frame = 0,
+    last_heartbeat_frame = 0,
     exit_requested = false,
     probe = nil,
     last_probe = nil,
@@ -269,13 +270,14 @@ end
 local function safe_read_u8(addr, domain)
     local val = 0
     if not domain or domain == "Main RAM" or domain == "ARM9 System Bus" then
-        local physical_addr = addr
-        if physical_addr < 0x02000000 then
-            physical_addr = 0x02000000 + addr
+        local ram_offset = addr
+        if ram_offset >= 0x02000000 and ram_offset < 0x02400000 then
+            ram_offset = ram_offset - 0x02000000
         end
+        local physical_addr = 0x02000000 + ram_offset
         local ok = pcall(function() val = memory.read_u8(physical_addr, "ARM9 System Bus") end)
         if not ok or val == nil then
-            pcall(function() val = mainmemory.read_u8(addr) end)
+            pcall(function() val = mainmemory.read_u8(ram_offset) end)
         end
     else
         pcall(function() val = memory.read_u8(addr, domain) end)
@@ -285,16 +287,55 @@ end
 
 local function read_binary(domain, offset, length)
     local ok, data
-    if domain == "Main RAM" then
-        ok, data = pcall(function() return memory.read_bytes_as_binary_string(offset, length, "Main RAM") end)
+    local dom = domain or "Main RAM"
+    local ram_offset = offset
+    if dom == "Main RAM" and ram_offset >= 0x02000000 and ram_offset < 0x02400000 then
+        ram_offset = ram_offset - 0x02000000
+    end
+    if dom == "Main RAM" then
+        ok, data = pcall(function() return memory.read_bytes_as_binary_string(ram_offset, length, "Main RAM") end)
         if not ok or not data then
-            ok, data = pcall(function() return mainmemory.read_bytes_as_binary_string(offset, length) end)
+            ok, data = pcall(function() return mainmemory.read_bytes_as_binary_string(ram_offset, length) end)
         end
     else
-        ok, data = pcall(function() return memory.read_bytes_as_binary_string(offset, length, domain) end)
+        ok, data = pcall(function() return memory.read_bytes_as_binary_string(offset, length, dom) end)
     end
     if ok and data then return data end
     return ""
+end
+
+local function fast_read_bytes(addr, len, dom)
+    local dom_name = dom or "Main RAM"
+    local ram_offset = addr
+    if dom_name == "Main RAM" and ram_offset >= 0x02000000 and ram_offset < 0x02400000 then
+        ram_offset = ram_offset - 0x02000000
+    end
+
+    if dom_name == "Main RAM" and mainmemory and mainmemory.readbyterange then
+        local ok, tbl = pcall(function() return mainmemory.readbyterange(ram_offset, len) end)
+        if ok and type(tbl) == "table" then
+            local res = {}
+            if tbl[0] ~= nil then
+                for i = 0, len - 1 do res[i + 1] = tbl[i] end
+            else
+                for i = 1, len do res[i] = tbl[i] end
+            end
+            return res
+        end
+    end
+
+    if len <= 1024 then
+        local bin = read_binary(dom_name, addr, len)
+        if bin and #bin == len then
+            return {string.byte(bin, 1, len)}
+        end
+    end
+
+    local bytes = {}
+    for i = 0, len - 1 do
+        bytes[i + 1] = safe_read_u8(addr + i, dom_name)
+    end
+    return bytes
 end
 
 local function binary_to_hex(data)
@@ -341,7 +382,13 @@ local function find_exact_patterns(payload)
     return {matches = matches, size = #data, frame = emu.framecount and emu.framecount() or 0}
 end
 
+-- Global screenshot switch: keep disabled to eliminate emulator rendering stalls and PNG disk I/O
+local ENABLE_SCREENSHOTS = false
+
 local function safe_screenshot(path)
+    if not ENABLE_SCREENSHOTS then
+        return true, nil
+    end
     local ok, error_message = pcall(function() client.screenshot(path) end)
     if not ok then return false, "client.screenshot failed: " .. tostring(error_message) end
     return true, nil
@@ -544,6 +591,11 @@ local function get_capabilities()
         universal_dump = true,
         watch_write = false,
         a_edge_capture = true,
+        -- Performance contract: heartbeat traffic is sampled once per 20
+        -- emulator frames rather than once per frame.
+        heartbeat_interval_frames = 20,
+        -- The backend coalesces duplicate same-frame PNG requests.
+        screenshot_same_frame_coalescing = true,
         -- The bridge advertises no successful writer-PC trace until the live
         -- trace-capabilities probe confirms its ARM9 scope and PC register.
         write_pc_trace = false
@@ -945,11 +997,7 @@ local function handle_command(cmd)
         local size = payload.size or payload.length or 1
         local format = payload.format or "u8"
 
-        local bytes = {}
-        for i = 0, size - 1 do
-            local val = safe_read_u8(addr + i, domain)
-            table.insert(bytes, val)
-        end
+        local bytes = fast_read_bytes(addr, size, domain)
 
         local val_scalar = nil
         if format == "u8" or size == 1 then
@@ -978,10 +1026,7 @@ local function handle_command(cmd)
             local len = r.length or r.size or 1
             local tag = r.id or r.tag or tostring(idx)
 
-            local bytes = {}
-            for i = 0, len - 1 do
-                bytes[i + 1] = safe_read_u8(addr + i, dom)
-            end
+            local bytes = fast_read_bytes(addr, len, dom)
 
             results[tag] = {
                 id = tag,
@@ -1087,7 +1132,8 @@ local function handle_command(cmd)
             local physical_addr = target_offset
             if physical_addr < 0x02000000 then physical_addr = 0x02000000 + physical_addr end
             pcall(function() memory.write_u8(physical_addr, val, "ARM9 System Bus") end)
-            pcall(function() mainmemory.write_u8(target_offset, val) end)
+            local ram_off = physical_addr - 0x02000000
+            pcall(function() mainmemory.write_u8(ram_off, val) end)
         end
         resp.payload = {
             written = #bytes,
@@ -1097,6 +1143,7 @@ local function handle_command(cmd)
     elseif op == "input.state" then
         resp.payload = {
             joypad = joypad.get and joypad.get(1) or {},
+            joypad_default = joypad.get and joypad.get() or {},
             queue_len = #state.input_queue
         }
 
@@ -1107,9 +1154,13 @@ local function handle_command(cmd)
         table.insert(state.input_queue, {
             buttons = buttons,
             touch = payload.touch,
-            remaining_frames = frames
+            remaining_frames = frames,
+            -- Optional frame-loop stop condition. This is deliberately
+            -- evaluated inside BizHawk rather than by wall-clock polling in
+            -- Python, so turbo/fast-forward cannot skip the target tile.
+            stop_when = payload.stop_when
         })
-        resp.payload = { queued = true, frames = frames, buttons = buttons }
+        resp.payload = { queued = true, frames = frames, buttons = buttons, stop_when = payload.stop_when }
 
     elseif op == "input.touch" then
         local x = payload.x or 128
@@ -1128,7 +1179,7 @@ local function handle_command(cmd)
         resp.payload = { cleared = true }
 
     elseif op == "screen.capture" then
-        local ok, error_message = safe_screenshot(payload.path)
+        local ok, error_message = pcall(function() client.screenshot(payload.path) end)
         if ok then
             resp.payload = {path = payload.path}
         else
@@ -1222,6 +1273,28 @@ end
 -- ============================================================================
 -- Input Application (100% Background direct core injection)
 -- ============================================================================
+local function read_u16_le(addr, domain)
+    local lo = safe_read_u8(addr, domain)
+    local hi = safe_read_u8(addr + 1, domain)
+    return lo + hi * 256
+end
+
+local function read_s16_le(addr, domain)
+    local value = read_u16_le(addr, domain)
+    if value >= 0x8000 then return value - 0x10000 end
+    return value
+end
+
+local function stop_condition_reached(stop)
+    if type(stop) ~= "table" or stop.kind ~= "actor_gpos" then return false end
+    if stop.x_addr == nil or stop.y_addr == nil or stop.z_addr == nil then return false end
+    local domain = stop.domain or "Main RAM"
+    local x = read_u16_le(stop.x_addr, domain)
+    local y = read_s16_le(stop.y_addr, domain)
+    local z = read_u16_le(stop.z_addr, domain)
+    return x == tonumber(stop.x) and y == tonumber(stop.y) and z == tonumber(stop.z)
+end
+
 local function apply_current_inputs()
     if state.probe and state.probe.phase == "press" then
         local pad = {}
@@ -1246,6 +1319,15 @@ local function apply_current_inputs()
     end
     if #state.input_queue > 0 then
         local item = state.input_queue[1]
+        if stop_condition_reached(item.stop_when) then
+            table.remove(state.input_queue, 1)
+            pcall(function() joypad.set({}) end)
+            pcall(function() joypad.set({}, 1) end)
+            if joypad.setanalog then
+                pcall(function() joypad.setanalog({["Touch X"] = "", ["Touch Y"] = ""}) end)
+            end
+            return
+        end
         local pad = {}
         for _, btn in ipairs(item.buttons or {}) do
             pad[btn] = true
@@ -1258,10 +1340,17 @@ local function apply_current_inputs()
         
         pcall(function() joypad.set(pad) end)
         pcall(function() joypad.set(pad, 1) end)
-        
+
+        -- Touch X/Y are raw NDS pixels.  setanalog must run after joypad.set;
+        -- the latter otherwise replaces the analog portion with its current
+        -- frame values.  The active config deliberately has no WMouse X/Y or
+        -- WMouse L binding, so the sticky values cannot be overwritten by the
+        -- host mouse adapter.
         if item.touch and joypad.setanalog then
             pcall(function()
-                joypad.setanalog({["Touch X"] = math.floor(item.touch.x), ["Touch Y"] = math.floor(item.touch.y)}, 1)
+                -- NDS exposes its touch controls on the default joypad; the
+                -- numeric controller argument (1) returns an empty pad here.
+                joypad.setanalog({["Touch X"] = math.floor(item.touch.x), ["Touch Y"] = math.floor(item.touch.y)})
             end)
         end
         
@@ -1270,6 +1359,12 @@ local function apply_current_inputs()
             table.remove(state.input_queue, 1)
         end
     else
+        if joypad.setanalog then
+            pcall(function()
+                joypad.setanalog({["Touch X"] = "", ["Touch Y"] = ""})
+            end)
+        end
+        pcall(function() joypad.set({}) end)
         pcall(function() joypad.set({}, 1) end)
     end
 end
@@ -1348,7 +1443,11 @@ local function socket_process_events()
     end
 
     -- Send periodic heartbeat every 20 frames with version
-    if cur_frame % 20 == 0 or cur_frame ~= state.last_heartbeat_frame then
+    -- Heartbeat is intentionally sparse.  The old second clause sent a JSON
+    -- heartbeat on *every emulated frame* (the frame always differs), which
+    -- added socket/JSON work to BizHawk's hot loop and became very visible
+    -- while taking screenshots.
+    if cur_frame % 20 == 0 or state.last_heartbeat_frame == 0 or cur_frame < state.last_heartbeat_frame then
         state.last_heartbeat_frame = cur_frame
         local ok, send_err = pcall(function()
             local ping_str = json.encode({type = "heartbeat", version = BRIDGE_VERSION, frame = cur_frame}) .. "\n"

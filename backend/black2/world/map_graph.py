@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-from ..decoders.field import get_map_name
+from .location_catalog import RomLocationCatalog
 from .gen5_rom_map import Gen5RomMap
 
 
@@ -38,21 +38,31 @@ class RomMapGraphService:
 
     def _label(self, zone_id: int, location_name_id: int, parent_zone_id: int, environment: str) -> dict[str, Any]:
         override = ZONE_LABEL_OVERRIDES.get(zone_id)
-        if override:
-            return {**override, "source": "operator_confirmed", "confidence": "confirmed_for_current_session"}
-        # Existing map-name IDs are useful when they happen to be section IDs,
-        # but are never presented as a decoded Zone name without a matching
-        # registry entry.
-        section_label = get_map_name(location_name_id)
-        known_section = not section_label.startswith("合众地区未知区域")
-        return {
-            "name_zh": section_label if known_section else f"Zone {zone_id}（{environment}）",
-            "name_en": f"Zone {zone_id} ({environment})",
-            "source": "location_name_id_registry" if known_section else "zone_id_fallback",
-            "confidence": "candidate" if known_section else "unresolved_name",
-            "location_name_id": location_name_id,
-            "parent_zone_id": parent_zone_id,
-        }
+        catalog = RomLocationCatalog(self.rom)
+        try:
+            rom_label = catalog.zone_label(zone_id)
+            if override:
+                return {
+                    **rom_label.as_dict(),
+                    **override,
+                    "source": "operator_confirmed+rom_text",
+                    "confidence": "verified_rom_text",
+                }
+            return {
+                **rom_label.as_dict(),
+                "name_en": f"Zone {zone_id} ({rom_label.environment})",
+                "location_name_id": location_name_id,
+                "parent_zone_id": parent_zone_id,
+            }
+        except Exception:
+            return {
+                "name_zh": f"Zone {zone_id}（{environment}）",
+                "name_en": f"Zone {zone_id} ({environment})",
+                "source": "zone_id_fallback",
+                "confidence": "unresolved_name",
+                "location_name_id": location_name_id,
+                "parent_zone_id": parent_zone_id,
+            }
 
     def _node(self, zone_id: int) -> dict[str, Any]:
         zone = self.rom.zone(zone_id)
@@ -103,10 +113,12 @@ class RomMapGraphService:
                     raw_target = warp.get("target_zone_or_map_raw")
                     target_zone = raw_target if isinstance(raw_target, int) and 0 <= raw_target < self.rom.zone_count else None
                     target_node = nodes.get(str(target_zone)) if target_zone is not None else None
+                    # Warp +0x08/+0x0C are horizontal candidates.  +0x12 is
+                    # an unverified raw parameter, never a 3-D elevation.
                     source_world = {
-                        "x": float(warp.get("x_world", 0)),
-                        "y": float(warp.get("z", 0)),
-                        "z": float(warp.get("y_world", 0)),
+                        "x": float(warp.get("x_raw", 0)),
+                        "y": None,
+                        "z": float(warp.get("y_raw", 0)),
                     }
                     edge = {
                     "edge_id": f"zone:{zone_id}:warp:{warp.get('id', 0)}",
@@ -116,17 +128,19 @@ class RomMapGraphService:
                     "source_warp_id": warp.get("id"),
                     "source_position": source_world,
                     "source_tile_candidate": {
-                        "x": warp.get("tile_x_candidate"),
-                        "z": warp.get("tile_y_candidate"),
-                        "width": warp.get("width"),
-                        "height": warp.get("height"),
+                        "x": (float(warp["x_raw"]) / 16.0) if isinstance(warp.get("x_raw"), int) else None,
+                        "z": (float(warp["y_raw"]) / 16.0) if isinstance(warp.get("y_raw"), int) else None,
+                        "x_extent_raw": warp.get("x_extent_raw"),
+                        "y_extent_raw": warp.get("y_extent_raw"),
                     },
                     "target_zone_or_map_raw": raw_target,
-                    "target_warp_id": warp.get("target_warp_id"),
+                    "target_warp_id": None,
+                    "target_warp_arg2_raw": warp.get("arg2_raw"),
+                    "target_warp_semantics_verified": False,
                     "target_zone_id_candidate": target_zone,
                     "target_node_id_candidate": f"zone:{target_zone}" if target_zone is not None else None,
                     "target_label_candidate": (target_node or {}).get("label"),
-                    "destination_semantics": "rom_zone_candidate" if target_zone is not None else "raw_unresolved",
+                    "destination_semantics": "rom_zone_candidate_only" if target_zone is not None else "raw_unresolved",
                     "verification": {
                         "status": "rom_candidate" if target_zone is not None else "unresolved",
                         "source": "rom:/a/1/2/6",
@@ -143,7 +157,7 @@ class RomMapGraphService:
             "coordinate_space": "gen5-field-world-v1",
             "semantic_policy": {
                 "zone_names": "Chinese label first when a confirmed/registered label exists; raw location_name_id is retained",
-                "warp_targets": "target_zone_or_map_raw is lossless; candidate Zone is not runtime verified",
+                "warp_targets": "target_zone_or_map_raw is lossless; arg2 target-record and landing are unresolved",
                 "runtime_promotion": "set verification.runtime_observed only after a PlayerRuntime Zone transition confirms the edge",
                 "parent_zone": "ROM parent_zone_id is preserved as an ownership candidate for interior maps",
             },

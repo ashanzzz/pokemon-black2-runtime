@@ -144,7 +144,14 @@ def _scene_from_truth(truth: dict[str, Any], service: MapTruthService) -> dict[s
     for warp in events.get("warps") or []:
         warps.append({
             **warp,
-            "map_local_tile": {"x": warp.get("tile_x"), "y": warp.get("tile_y")},
+            "map_local_tile": {
+                "x": warp.get("tile_x") if warp.get("tile_x") is not None else (
+                    float(warp["x_raw"]) / _WORLD_UNITS_PER_TILE if isinstance(warp.get("x_raw"), int) else None
+                ),
+                "y": warp.get("tile_y") if warp.get("tile_y") is not None else (
+                    float(warp["y_raw"]) / _WORLD_UNITS_PER_TILE if isinstance(warp.get("y_raw"), int) else None
+                ),
+            },
             "semantic_role": "warp_region",
             "destination_status": "raw target IDs; destination landing requires live transition validation",
         })
@@ -166,8 +173,9 @@ def _scene_from_truth(truth: dict[str, Any], service: MapTruthService) -> dict[s
                 "door_uid": door.get("door_uid"),
                 "resource_uid": door.get("resource_uid"),
                 "warp_id": warp.get("id"),
-                "target_map_id_raw": warp.get("target_map_id"),
-                "target_warp_id_raw": warp.get("target_warp_id"),
+                "target_map_id_raw": warp.get("target_map_id_raw", warp.get("destination_map_raw")),
+                "target_warp_id_raw": None,
+                "target_arg2_raw": warp.get("arg2_raw"),
                 "distance_tiles": round(distance, 4),
                 "confidence": "candidate",
                 "reason": (

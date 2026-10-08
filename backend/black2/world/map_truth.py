@@ -20,6 +20,7 @@ from .map_knowledge import MapKnowledgeService
 from .rom_maps import NativeMapEngine
 from .rom_reader import NarcArchive
 from .runtime_field_resolver import read_main_ram, resolve_runtime_field_from_ram
+from .actor_binding import bind_static_npcs_to_runtime
 
 _NONE = 0xFFFFFFFF
 _TEXTURE_PATH = "a/0/1/4"
@@ -303,6 +304,12 @@ class MapTruthService:
 
         runtime_actors = runtime.get("actors", {}).get("actors", []) or []
         static_npcs = (rom_detail or {}).get("events", {}).get("npcs", []) or []
+        runtime_zone = runtime.get("player", {}).get("zone_id")
+        bound_npcs = (
+            bind_static_npcs_to_runtime(static_npcs, runtime_actors, zone_id=runtime_zone)
+            if isinstance(runtime_zone, int) and isinstance(static_npcs, list) and isinstance(runtime_actors, list)
+            else []
+        )
         texture_identity = _resident_texture_ids(ram, self.engine)
         permission = _player_permission(runtime, self.engine)
 
@@ -338,6 +345,9 @@ class MapTruthService:
             "furniture": [], "npcs": [], "warps": [], "triggers": [],
             "counts": {"furniture": 0, "npcs": 0, "warps": 0, "triggers": 0},
         }
+        events_with_bindings = dict(events) if isinstance(events, dict) else {}
+        if bound_npcs:
+            events_with_bindings["npcs"] = bound_npcs
         confidence = "probable" if all((
             runtime.get("confidence") == "probable",
             matrix_identity.get("confidence") == "probable",
@@ -375,13 +385,23 @@ class MapTruthService:
             "runtime_actors": runtime_actors,
             "runtime_actor_system": {
                 key: runtime.get("actors", {}).get(key) for key in (
-                    "address", "capacity", "declared_count", "resolved_count",
-                    "player_slot", "structure_coherent", "zone_consensus",
+                    "address", "capacity", "declared_count_raw", "declared_count",
+                    "resolved_count", "active_slot_count", "player_slot",
+                    "structure_coherent", "count_semantics", "slot_scan", "zone_consensus",
                 )
             },
             "runtime_props": runtime.get("props"),
-            "rom_events": events,
-            "candidate_npc_links": _candidate_npc_links(runtime_actors, static_npcs),
+            "rom_events": events_with_bindings,
+            "candidate_npc_links": [
+                {
+                    "static_npc_id": row.get("id"),
+                    "binding": (row.get("runtime") or {}).get("binding"),
+                    "confidence": ((row.get("runtime") or {}).get("binding") or {}).get("status"),
+                    "reason": "evidence-ranked ROM↔Runtime FieldActor binding",
+                }
+                for row in bound_npcs
+                if ((row.get("runtime") or {}).get("binding") or {}).get("status") != "unresolved"
+            ] or _candidate_npc_links(runtime_actors, static_npcs),
             "collision": {
                 "player_tile": permission,
                 "current_map_models": models,

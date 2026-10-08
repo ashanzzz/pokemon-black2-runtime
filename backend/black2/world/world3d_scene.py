@@ -24,10 +24,15 @@ from .original_world import OriginalWorldService
 from .exported_world_store import ExportedWorldStore
 from .runtime_player_state import player_runtime_service
 from .runtime_actor_overlay import runtime_actor_overlay_service
+from .actor_binding import merge_scene_npcs
 from .map_graph import ZONE_LABEL_OVERRIDES
 
 TILE_WORLD = 16.0
 TILE_HALF = 8.0
+# Connected scenes are a viewport convenience, never a whole-ROM preload.
+# Keep this below the per-Zone static-store cache limit so one broad request
+# cannot retain an unbounded set of full ROM bundles in the web process.
+MAX_CONNECTED_SCENE_ZONES = 8
 
 
 def _num(value: Any) -> float | None:
@@ -298,7 +303,7 @@ class World3DSceneService:
                 "has_door_metadata": bool((item.get("resource") or {}).get("has_door_metadata")),
                 "asset_url": f"/api/v1/map/v5/building/{zone_id}/{item.get('model_uid')}/model.glb",
             })
-        return {
+        result = {
             "format": "black2-world3d-static/v6",
             "zone_id": zone_id,
             "environment": "exterior" if (world.get("area") or {}).get("is_exterior") else "interior",
@@ -309,7 +314,10 @@ class World3DSceneService:
             "matrix": matrix_meta,
             "terrains": terrains,
             "buildings": buildings,
-            "entities": world.get("entities"),
+            # Entity records are small compared with terrain data, but the
+            # source world is cached. Copy only this mutable projection before
+            # adding canonical rendering coordinates below.
+            "entities": deepcopy(world.get("entities") or {}),
             "source_policy": {
                 "terrain": "ROM matrix coordinates + original BMD0/BTX0 conversion (cached)",
                 "buildings": "ROM only / cached",
@@ -325,8 +333,9 @@ class World3DSceneService:
                 ),
             },
         }
+        return self._attach_static_entity_positions(result)
 
-    def connected_zone_cluster(self, zone_id: int, *, matrix_id: int | None = None, max_zones: int = 24) -> dict[str, Any]:
+    def connected_zone_cluster(self, zone_id: int, *, matrix_id: int | None = None, max_zones: int = MAX_CONNECTED_SCENE_ZONES) -> dict[str, Any]:
         """Return the exact spatial component around an exterior Zone.
 
         Only Zones that own cardinally adjacent cells in the *same* ROM
@@ -335,7 +344,8 @@ class World3DSceneService:
         canonical transform.
         """
         zone_id = int(zone_id)
-        max_zones = max(1, min(64, int(max_zones)))
+        requested_max_zones = int(max_zones)
+        max_zones = max(1, min(MAX_CONNECTED_SCENE_ZONES, requested_max_zones))
         anchor_header = self.original.rom.zone(zone_id)
         anchor_area = self.original.rom.area(anchor_header.area_id)
         selected_matrix_id = int(matrix_id if isinstance(matrix_id, int) else anchor_header.matrix_id)
@@ -350,6 +360,8 @@ class World3DSceneService:
             },
             "alignment": "shared_matrix_exact",
             "cross_matrix_policy": "cross_matrix_connector_graph_only_until_runtime_landing_transform_is_verified",
+            "requested_max_zones": requested_max_zones,
+            "max_zones": max_zones,
         }
         if not anchor_area.is_exterior:
             return {**base, "environment": "interior", "zone_ids": [zone_id], "zone_count": 1,
@@ -420,7 +432,7 @@ class World3DSceneService:
         live_span: float | None = None,
         matrix_id: int | None = None,
         anchor_static: dict[str, Any] | None = None,
-        max_zones: int = 24,
+        max_zones: int = MAX_CONNECTED_SCENE_ZONES,
     ) -> dict[str, Any]:
         """Combine an exterior same-Matrix Zone component into one static scene."""
         anchor = deepcopy(anchor_static) if isinstance(anchor_static, dict) else self.static_scene(
@@ -511,7 +523,7 @@ class World3DSceneService:
         }
         return anchor
 
-    def connected_static_preview_scene(self, zone_id: int, *, max_zones: int = 24) -> dict[str, Any]:
+    def connected_static_preview_scene(self, zone_id: int, *, max_zones: int = MAX_CONNECTED_SCENE_ZONES) -> dict[str, Any]:
         base = self.static_preview_scene(int(zone_id))
         connected = self.connected_static_scene(int(zone_id), anchor_static=base.get("static"), max_zones=max_zones)
         cluster = connected.get("connected_world") or {}
@@ -528,7 +540,7 @@ class World3DSceneService:
         *,
         force_identity: bool = False,
         loaded_visual: dict[str, Any] | None = None,
-        max_zones: int = 24,
+        max_zones: int = MAX_CONNECTED_SCENE_ZONES,
     ) -> dict[str, Any]:
         base = await self.current_scene(reader, force_identity=force_identity, loaded_visual=loaded_visual)
         if base.get("status") == "unresolved" or not isinstance(base.get("zone_id"), int):
@@ -729,6 +741,43 @@ class World3DSceneService:
         return static
 
     @staticmethod
+    def _attach_static_entity_positions(static: dict[str, Any]) -> dict[str, Any]:
+        """Give non-warp static entities one explicit canonical projection.
+
+        Event records use X/Y as their horizontal axes and Z as elevation.
+        The renderer and navigator use X/Z horizontally and Y as elevation.
+        This keeps every connected-scene entity in the Matrix-global field
+        coordinate system while preserving the lossless ROM fields.
+        """
+        entities = static.get("entities")
+        zone_id = _int(static.get("zone_id"))
+        if not isinstance(entities, dict) or zone_id is None:
+            return static
+        for kind in ("npcs", "furniture", "triggers"):
+            for record in entities.get(kind) or ():
+                if not isinstance(record, dict):
+                    continue
+                record.setdefault("source_zone_id", zone_id)
+                x, event_y, elevation = _int(record.get("x")), _int(record.get("y")), _int(record.get("z"))
+                if x is None or event_y is None or elevation is None:
+                    continue
+                grid = {"x": x, "y": elevation, "z": event_y}
+                record["grid"] = grid
+                record["world"] = {
+                    "x": x * TILE_WORLD + TILE_HALF,
+                    "y": elevation * TILE_WORLD,
+                    "z": event_y * TILE_WORLD + TILE_HALF,
+                }
+                record["coordinate_space"] = "gen5-field-world-v1"
+                record["grid_coordinate_space"] = "gen5-field-grid-v1"
+                record["axis_mapping"] = "event.x->grid.x; event.y->grid.z; event.z->grid.y"
+                record["world_position_confidence"] = "rom_event_grid_candidate"
+        for warp in entities.get("warps") or ():
+            if isinstance(warp, dict):
+                warp.setdefault("source_zone_id", zone_id)
+        return static
+
+    @staticmethod
     def _attach_warp_world_positions(static: dict[str, Any], player: dict[str, Any]) -> dict[str, Any]:
         """Promote ROM warp-local coordinates into canonical world X/Z.
 
@@ -755,8 +804,9 @@ class World3DSceneService:
         for warp in warps:
             if not isinstance(warp, dict):
                 continue
-            x = warp.get("x_world")
-            z = warp.get("y_world")
+            legacy_record = "x_raw" not in warp and "y_raw" not in warp
+            x = warp.get("x_raw", warp.get("x_world"))
+            z = warp.get("y_raw", warp.get("y_world"))
             if not isinstance(x, (int, float)) or not isinstance(z, (int, float)):
                 continue
             # The scene builder receives coordinates from the decoded Zone
@@ -775,8 +825,8 @@ class World3DSceneService:
                 wz = float(chunk_z) * span + float(z)
             else:
                 wx, wz = float(x), float(z)
-            width = max(1, _int(warp.get("width")) or 1)
-            height = max(1, _int(warp.get("height")) or 1)
+            width = max(1, _int(warp.get("x_extent_raw", warp.get("width"))) or 1)
+            height = max(1, _int(warp.get("y_extent_raw", warp.get("height"))) or 1)
             # The ROM record is the footprint's first tile, while the
             # renderer's orange marker represents the middle tile.  Export
             # both explicitly so a client never has to repeat (or accidentally
@@ -784,7 +834,8 @@ class World3DSceneService:
             # warp therefore remains exactly on its ROM coordinate.
             center_x = wx + (width - 1) * TILE_WORLD * 0.5
             center_z = wz + (height - 1) * TILE_WORLD * 0.5
-            world_y = float(warp.get("z") or 0.0)
+            # Warp +0x12 is unverified; never present it as elevation.
+            world_y = _num(warp.get("z")) if legacy_record else None
             warp["world"] = {
                 "x": wx,
                 "y": world_y,
@@ -926,3 +977,44 @@ class World3DSceneService:
     async def runtime_actors(self, reader: MemoryReader, *, force: bool = False) -> dict[str, Any]:
         """Bounded actor overlay; never trigger a full Main-RAM identity scan."""
         return await runtime_actor_overlay_service.sample(reader)
+
+    async def merged_npcs(
+        self, reader: MemoryReader, *, zone_ids: list[int], max_zones: int = MAX_CONNECTED_SCENE_ZONES,
+    ) -> dict[str, Any]:
+        """Merge explicitly requested scene NPC definitions with one RAM overlay.
+
+        This deliberately does not invoke connected-scene composition, terrain
+        asset conversion, GLB loading, or full-RAM identity discovery.  The
+        caller supplies the Zone IDs already mounted in its scene.
+        """
+        selected: list[int] = []
+        for value in zone_ids:
+            zone_id = _int(value)
+            if zone_id is not None and zone_id not in selected:
+                selected.append(zone_id)
+            if len(selected) >= max(1, min(MAX_CONNECTED_SCENE_ZONES, int(max_zones))):
+                break
+        actors_payload = await self.runtime_actors(reader)
+        actors = actors_payload.get("actors") if isinstance(actors_payload, dict) else []
+        static_by_zone: dict[int, list[dict[str, Any]]] = {}
+        for zone_id in selected:
+            # Do not call static_scene here: it constructs terrain/building
+            # projections for a browser mount.  This polling endpoint needs
+            # only the small entity list already present in the Zone cache.
+            world = self.exported.zone(zone_id)
+            projected = self._attach_static_entity_positions({
+                "zone_id": zone_id,
+                "entities": deepcopy({"npcs": (world.get("entities") or {}).get("npcs") or []}),
+            })
+            entities = projected.get("entities") or {}
+            npcs = entities.get("npcs") if isinstance(entities, dict) else []
+            static_by_zone[zone_id] = npcs if isinstance(npcs, list) else []
+        merged = merge_scene_npcs(static_by_zone, actors if isinstance(actors, list) else [])
+        return {
+            **merged,
+            "zone_ids": selected,
+            "actors": actors if isinstance(actors, list) else [],
+            "actor_status": actors_payload.get("status") if isinstance(actors_payload, dict) else "unresolved",
+            "frame": actors_payload.get("frame") if isinstance(actors_payload, dict) else None,
+            "read_policy": "one bounded ActorSystem snapshot plus requested static Zone records; no connected-scene, GLB, or full-RAM scan",
+        }

@@ -82,6 +82,36 @@ def test_stop_backend_kills_all_owned_runtime_processes_not_emulator(monkeypatch
     assert saved.get("emuhawk_pid") == 333
 
 
+def test_stop_backend_trusts_control_root_when_windows_commandline_is_garbled(monkeypatch):
+    """A non-ASCII checkout path must not strand the live backend on STOP."""
+    launcher = load_launcher()
+    state = {"backend_pid": 46748, "backend_pid_history": [46748]}
+    saved = {}
+    calls = []
+    # This is the shape returned by Get-CimInstance when the host encoding
+    # cannot represent the Chinese checkout path; the PID itself is still
+    # returned but the strict command-line matcher cannot prove ownership.
+    rows = [{"ProcessId": 46748, "CommandLine": "python.exe D:\\SynologyDrive\\ufffd\\run_runtime.py"}]
+    monkeypatch.setattr(launcher.os, "name", "nt")
+    monkeypatch.setattr(launcher, "cfg", lambda: {"http_host": "127.0.0.1", "http_port": 8765})
+    monkeypatch.setattr(launcher, "_powershell_process_rows", lambda: rows)
+    monkeypatch.setattr(launcher, "_load", lambda _path: dict(state))
+    monkeypatch.setattr(launcher, "_save", lambda _path, value: saved.update(value))
+    monkeypatch.setattr(launcher, "runtime_control_status", lambda _cfg: {"pid": 46748, "project_root": str(launcher.ROOT)})
+    monkeypatch.setattr(launcher, "health", lambda _cfg: None)
+    monkeypatch.setattr(launcher, "pid_alive", lambda pid: int(pid) == 46748)
+    monkeypatch.setattr(launcher, "wait", lambda _fn, _seconds: True)
+
+    def fake_run(command, **_kwargs):
+        calls.append(command)
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(launcher.subprocess, "run", fake_run)
+    result = launcher.stop_backend()
+    assert [command for command in calls if command[:2] == ["taskkill", "/PID"]]
+    assert result["backend_stop"]["stopped"] == [46748]
+
+
 def test_fallback_launcher_lock_rejects_second_instance(monkeypatch, tmp_path):
     launcher = load_launcher()
     runtime = tmp_path / "runtime"

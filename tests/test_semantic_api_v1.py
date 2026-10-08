@@ -47,6 +47,9 @@ class Connectors:
     def query(self, zone_id=None, **kwargs):
         return {"format": "black2-ai-warps/v1", "warps": [], "count": 0}
 
+    def window_warps(self, zone_id):
+        return []
+
 
 @pytest.fixture
 def api(monkeypatch):
@@ -83,6 +86,21 @@ def test_static_other_zone_query_works_without_live_ram(api):
     assert response.json()["collision"]["can_walk"] is None
 
 
+def test_tile_exposes_transport_eligibility_separately_from_collision(api):
+    data = {
+        "surfaces": [{
+            "layer_index": 0,
+            "material": {"kind": "water", "requires": "surf"},
+            "collision": {"static_blocked": False},
+        }],
+        "height": {"selected_surface": 0},
+    }
+    routes._attach_movement_rules(data)
+    assert data["movement"]["modes"]["walk"]["allowed"] is False
+    assert data["movement"]["modes"]["surf"]["allowed"] is True
+    assert data["movement"]["runtime_transport_required"] is True
+
+
 def test_runtime_tile_only_attached_to_exact_fresh_layer(api):
     client, hub = api
     url = "/api/v1/ai/map/tile?zone_id=10&x=2&z=3&y="
@@ -107,6 +125,8 @@ def test_window_orientation_and_player_marker(api):
     assert body["rows"] == ["???", "?@?", "???"]
     assert body["origin"] == {"zone_id": 10, "x": 1, "y": 0, "z": 2}
     assert body["legend"]["?"]
+    assert body["view"]["is_current_nds_view"] is False
+    assert body["view"]["memory_backed"] is False
 
 
 def test_context_reads_runtime_once_and_bag_unknown(api):

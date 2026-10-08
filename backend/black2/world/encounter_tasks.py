@@ -59,18 +59,26 @@ class EncounterTaskService:
         player_sample: Callable[[], dict[str, Any] | None],
         *,
         occupancy_sample: Callable[[int, int, Any], Awaitable[tuple[list[dict[str, Any]], dict[str, Any]]] | tuple[list[dict[str, Any]], dict[str, Any]]] | None = None,
+        control_sample: Callable[[], dict[str, Any] | None] | None = None,
         poll_seconds: float = 0.05,
         blocker_retry_seconds: float = 0.12,
         blocker_retry_count: int = 8,
+        interruption_grace_seconds: float = 2.5,
     ) -> None:
         self.regions = regions
         self.planner = planner
         self.navigation = navigation
         self.player_sample = player_sample
         self.occupancy_sample = occupancy_sample
+        # Reuse the same semantic snapshot used by NavigationTaskService.
+        # Encounter execution must classify a late battle/dialogue modal from
+        # the control plane even when PlayerRuntime temporarily loses its
+        # overworld coordinates.
+        self.control_sample = control_sample or getattr(navigation, "control_sample", None) or (lambda: None)
         self.poll_seconds = max(0.02, float(poll_seconds))
         self.blocker_retry_seconds = max(0.05, float(blocker_retry_seconds))
         self.blocker_retry_count = max(1, int(blocker_retry_count))
+        self.interruption_grace_seconds = max(0.0, float(interruption_grace_seconds))
         self._tasks: dict[str, dict[str, Any]] = {}
         self._runners: dict[str, asyncio.Task] = {}
 
@@ -281,10 +289,91 @@ class EncounterTaskService:
                 return status
             await asyncio.sleep(self.poll_seconds)
 
-    @staticmethod
-    def _interruption(status: dict[str, Any]) -> bool:
+    def _control_interruption(self) -> dict[str, Any] | None:
+        """Return a blocking field modal observed after a patrol leg.
+
+        A wild encounter can be raised asynchronously after the final D-pad
+        press has been cleared.  In that race the navigation task may finish
+        with ``NAV_STUCK`` before the next semantic snapshot becomes BATTLE.
+        The encounter layer therefore observes the same control snapshot and
+        gives the modal a short bounded grace period before classifying the
+        navigation result as a real failure.
+        """
+        try:
+            snapshot = self.control_sample() or {}
+        except Exception:
+            return None
+        semantic = snapshot.get("semantic") if isinstance(snapshot, dict) else {}
+        semantic = semantic if isinstance(semantic, dict) else {}
+        context = semantic.get("context") if isinstance(semantic.get("context"), dict) else {}
+        screen = context.get("screen_type")
+        screen = str(getattr(screen, "value", screen) or "")
+        current = snapshot.get("current") if isinstance(snapshot, dict) else {}
+        layers = current.get("layers") if isinstance(current, dict) else []
+        battle_layer = any(
+            isinstance(layer, dict) and layer.get("id") == "battle" and layer.get("active") is True
+            for layer in (layers or [])
+        )
+        if screen == "BATTLE" or battle_layer:
+            return {
+                "kind": "battle",
+                "reason": "battle_started",
+                "screen_type": screen,
+                "source": "encounter_control_snapshot",
+            }
+        if context.get("is_dialogue_active") is True or screen in {"DIALOGUE", "DIALOGUE_ACTIVE"}:
+            return {
+                "kind": "dialogue",
+                "reason": "dialogue_started",
+                "screen_type": screen,
+                "source": "encounter_control_snapshot",
+            }
+        return None
+
+    def _interruption_signal(self, status: dict[str, Any]) -> dict[str, Any] | None:
         reason = status.get("stop_reason") or {}
-        return status.get("status") == "failed" and reason.get("code") == "NAV_NOT_CONTROLLABLE"
+        code = reason.get("code")
+        if status.get("status") == "failed" and code in {
+            "NAV_NOT_CONTROLLABLE",
+            "NAV_INTERRUPTED_BY_BATTLE",
+            "NAV_INTERRUPTED_BY_DIALOGUE",
+            "NAV_INTERRUPTED_BY_FIELD_EVENT",
+        }:
+            return {"kind": "navigation", "reason": code, "source": "navigation_task"}
+        return self._control_interruption()
+
+    async def _wait_for_interruption(self, status: dict[str, Any]) -> dict[str, Any] | None:
+        """Observe a late battle/dialogue modal for a bounded grace period."""
+        deadline = asyncio.get_running_loop().time() + self.interruption_grace_seconds
+        while True:
+            signal = self._interruption_signal(status)
+            if signal is not None:
+                return signal
+            if asyncio.get_running_loop().time() >= deadline:
+                return None
+            await asyncio.sleep(min(self.poll_seconds, 0.1))
+
+    @staticmethod
+    def _interruption(status: dict[str, Any], signal: dict[str, Any] | None = None) -> bool:
+        reason = status.get("stop_reason") or {}
+        code = reason.get("code")
+        return bool(signal) or (status.get("status") == "failed" and code in {
+            "NAV_NOT_CONTROLLABLE",
+            "NAV_INTERRUPTED_BY_BATTLE",
+            "NAV_INTERRUPTED_BY_DIALOGUE",
+            "NAV_INTERRUPTED_BY_FIELD_EVENT",
+        })
+
+    @staticmethod
+    def _set_interrupted(record: dict[str, Any], message: str, result: dict[str, Any], signal: dict[str, Any]) -> None:
+        record["status"] = "interrupted"
+        record["stop_reason"] = {
+            "code": "ENCOUNTER_OVERWORLD_INTERRUPTED",
+            "message": message,
+            "battle_confirmed": False,
+            "signal": signal,
+            "navigation": result.get("stop_reason"),
+        }
 
     async def _navigate(
         self,
@@ -328,13 +417,14 @@ class EncounterTaskService:
                 record["status"] = "entering_region"; record["updated_at"] = _now()
                 entry = (await self._choose_entry(region, str(record["movement_mode"])))["tile"]
                 result = await self._navigate(record, entry)
-                if self._interruption(result):
-                    record["status"] = "interrupted"
-                    record["stop_reason"] = {
-                        "code": "ENCOUNTER_OVERWORLD_INTERRUPTED",
-                        "message": "Navigation lost controllable OVERWORLD state while entering the region; movement is stopped safely.",
-                        "battle_confirmed": False,
-                    }
+                signal = await self._wait_for_interruption(result) if result.get("status") != "succeeded" else self._interruption_signal(result)
+                if self._interruption(result, signal):
+                    self._set_interrupted(
+                        record,
+                        "Navigation lost controllable OVERWORLD state while entering the region; movement is stopped safely.",
+                        result,
+                        signal or {"kind": "navigation", "reason": "unknown"},
+                    )
                     return
                 if result.get("status") != "succeeded":
                     record["status"] = "failed"
@@ -362,10 +452,15 @@ class EncounterTaskService:
             )
             if (live["x"], live["z"]) != (int(route[nearest_index]["x"]), int(route[nearest_index]["z"])):
                 result = await self._navigate(record, route[nearest_index], allowed_nodes=allowed)
+                signal = await self._wait_for_interruption(result) if result.get("status") != "succeeded" else self._interruption_signal(result)
                 if result.get("status") != "succeeded":
-                    if self._interruption(result):
-                        record["status"] = "interrupted"
-                        record["stop_reason"] = {"code": "ENCOUNTER_OVERWORLD_INTERRUPTED", "message": "OVERWORLD was interrupted during patrol setup.", "battle_confirmed": False}
+                    if self._interruption(result, signal):
+                        self._set_interrupted(
+                            record,
+                            "OVERWORLD was interrupted during patrol setup.",
+                            result,
+                            signal or {"kind": "navigation", "reason": "unknown"},
+                        )
                     else:
                         record["status"] = "failed"
                         record["stop_reason"] = {"code": "ENCOUNTER_PATROL_SETUP_FAILED", "message": "Could not reach a patrol waypoint inside the region.", "navigation": result.get("stop_reason")}
@@ -391,13 +486,14 @@ class EncounterTaskService:
                 result = await self._navigate(record, target, allowed_nodes=allowed)
                 record["progress"]["legs_completed"] += 1
                 record["updated_at"] = _now()
-                if self._interruption(result):
-                    record["status"] = "interrupted"
-                    record["stop_reason"] = {
-                        "code": "ENCOUNTER_OVERWORLD_INTERRUPTED",
-                        "message": "The controllable OVERWORLD state ended during patrol. Inputs were cleared; battle identity remains unresolved.",
-                        "battle_confirmed": False,
-                    }
+                signal = await self._wait_for_interruption(result) if result.get("status") != "succeeded" else self._interruption_signal(result)
+                if self._interruption(result, signal):
+                    self._set_interrupted(
+                        record,
+                        "The controllable OVERWORLD state ended during patrol. Inputs were cleared; battle identity remains unresolved.",
+                        result,
+                        signal or {"kind": "navigation", "reason": "unknown"},
+                    )
                     return
                 if result.get("status") != "succeeded":
                     record["status"] = "failed"
@@ -430,12 +526,21 @@ class EncounterTaskService:
                 record["stop_reason"] = {"code": "ENCOUNTER_CANCELLED", "message": "Encounter patrol was cancelled."}
             raise
         except (EncounterTaskError, NavigationPlanningError) as exc:
-            record["status"] = "failed"
-            record["stop_reason"] = {
-                "code": getattr(exc, "code", "ENCOUNTER_INTERNAL"),
-                "message": getattr(exc, "message", str(exc)),
-                "details": getattr(exc, "details", {}),
-            }
+            signal = self._control_interruption()
+            if signal is not None:
+                self._set_interrupted(
+                    record,
+                    "The encounter patrol was interrupted by a field modal while runtime coordinates were unavailable.",
+                    {"stop_reason": {"code": getattr(exc, "code", "ENCOUNTER_INTERNAL"), "message": getattr(exc, "message", str(exc))}},
+                    signal,
+                )
+            else:
+                record["status"] = "failed"
+                record["stop_reason"] = {
+                    "code": getattr(exc, "code", "ENCOUNTER_INTERNAL"),
+                    "message": getattr(exc, "message", str(exc)),
+                    "details": getattr(exc, "details", {}),
+                }
         except Exception as exc:  # pragma: no cover - final safety fence
             record["status"] = "failed"
             record["stop_reason"] = {"code": "ENCOUNTER_INTERNAL", "message": f"{type(exc).__name__}: {exc}"}

@@ -82,14 +82,24 @@ def _decode_events(raw: bytes, event_archive_id: int) -> dict[str, Any]:
         record = raw[cursor:cursor + _FURNITURE_SIZE]
         cursor += _FURNITURE_SIZE
         furniture.append({
+            "record_index": index,
             "id": index,
             "script_id": struct.unpack_from("<H", record, 0)[0],
+            "arg2_raw": struct.unpack_from("<H", record, 2)[0],
+            "arg3_raw": struct.unpack_from("<H", record, 4)[0],
+            "arg4_raw": struct.unpack_from("<H", record, 6)[0],
+            "x_raw": struct.unpack_from("<i", record, 8)[0],
+            "y_raw": struct.unpack_from("<i", record, 12)[0],
+            "z_raw": struct.unpack_from("<i", record, 16)[0],
             "x": struct.unpack_from("<i", record, 8)[0],
             "y": struct.unpack_from("<i", record, 12)[0],
             "z": struct.unpack_from("<i", record, 16)[0],
             "tile_x": struct.unpack_from("<i", record, 8)[0],
             "tile_y": struct.unpack_from("<i", record, 12)[0],
             "coordinate_units": "map_local_tiles",
+            "coordinate_semantics": "candidate",
+            "raw_hex": record.hex(),
+            "record_size": _FURNITURE_SIZE,
         })
 
     npcs = []
@@ -97,11 +107,21 @@ def _decode_events(raw: bytes, event_archive_id: int) -> dict[str, Any]:
         record = raw[cursor:cursor + _NPC_SIZE]
         cursor += _NPC_SIZE
         npcs.append({
+            "record_index": index,
             "id": struct.unpack_from("<H", record, 0)[0],
             "sprite_id": struct.unpack_from("<H", record, 2)[0],
             "movement_id": struct.unpack_from("<H", record, 4)[0],
+            "movement2_raw": struct.unpack_from("<H", record, 6)[0],
             "flag_id": struct.unpack_from("<H", record, 8)[0],
             "script_id": struct.unpack_from("<H", record, 10)[0],
+            "direction_raw": struct.unpack_from("<H", record, 12)[0],
+            "sight_raw": struct.unpack_from("<H", record, 14)[0],
+            "arg9_raw": struct.unpack_from("<H", record, 16)[0],
+            "arg10_raw": struct.unpack_from("<H", record, 18)[0],
+            "leash_lr_raw": struct.unpack_from("<H", record, 20)[0],
+            "leash_ud_raw": struct.unpack_from("<H", record, 22)[0],
+            "arg13_raw": struct.unpack_from("<H", record, 24)[0],
+            "arg14_raw": struct.unpack_from("<H", record, 26)[0],
             "facing_id": struct.unpack_from("<H", record, 12)[0],
             "x": _s16(record, 28),
             "y": _s16(record, 30),
@@ -109,6 +129,9 @@ def _decode_events(raw: bytes, event_archive_id: int) -> dict[str, Any]:
             "tile_x": _s16(record, 28),
             "tile_y": _s16(record, 30),
             "coordinate_units": "map_local_tiles",
+            "facing_semantics": "ROM default/direction candidate; live facing comes from FieldActor.face_dir",
+            "raw_hex": record.hex(),
+            "record_size": _NPC_SIZE,
         })
 
     warps = []
@@ -117,18 +140,31 @@ def _decode_events(raw: bytes, event_archive_id: int) -> dict[str, Any]:
         cursor += _WARP_SIZE
         x_world, y_world = _s16(record, 8), _s16(record, 12)
         warps.append({
+            "record_index": index,
             "id": index,
+            "target_map_id_raw": struct.unpack_from("<H", record, 0)[0],
+            # Compatibility alias; the value remains explicitly raw and is
+            # not a decoded Zone identity.
             "target_map_id": struct.unpack_from("<H", record, 0)[0],
-            "target_warp_id": struct.unpack_from("<H", record, 2)[0],
-            "kind": struct.unpack_from("<H", record, 4)[0],
-            "x_world": x_world,
-            "y_world": y_world,
-            "z": _s16(record, 18),
+            "destination_map_raw": struct.unpack_from("<H", record, 0)[0],
+            "arg2_raw": struct.unpack_from("<H", record, 2)[0],
+            "arg3_raw": record[4],
+            "arg4_raw": record[5],
+            "arg5_raw": struct.unpack_from("<H", record, 6)[0],
+            "x_raw": x_world,
+            "arg7_raw": struct.unpack_from("<H", record, 10)[0],
+            "y_raw": y_world,
+            "x_extent_raw": struct.unpack_from("<H", record, 14)[0],
+            "y_extent_raw": struct.unpack_from("<H", record, 16)[0],
+            "arg11_raw": _s16(record, 18),
             "tile_x": x_world / 16.0,
             "tile_y": y_world / 16.0,
-            "width": max(1, struct.unpack_from("<H", record, 14)[0]),
-            "height": max(1, struct.unpack_from("<H", record, 16)[0]),
             "coordinate_units": "map_world_units_16_per_tile",
+            "coordinate_semantics": "horizontal candidate only; elevation unresolved",
+            "destination_semantics": "raw; arg2 target-record meaning unresolved until live transition evidence",
+            "semantic_status": "raw_record",
+            "raw_hex": record.hex(),
+            "record_size": _WARP_SIZE,
         })
 
     triggers = []
@@ -136,6 +172,7 @@ def _decode_events(raw: bytes, event_archive_id: int) -> dict[str, Any]:
         record = raw[cursor:cursor + _TRIGGER_SIZE]
         cursor += _TRIGGER_SIZE
         triggers.append({
+            "record_index": index,
             "id": index,
             "entity_id": struct.unpack_from("<H", record, 0)[0],
             "constant": struct.unpack_from("<H", record, 2)[0],
@@ -146,6 +183,13 @@ def _decode_events(raw: bytes, event_archive_id: int) -> dict[str, Any]:
             "tile_x": _s16(record, 10),
             "tile_y": _s16(record, 12),
             "coordinate_units": "map_local_tiles",
+            "arg4_raw": struct.unpack_from("<H", record, 6)[0],
+            "arg5_raw": struct.unpack_from("<H", record, 8)[0],
+            "arg9_raw": struct.unpack_from("<H", record, 16)[0],
+            "arg10_raw": struct.unpack_from("<H", record, 18)[0],
+            "arg11_raw": struct.unpack_from("<H", record, 20)[0],
+            "raw_hex": record.hex(),
+            "record_size": _TRIGGER_SIZE,
         })
 
     return {
@@ -164,7 +208,7 @@ def _decode_events(raw: bytes, event_archive_id: int) -> dict[str, Any]:
             "triggers": trigger_count,
         },
         "semantic_status": {
-            "warp_targets": "raw target_map_id/target_warp_id; destination mapping still needs live transition evidence",
+            "warp_targets": "raw destination_map/arg2; target record and landing still need live transition evidence",
             "object_types": "raw furniture/NPC/trigger records; item and field-move semantics are not inferred",
         },
     }
@@ -527,7 +571,7 @@ def format_current_text(snapshot: dict[str, Any]) -> str:
         counts = event.get("counts", {})
         lines.append(f"事件记录: warps={counts.get('warps', 0)} npcs={counts.get('npcs', 0)} furniture={counts.get('furniture', 0)} triggers={counts.get('triggers', 0)}")
         for warp in event.get("warps", []):
-            lines.append(f"  出入口 #{warp['id']}: ({warp['tile_x']},{warp['tile_y']}) -> target_map={warp['target_map_id']} target_warp={warp['target_warp_id']}（待实际切图验证）")
+            lines.append(f"  出入口 #{warp['id']}: ({warp['tile_x']},{warp['tile_y']}) -> target_map_raw={warp.get('target_map_id_raw', warp.get('destination_map_raw'))} arg2_raw={warp.get('arg2_raw')}（目标记录待实际切图验证）")
         for model in detail.get("models", []):
             lines.append(f"  碰撞模型 #{model['model_id']}: {model.get('width', '?')}x{model.get('height', '?')} planes={model.get('plane_count', '?')} · 原始字节")
             if "permission_planes" in model:

@@ -1,0 +1,194 @@
+function renderTileInspection(cellKey, x, y, z, symbol, walkable, kindName) {
+  let cell = activeCellDataMap.get(cellKey);
+  
+  // 保底查找：若 activeCellDataMap 未命中，从 activeSlicesData 遍历查找
+  if (!cell && activeSlicesData && activeSlicesData.slices) {
+    for (const s of activeSlicesData.slices) {
+      for (const row of (s.grid || [])) {
+        for (const c of row) {
+          if (c.x === x && c.z === z && c.y === y) {
+            cell = c;
+            break;
+          }
+        }
+        if (cell) break;
+      }
+      if (cell) break;
+    }
+  }
+  cell = cell || {};
+
+  const coordElem = document.getElementById('inspectTileCoord');
+  if (coordElem) coordElem.innerText = `选定瓦片: (X=${x}, Z=${z})`;
+
+  const layerElem = document.getElementById('inspectTileLayer');
+  if (layerElem) layerElem.innerText = `标高 Y=${y >= 0 ? '+' + y : y}`;
+
+  const symElem = document.getElementById('inspectTileSymbol');
+  if (symElem) symElem.innerText = `符号: ${symbol}`;
+
+  const statusElem = document.getElementById('inspectTileWalkStatus');
+  if (statusElem) {
+    if (walkable) {
+      statusElem.className = 'ds-badge ds-badge-green';
+      statusElem.innerText = '[OK 允许通行]';
+    } else {
+      statusElem.className = 'ds-badge ds-badge-red';
+      statusElem.innerText = '[BLOCK 障碍阻隔]';
+    }
+  }
+
+  const matElem = document.getElementById('inspectTileMaterial');
+  const descElem = document.getElementById('inspectTileSemanticDesc');
+  const tileClass = cell.tile_class !== undefined ? cell.tile_class : 0;
+  const tileClassHex = cell.tile_class_hex || ('0x' + tileClass.toString(16).toUpperCase().padStart(4, '0'));
+  const matInfo = cell.material || {};
+  const matKind = matInfo.kind || kindName;
+  const matLabel = matInfo.label || kindName;
+
+  const hasWarp = Boolean(cell.has_warp || symbol === 'D' || cell.underlying_symbol === 'D');
+  const isPlayerStandingHere = (x === livePlayerGrid.x && z === livePlayerGrid.z && (y === livePlayerGrid.y || livePlayerGrid.y === undefined));
+
+  const altY = (cell.alternate_layer_y !== undefined && cell.alternate_layer_y !== null) ? cell.alternate_layer_y : (y > 0 ? 0 : 2);
+  const isAltHigher = (altY > y); // 另一层在上方 (如当前 y=0, 上方 altY=2) -> 高台支架 / 实体墙基
+  const isAltLower = (altY < y);  // 另一层在下方 (如当前 y=2, 下方 altY=0) -> 高空敞空 / 悬空空间
+
+  const isPlatformBase = (!walkable && cell.alternate_layer_available && isAltHigher);
+  const isAirGap = (!walkable && (symbol === '↕' || cell.alternate_layer_available) && isAltLower);
+  const isCatwalkEntry = (symbol === '╪' || tileClass === 191 || matKind === 'catwalk_entry');
+  const isCatwalkBody = (symbol === '╫' || tileClass === 190 || matKind === 'catwalk');
+  const isStair = (symbol === '▲' || symbol === '▼' || matKind.includes('stair') || String(cell.kind || '').includes('slope') || String(cell.kind || '').includes('阶梯'));
+
+  if (matElem) {
+    if (isPlatformBase) {
+      matElem.innerHTML = `<strong style="color:var(--accent-red);">[🧱 高台支架 / 实体墙基]</strong> 材质: platform_support · 高架支撑立柱/桥墩 (上方 Y=+${altY} 为高台平台)`;
+    } else if (isAirGap) {
+      matElem.innerHTML = `<strong style="color:var(--text-3);">[☁️ 空中敞空 / 悬空空间]</strong> 材质: open_air · 无上层路面 (空中悬空)`;
+    } else if (isCatwalkEntry) {
+      matElem.innerHTML = `<strong style="color:var(--accent-amber);">[╪ 独木桥入口]</strong> 材质: catwalk_entry · 独木桥桥头入口 (TileClass: ${tileClassHex})`;
+    } else if (isCatwalkBody) {
+      matElem.innerHTML = `<strong style="color:var(--accent-amber);">[╫ 独木桥主体]</strong> 材质: catwalk · 独木桥主体 (TileClass: ${tileClassHex})`;
+    } else if (isStair) {
+      const isUp = (y <= 0);
+      const stairSym = isUp ? '▲' : '▼';
+      const stairLabel = isUp ? '上行爬升阶梯' : '下行降落阶梯';
+      matElem.innerHTML = `<strong style="color:var(--accent-cyan);">[${stairSym} ${stairLabel}]</strong> 材质: staircase_slope · 跨层立体阶梯 (TileClass: ${tileClassHex})`;
+    } else if (hasWarp) {
+      matElem.innerHTML = `<strong style="color:var(--accent-red);">[D 传送大门]</strong> 材质: ${matKind} · 跨区传送门垫 (TileClass: ${tileClassHex})`;
+    } else if (isPlayerStandingHere) {
+      matElem.innerHTML = `<strong style="color:var(--accent-cyan);">[P 主角站立点]</strong> 材质: ${matKind} · ${matLabel} (TileClass: ${tileClassHex})`;
+    } else {
+      matElem.innerText = `材质: ${matKind} · ${matLabel} (TileClass: ${tileClassHex})`;
+    }
+  }
+
+  if (descElem) {
+    if (isPlatformBase) {
+      descElem.innerHTML = `<span style="color:var(--text-2);">🧱 标高 Y=${y >= 0 ? '+' + y : y} 处为上方高台的<strong>实体支撑立柱/墙基支架（不可穿越）</strong>。其正上方标高 Y=+${altY} 处为可通行高台平台（<strong>${matKind} · ${matLabel}</strong>）。在当前地面层，此处为阻隔墙体；如需登上高台，请经由旁边的阶梯走廊爬升。</span>`;
+    } else if (isAirGap) {
+      descElem.innerHTML = `<span style="color:var(--text-2);">☁️ 标高 Y=${y >= 0 ? '+' + y : y} 处为高空敞空区（无高架或独木桥支撑，无法立足或随意跳下）。下方地面投影为: <strong>${matKind} · ${matLabel} (标高 Y=${altY >= 0 ? '+' + altY : altY})</strong>。如需下行，请通过阶梯通道返回地面。</span>`;
+    } else if (isCatwalkEntry) {
+      descElem.innerHTML = `<span style="color:var(--accent-amber); font-weight:700;">🌉 独木桥桥头入口 (Catwalk Entry · 0x00BF)：</span>高台平坦路面与独木桥的平整接驳端点。经黑2实机验证：游戏引擎在踏入此格时即严禁自行车驶入，进入前必须下车换乘步行或奔跑！主轴向可通行，垂直侧向为悬空边缘。`;
+    } else if (isCatwalkBody) {
+      descElem.innerHTML = `<span style="color:var(--accent-amber); font-weight:700;">🌉 独木桥主体 (Catwalk · 0x00BE)：</span>高空狭窄木桥，仅限主轴方向通行，南北两侧为高空坠落边缘。支持步行与跑步平衡通过，自行车严禁驶入。`;
+    } else if (isStair) {
+      const isUp = (y <= 0);
+      descElem.innerHTML = isUp
+        ? `<span style="color:var(--accent-cyan); font-weight:700;">⛰️ 跨层上行阶梯通道 (▲)：</span>连接地面 Y=0 ➔ 高台 Y=+2。在此处向西直行即可安全爬升至高台平台 (X=10, Y=2)。南北两侧带有防护栏，无法侧向掉落。`
+        : `<span style="color:var(--accent-amber); font-weight:700;">⛰️ 跨层下行阶梯通道 (▼)：</span>连接高台 Y=+2 ➔ 地面 Y=0。在此处向东直行即可安全走下阶梯返回地面道路。南北两侧带有防护栏。`;
+    } else if (hasWarp && isPlayerStandingHere) {
+      descElem.innerHTML = `<span style="color:var(--accent-red); font-weight:700;">🚪 主角当前正站在跨区传送门垫 [D] 上！踏入或向此方向移动将触发地图黑屏转场。</span>`;
+    } else if (hasWarp) {
+      descElem.innerHTML = `<span style="color:var(--accent-red); font-weight:700;">🚪 传送大门出入口 [D]：ROM 预设跨区传送门垫。踏入将直接传送至外部相邻地图。</span>`;
+    } else if (isPlayerStandingHere) {
+      const northKey = `${x},${z - 1},${y}`;
+      const isNorthDoor = (activeCellDataMap.get(northKey)?.symbol === 'D' || activeCellDataMap.get(northKey)?.has_warp);
+      if (isNorthDoor) {
+        descElem.innerHTML = `<span style="color:var(--accent-amber); font-weight:700;">🚪 门前待命格 (Doorstep)：主角当前站立于大门入口前 1 格。正前方 (X=${x}, Z=${z - 1}) 即为传送门 [D]！</span>`;
+      } else {
+        descElem.innerText = cell.status || `主角当前站立地块，归属 Zone ${livePlayerZone}。连通性正常。`;
+      }
+    } else {
+      descElem.innerText = cell.status || `当前区域物理地块，归属 Zone ${livePlayerZone}。连通性正常，可作为导航与运动目标。`;
+    }
+  }
+
+  // 全载具与步态许可矩阵 (Walk, Run, Bike, Surf)
+  const isWater = (symbol === 'W' || symbol === '~' || matKind.includes('water') || tileClass === 16 || tileClass === 17);
+  const isTrueCatwalk = (symbol === '╫' || symbol === '╪' || matKind.includes('catwalk') || tileClass === 190 || tileClass === 191);
+  
+  // 1. 步行 (Walk)
+  const mWalk = document.getElementById('matrixWalk');
+  if (mWalk) {
+    if (isPlatformBase) {
+      mWalk.className = 'ds-badge ds-badge-red';
+      mWalk.innerText = '🚶 步行: [NO 支架实体阻隔]';
+    } else if (isAirGap) {
+      mWalk.className = 'ds-badge ds-badge-red';
+      mWalk.innerText = '🚶 步行: [NO 悬空无法立足]';
+    } else if (walkable && !isWater) {
+      mWalk.className = 'ds-badge ds-badge-green';
+      mWalk.innerText = isTrueCatwalk ? '🚶 步行: [OK 允许·独木桥平衡]' : '🚶 步行: [OK 允许]';
+    } else {
+      mWalk.className = 'ds-badge ds-badge-red';
+      mWalk.innerText = '🚶 步行: [NO 障碍禁止]';
+    }
+  }
+
+  // 2. 奔跑 (Run)
+  const mRun = document.getElementById('matrixRun');
+  if (mRun) {
+    if (isPlatformBase) {
+      mRun.className = 'ds-badge ds-badge-red';
+      mRun.innerText = '🏃 奔跑: [NO 支架实体阻隔]';
+    } else if (isAirGap) {
+      mRun.className = 'ds-badge ds-badge-red';
+      mRun.innerText = '🏃 奔跑: [NO 悬空无法奔跑]';
+    } else if (walkable && !isWater) {
+      mRun.className = 'ds-badge ds-badge-green';
+      mRun.innerText = isTrueCatwalk ? '🏃 奔跑: [OK 允许·快速过桥]' : '🏃 奔跑: [OK 允许·B键]';
+    } else {
+      mRun.className = 'ds-badge ds-badge-red';
+      mRun.innerText = '🏃 奔跑: [NO 障碍禁止]';
+    }
+  }
+
+  // 3. 自行车 (Bike - 用户指定黄色)
+  const mBike = document.getElementById('matrixBike');
+  if (mBike) {
+    if (isPlatformBase) {
+      mBike.className = 'ds-badge ds-badge-red';
+      mBike.innerText = '🚲 自行车: [NO 支架实体阻隔]';
+    } else if (isAirGap) {
+      mBike.className = 'ds-badge ds-badge-red';
+      mBike.innerText = '🚲 自行车: [NO 悬空无法骑行]';
+    } else if (isCatwalkEntry) {
+      mBike.className = 'ds-badge ds-badge-amber';
+      mBike.innerText = '🚲 自行车: [NO 独木桥入口禁行 (需下车)]';
+    } else if (isCatwalkBody) {
+      mBike.className = 'ds-badge ds-badge-amber';
+      mBike.innerText = '🚲 自行车: [NO 独木桥狭窄阻断 (自动下车)]';
+    } else if (isStair) {
+      mBike.className = 'ds-badge ds-badge-amber';
+      mBike.innerText = '🚲 自行车: [NO 阶梯阻断]';
+    } else if (walkable && !isWater) {
+      mBike.className = 'ds-badge ds-badge-yellow';
+      mBike.innerText = '🚲 自行车: [OK 极速允许·黄色]';
+    } else {
+      mBike.className = 'ds-badge ds-badge-red';
+      mBike.innerText = '🚲 自行车: [NO 障碍阻断]';
+    }
+  }
+
+  // 4. 冲浪水路 (Surf - 用户指定蓝色稳妥)
+  const mSurf = document.getElementById('matrixSurf');
+  if (mSurf) {
+    if (isWater) {
+      mSurf.className = 'ds-badge ds-badge-blue';
+      mSurf.innerText = '🏄 冲浪: [OK 水路航行·蓝色]';
+    } else {
+      mSurf.className = 'ds-badge';
+      mSurf.innerText = isAirGap ? '🏄 冲浪: [NO 悬空非水面]' : '🏄 冲浪: [NO 陆地不可冲浪]';
+    }
+  }
+}

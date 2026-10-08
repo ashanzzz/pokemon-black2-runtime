@@ -44,6 +44,8 @@ AREA_RECORD_SIZE = 10
 MATRIX_NONE = 0xFFFFFFFF
 FX32_ONE = 4096.0
 ANGLE16_FULL = 65536.0
+CHUNK_CACHE_CAP = 64
+BUILDING_BUNDLE_CACHE_CAP = 16
 
 # Existing project evidence for map-chunk permission container variants.
 ONE_PERMISSION_BLOCK = 0x00034257   # bytes: WB 03 00 ...
@@ -493,12 +495,22 @@ def decode_entities(raw: bytes, entities_id: int) -> dict[str, Any]:
         rec = raw[cursor:cursor + FURNITURE_SIZE]
         cursor += FURNITURE_SIZE
         furniture.append({
+            "record_index": index,
             "id": index,
             "script_id": _u16(rec, 0),
+            "arg2_raw": _u16(rec, 0x02),
+            "arg3_raw": _u16(rec, 0x04),
+            "arg4_raw": _u16(rec, 0x06),
+            "x_raw": _s32(rec, 0x08),
+            "y_raw": _s32(rec, 0x0C),
+            "z_raw": _s32(rec, 0x10),
             "x": _s32(rec, 8),
             "y": _s32(rec, 12),
             "z": _s32(rec, 16),
             "coordinate_units": "map_local_tiles_candidate",
+            "coordinate_semantics": "candidate",
+            "raw_hex": rec.hex(),
+            "record_size": FURNITURE_SIZE,
         })
     npcs: list[dict[str, Any]] = []
     for index in range(npc_count):
@@ -509,47 +521,94 @@ def decode_entities(raw: bytes, entities_id: int) -> dict[str, Any]:
             "id": _u16(rec, 0),
             "sprite_id": _u16(rec, 2),
             "movement_id": _u16(rec, 4),
+            "movement2_raw": _u16(rec, 0x06),
             "flag_id": _u16(rec, 8),
             "script_id": _u16(rec, 10),
+            "direction_raw": _u16(rec, 0x0C),
+            "sight_raw": _u16(rec, 0x0E),
+            "arg9_raw": _u16(rec, 0x10),
+            "arg10_raw": _u16(rec, 0x12),
+            "leash_lr_raw": _u16(rec, 0x14),
+            "leash_ud_raw": _u16(rec, 0x16),
+            "arg13_raw": _u16(rec, 0x18),
+            "arg14_raw": _u16(rec, 0x1A),
             "facing_id": _u16(rec, 12),
             "x": _s16(rec, 28),
             "y": _s16(rec, 30),
             "z": _s16(rec, 34),
             "coordinate_units": "map_local_tiles_candidate",
+            "facing_semantics": "ROM default/direction candidate; live facing comes from FieldActor.face_dir",
+            "raw_hex": rec.hex(),
+            "record_size": NPC_SIZE,
         })
     warps: list[dict[str, Any]] = []
     for index in range(warp_count):
         rec = raw[cursor:cursor + WARP_SIZE]
         cursor += WARP_SIZE
-        x_world, y_world = _s16(rec, 8), _s16(rec, 12)
         warps.append({
+            "record_index": index,
             "id": index,
             "target_zone_or_map_raw": _u16(rec, 0),
-            "target_warp_id": _u16(rec, 2),
-            "kind": _u16(rec, 4),
-            "x_world": x_world,
-            "y_world": y_world,
-            "z": _s16(rec, 18),
-            "tile_x_candidate": x_world / 16.0,
-            "tile_y_candidate": y_world / 16.0,
-            "width": max(1, _u16(rec, 14)),
-            "height": max(1, _u16(rec, 16)),
+            "destination_map_raw": _u16(rec, 0),
+            "arg2_raw": _u16(rec, 0x02),
+            "arg3_raw": rec[0x04],
+            "arg4_raw": rec[0x05],
+            "arg5_raw": _u16(rec, 0x06),
+            "x_raw": _s16(rec, 0x08),
+            "arg7_raw": _u16(rec, 0x0A),
+            "y_raw": _s16(rec, 0x0C),
+            "x_extent_raw": _u16(rec, 0x0E),
+            "y_extent_raw": _u16(rec, 0x10),
+            "arg11_raw": _u16(rec, 0x12),
             "coordinate_units": "map_world_units_16_per_tile_candidate",
-            "destination_semantics": "raw; promote only after live transition evidence",
+            "coordinate_semantics": "horizontal candidate only; elevation unresolved",
+            "destination_semantics": "raw; arg2 target-record meaning unresolved until live transition evidence",
+            "semantic_status": "raw_record",
+            "raw_hex": rec.hex(),
+            "record_size": WARP_SIZE,
         })
     triggers: list[dict[str, Any]] = []
     for index in range(trigger_count):
         rec = raw[cursor:cursor + TRIGGER_SIZE]
         cursor += TRIGGER_SIZE
+        scrid = _u16(rec, 0)
+        expected_val = _u16(rec, 2)
+        var_id = _u16(rec, 4)
+        unk6 = _u16(rec, 6)
+        unk8 = _u16(rec, 8)
+        tx = _s16(rec, 10)
+        tz = _s16(rec, 12)
+        width = _u16(rec, 14)
+        height = _u16(rec, 16)
+        raw_y = _s16(rec, 18)
+        elevation_y = raw_y // 16 if raw_y % 16 == 0 else raw_y
+        field_14 = _u16(rec, 20)
         triggers.append({
+            "record_index": index,
             "id": index,
-            "entity_id": _u16(rec, 0),
-            "constant": _u16(rec, 2),
-            "reference": _u16(rec, 4),
-            "x": _s16(rec, 10),
-            "y": _s16(rec, 12),
-            "z": _s16(rec, 14),
+            "script_id": scrid,
+            "entity_id": scrid,
+            "expected_value": expected_val,
+            "constant": expected_val,
+            "var_id": var_id,
+            "reference": var_id,
+            "unk6": unk6,
+            "arg4_raw": unk6,
+            "unk8": unk8,
+            "arg5_raw": unk8,
+            "x": tx,
+            "z": tz,
+            "y": elevation_y,
+            "grid": {"x": tx, "y": elevation_y, "z": tz},
+            "width": width,
+            "height": height,
+            "raw_y": raw_y,
+            "field_14": field_14,
+            "legacy_y": tz,
+            "legacy_z": width,
             "coordinate_units": "map_local_tiles_candidate",
+            "raw_hex": rec.hex(),
+            "record_size": TRIGGER_SIZE,
         })
     return {
         "entities_id": entities_id,
@@ -618,7 +677,7 @@ class Gen5RomMap:
         selected = next((p for p in candidates if p and os.path.isfile(p)), None)
         if not selected:
             raise FileNotFoundError("BLACK2_ROM_PATH is not set and no ROM path was supplied")
-        self.rom = NitroRom(selected)
+        self.rom = NitroRom.shared(selected)
         zone_file = self.rom.read_file(ZONE_DATA_PATH)
         # B2/W2 stores the fixed-size ZoneData table in the first NARC member.
         # Counting the NARC header as records shifts every area/matrix lookup.
@@ -630,7 +689,6 @@ class Gen5RomMap:
         else:
             self.zone_data = zone_file
         self.area_data = self.rom.read_file(AREA_DATA_PATH)
-        self._archive_cache: dict[str, NarcArchive] = {}
         self.zone_count_actual, self.zone_data_trailing = divmod(len(self.zone_data), ZONE_RECORD_SIZE)
         if self.zone_count_actual == 0:
             raise Gen5MapFormatError(
@@ -651,9 +709,7 @@ class Gen5RomMap:
         return self.area_count_actual
 
     def archive(self, path: str) -> NarcArchive:
-        if path not in self._archive_cache:
-            self._archive_cache[path] = NarcArchive(self.rom.read_file(path))
-        return self._archive_cache[path]
+        return self.rom.archive(path)
 
     @lru_cache(maxsize=2048)
     def zone(self, zone_id: int) -> ZoneHeader:
@@ -676,7 +732,7 @@ class Gen5RomMap:
             raise IndexError(f"Matrix {matrix_id} outside {MAP_MATRIX_PATH}")
         return MapMatrix.parse(files[matrix_id], matrix_id)
 
-    @lru_cache(maxsize=4096)
+    @lru_cache(maxsize=CHUNK_CACHE_CAP)
     def chunk(self, chunk_id: int) -> MapChunk:
         files = self.archive(MAP_CHUNKS_PATH).files
         if not 0 <= chunk_id < len(files):
@@ -690,7 +746,7 @@ class Gen5RomMap:
             raise IndexError(f"Entities {entities_id} outside {ZONE_ENTITIES_PATH}")
         return decode_entities(files[entities_id], entities_id)
 
-    @lru_cache(maxsize=512)
+    @lru_cache(maxsize=BUILDING_BUNDLE_CACHE_CAP)
     def building_bundle(self, area_id: int) -> AreaBuildingBundle:
         area = self.area(area_id)
         path = BUILDING_BUNDLE_EXT_PATH if area.is_exterior else BUILDING_BUNDLE_INT_PATH
@@ -737,6 +793,24 @@ class Gen5RomMap:
                 "building_bundle_int": BUILDING_BUNDLE_INT_PATH,
             },
             "policy": "static ROM facts only; current identity must come from runtime RAM",
+        }
+
+    def cache_status(self) -> dict[str, Any]:
+        def cache_info(method) -> dict[str, int]:
+            info = method.cache_info()
+            return {"entries": info.currsize, "cap": info.maxsize, "hits": info.hits, "misses": info.misses}
+
+        return {
+            "format": "black2-gen5-map-cache-status/v1",
+            "rom_backing": self.rom.cache_status(),
+            "decoded": {
+                "zone": cache_info(self.zone),
+                "area": cache_info(self.area),
+                "matrix": cache_info(self.matrix),
+                "chunk": cache_info(self.chunk),
+                "entities": cache_info(self.entities),
+                "building_bundle": cache_info(self.building_bundle),
+            },
         }
 
 

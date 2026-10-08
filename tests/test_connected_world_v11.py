@@ -46,3 +46,11 @@ def test_connected_cluster_stitches_only_same_matrix_cardinal_component():
     assert {tuple(sorted((edge["zone_a"], edge["zone_b"]))) for edge in cluster["adjacency"]} == {(1, 2), (2, 3)}
     assert 9 not in cluster["zone_ids"]
     assert "cross_matrix" in cluster["cross_matrix_policy"]
+
+
+def test_connected_cluster_caps_requested_zone_count_and_reports_it():
+    service = World3DSceneService(original=_Original(), truth=object(), exported=object())
+    cluster = service.connected_zone_cluster(1, matrix_id=10, max_zones=100)
+    assert cluster["requested_max_zones"] == 100
+    assert cluster["max_zones"] == 8
+    assert cluster["zone_count"] <= 8

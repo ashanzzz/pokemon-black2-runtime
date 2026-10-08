@@ -38,13 +38,16 @@ LEGENDARY_SPRITES = {
     498: "Kyurem",
 }
 
-# Movement IDs that indicate line-of-sight trainer behavior in Gen 5
-TRAINER_LOOK_MOVEMENTS = {
-    1: {"facing": "South", "sight_range": 4},
-    2: {"facing": "North", "sight_range": 4},
-    3: {"facing": "West", "sight_range": 4},
-    4: {"facing": "East", "sight_range": 4},
-    # Spinning trainers usually have movement IDs 5..12
+# Research hint only.  A movement code is not sufficient evidence for trainer
+# identity, facing, sight range, battle readiness, or defeated state.
+LEGACY_TRAINER_MOVEMENT_HINTS = frozenset({1, 2, 3, 4})
+
+# Evidence-backed labels for recurring story actors.  These are labels only;
+# battle/defeat/interaction state remains decoded separately from RAM and ROM
+# scripts.  Unknown residents deliberately keep an unresolved name status.
+KNOWN_NPC_LABELS: dict[tuple[int, int, int], dict[str, str]] = {
+    (439, 8, 97): {"name_zh": "阿戴克", "role_zh": "主线剧情封路角色"},
+    (446, 4, 64): {"name_zh": "登山大叔", "role_zh": "主线剧情封路角色"},
 }
 
 
@@ -66,25 +69,152 @@ class NPCClassifier:
         flag_id = int(raw_npc.get("flag_id") or raw_npc.get("spawn_flag") or 0)
         movement_id = int(raw_npc.get("movement_id") or raw_npc.get("move_code") or 0)
 
-        # 1. Check OVERWORLD_ITEM
-        if sprite_id in ITEM_BALL_SPRITES or (script_id >= 7000 and flag_id > 0):
-            return self._classify_item_ball(raw_npc, zone_id, sprite_id, script_id, flag_id, runtime_flags)
+        # 1. Check OVERWORLD_ITEM: true overworld item balls (Pokéball/crate models on ground).
+        # Standard human NPC scripts (including delivery/event scripts >= 7000 or 10000) are never items.
+        if sprite_id in ITEM_BALL_SPRITES or (7000 <= script_id < 8000 and flag_id > 0 and sprite_id in ITEM_BALL_SPRITES):
+            return self._finalize(
+                self._classify_item_ball(raw_npc, zone_id, sprite_id, script_id, flag_id, runtime_flags),
+                raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id,
+            )
 
         # 2. Check DYNAMIC_OBSTACLE
         if sprite_id in OBSTACLE_SPRITES:
-            return self._classify_obstacle(raw_npc, zone_id, sprite_id, script_id, flag_id)
+            return self._finalize(
+                self._classify_obstacle(raw_npc, zone_id, sprite_id, script_id, flag_id),
+                raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id,
+            )
 
         # 3. Check LEGENDARY_OVERWORLD
         if sprite_id in LEGENDARY_SPRITES:
-            return self._classify_legendary(raw_npc, zone_id, sprite_id, script_id, flag_id)
+            return self._finalize(
+                self._classify_legendary(raw_npc, zone_id, sprite_id, script_id, flag_id),
+                raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id,
+            )
 
-        # 4. Check NPC_TRAINER vs NPC_TALKER
-        # Movement patterns 1..4 with specific scripts indicate sight-trigger trainers
-        if movement_id in TRAINER_LOOK_MOVEMENTS and 10 <= script_id < 3000:
-            return self._classify_trainer(raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id)
+        # 4. Movement patterns are retained as a low-confidence hypothesis.
+        # An explicit runtime/story decoder may opt in to trainer semantics,
+        # but movement_id + script_id alone must never do so.
+        explicit_trainer = raw_npc.get("trainer_verified") is True or raw_npc.get("is_trainer") is True
+        if explicit_trainer:
+            return self._finalize(
+                self._classify_trainer(raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id),
+                raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id,
+                trainer_verified=True,
+            )
 
         # Default: peaceful talking inhabitant
-        return self._classify_talker(raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id)
+        return self._finalize(
+            self._classify_talker(raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id),
+            raw_npc, zone_id, sprite_id, script_id, flag_id, movement_id,
+        )
+
+    @staticmethod
+    def _runtime_layers(raw_npc: Dict[str, Any]) -> Dict[str, Any]:
+        runtime = raw_npc.get("runtime") if isinstance(raw_npc.get("runtime"), dict) else {}
+        actor_id = runtime.get("actor_id", raw_npc.get("runtime_actor_uid", raw_npc.get("actor_uid")))
+        grid = runtime.get("grid", raw_npc.get("grid"))
+        return {
+            "bound": bool(runtime.get("bound", actor_id is not None)),
+            "actor_id": actor_id,
+            "grid": grid if isinstance(grid, dict) else None,
+            "facing": runtime.get("facing", raw_npc.get("facing")),
+            "present": runtime.get("present") if "present" in runtime else None,
+            "frame": runtime.get("frame", raw_npc.get("frame")),
+        }
+
+    def _finalize(
+        self,
+        result: Dict[str, Any],
+        raw_npc: Dict[str, Any],
+        zone_id: int,
+        sprite_id: int,
+        script_id: int,
+        flag_id: int,
+        movement_id: int,
+        *,
+        trainer_verified: bool = False,
+    ) -> Dict[str, Any]:
+        """Add evidence-separated identity/ROM/runtime/semantic layers."""
+        sight_raw = raw_npc.get("sight_raw")
+        identity = {
+            "zone_id": zone_id,
+            "rom_entity_id": raw_npc.get("id"),
+            "record_index": raw_npc.get("record_index"),
+            "script_id": script_id,
+            "spawn_flag": flag_id,
+            "sprite_id": sprite_id,
+        }
+        rom = {
+            "movement_id": movement_id,
+            "movement2_raw": raw_npc.get("movement2_raw"),
+            "direction_raw": raw_npc.get("direction_raw", raw_npc.get("facing_id")),
+            "sight_raw": sight_raw,
+            "leash_lr_raw": raw_npc.get("leash_lr_raw"),
+            "leash_ud_raw": raw_npc.get("leash_ud_raw"),
+            "spawn_grid": {
+                "x": raw_npc.get("x"), "y": raw_npc.get("y"), "z": raw_npc.get("z"),
+            },
+            "raw_hex": raw_npc.get("raw_hex"),
+        }
+        runtime = self._runtime_layers(raw_npc)
+        legacy_kind = result.get("semantic_kind", "NPC_UNRESOLVED")
+        unresolved_npc = legacy_kind in {"NPC_TRAINER", "NPC_TALKER"} and not trainer_verified
+        semantic_kind = "NPC_UNRESOLVED" if unresolved_npc else legacy_kind
+        trainer = {
+            "is_trainer": True if trainer_verified else None,
+            "is_defeated": None,
+            "will_battle": True if trainer_verified and raw_npc.get("will_battle_verified") is True else None,
+            "sight_range": sight_raw,
+            "sight_range_status": "rom_raw_not_yet_semantically_verified",
+            "hypothesis": (
+                {"hypothesis": "trainer_movement_candidate", "confidence": "low", "basis": ["movement_id heuristic"]}
+                if movement_id in LEGACY_TRAINER_MOVEMENT_HINTS else None
+            ),
+        }
+        result["identity"] = identity
+        result["rom"] = rom
+        result["runtime"] = runtime
+        result["semantics"] = {
+            "kind": semantic_kind,
+            "trainer": trainer,
+            "can_interact_now": None,
+            "interaction_mode_candidate": "action_button",
+            "confidence": "candidate" if not unresolved_npc else "unresolved",
+            "evidence": {
+                "source": "static ROM entity record",
+                "runtime_visual_verified": False,
+            },
+        }
+        result["semantic_kind"] = semantic_kind
+        if isinstance(result.get("interaction"), dict):
+            result["interaction"]["can_interact_now"] = None
+            result["interaction"]["interaction_mode_candidate"] = "action_button"
+            if unresolved_npc:
+                result["interaction"]["sight_range"] = sight_raw
+                result["interaction"]["facing_direction"] = None
+        result["trainer"] = trainer
+        if sight_raw is not None and int(sight_raw or 0) > 0:
+            result["candidate_role"] = "NPC_TRAINER_CANDIDATE"
+            result["candidate_role_status"] = "sight_range_present_but_battle_binding_unverified"
+        else:
+            result["candidate_role"] = None
+            result["candidate_role_status"] = "not_nominated"
+        known = KNOWN_NPC_LABELS.get((int(zone_id), int(script_id), int(sprite_id)))
+        if known:
+            result["name"] = known["name_zh"]
+            result["name_status"] = "verified_registry"
+            result["role_zh"] = known["role_zh"]
+        else:
+            result["name_status"] = "unresolved_rom_name"
+            result["role_zh"] = result.get("category_label")
+        if result.get("semantics_confidence") == "verified_rule":
+            result["semantics_confidence"] = "candidate_registry"
+        result["evidence"] = {
+            "source": "static sprite/model registry" if legacy_kind != "NPC_UNRESOLVED" else "static ROM entity record",
+            "rom_profile": "IREJ rev.1",
+            "runtime_visual_verified": False,
+        }
+        return result
 
     def _classify_item_ball(
         self,
@@ -131,7 +261,6 @@ class NPCClassifier:
         flag_id: int,
         movement_id: int,
     ) -> Dict[str, Any]:
-        trainer_props = TRAINER_LOOK_MOVEMENTS.get(movement_id, {"facing": "South", "sight_range": 3})
         return {
             "semantic_kind": "NPC_TRAINER",
             "name": f"训练家 (Script {script_id})",
@@ -139,15 +268,15 @@ class NPCClassifier:
             "interaction": {
                 "type": "battle",
                 "trigger_mode": "sight_or_button",
-                "sight_range": trainer_props["sight_range"],
-                "facing_direction": trainer_props["facing"],
-                "can_interact_now": True,
+                "sight_range": raw_npc.get("sight_raw"),
+                "facing_direction": None,
+                "can_interact_now": None,
                 "reward": None,
             },
             "trainer": {
-                "will_battle": True,
-                "is_defeated": False,
-                "sight_range": trainer_props["sight_range"],
+                "will_battle": None,
+                "is_defeated": None,
+                "sight_range": raw_npc.get("sight_raw"),
             },
             "lifecycle": {
                 "flag_id": flag_id,
@@ -173,7 +302,7 @@ class NPCClassifier:
                 "type": "talk",
                 "trigger_mode": "action_button",
                 "sight_range": 0,
-                "can_interact_now": True,
+                "can_interact_now": None,
                 "reward": None,
             },
             "trainer": None,
@@ -201,7 +330,7 @@ class NPCClassifier:
                 "type": "obstacle",
                 "trigger_mode": "action_button",
                 "sight_range": 0,
-                "can_interact_now": True,
+                "can_interact_now": None,
                 "reward": None,
             },
             "trainer": None,
@@ -209,7 +338,7 @@ class NPCClassifier:
                 "flag_id": flag_id,
                 "availability": "present",
             },
-            "semantics_confidence": "verified_rule",
+            "semantics_confidence": "candidate_registry",
         }
 
     def _classify_legendary(
@@ -229,7 +358,7 @@ class NPCClassifier:
                 "type": "battle",
                 "trigger_mode": "action_button",
                 "sight_range": 0,
-                "can_interact_now": True,
+                "can_interact_now": None,
                 "reward": None,
             },
             "trainer": None,
@@ -237,31 +366,26 @@ class NPCClassifier:
                 "flag_id": flag_id,
                 "availability": "present",
             },
-            "semantics_confidence": "verified_rule",
+            "semantics_confidence": "candidate_registry",
         }
 
     def _resolve_item_reward(self, script_id: int, flag_id: int) -> Dict[str, Any]:
-        """Resolve item ball reward metadata using DexStore."""
-        # Query DexStore if available
+        """Resolve item ball reward metadata using RomItemCatalog and DexStore."""
         try:
-            self.dex._ensure()
-            # In Gen 5, many standard item scripts can be looked up or mapped
-            # We return a structured reward schema
-            return {
-                "item_id": None,
-                "name_zh": "道具球",
-                "name_en": "Item Ball",
-                "count": 1,
-                "status": "candidate",
-            }
+            from .item_catalog import default_item_catalog
+            catalog = default_item_catalog()
+            resolved = catalog.resolve_field_item(script_id, flag_id)
+            if resolved and resolved.get("status") == "resolved":
+                return resolved
         except Exception:
-            return {
-                "item_id": None,
-                "name_zh": "道具球",
-                "name_en": "Item Ball",
-                "count": 1,
-                "status": "unresolved",
-            }
+            pass
+        return {
+            "item_id": None,
+            "name_zh": "道具球",
+            "name_en": "Item Ball",
+            "count": 1,
+            "status": "candidate",
+        }
 
 
 # Singleton instance

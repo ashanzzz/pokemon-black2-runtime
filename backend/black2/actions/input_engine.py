@@ -8,23 +8,70 @@ from typing import Dict, Any, Optional, List
 from ..bizhawk.bridge_client import BridgeClient
 from ..state.engine import SemanticStateEngine
 from ..decoders.text import extract_printable_strings, decode_gen5_string
+from .input_lease import InputLease
 
 
 class ActionEngine:
-    def __init__(self, client: BridgeClient, state_engine: SemanticStateEngine):
+    def __init__(self, client: BridgeClient, state_engine: SemanticStateEngine, input_lease: InputLease | None = None):
         self.client = client
         self.state_engine = state_engine
+        self.input_lease = input_lease or InputLease()
 
     async def press_button(self, button: str, hold_frames: int = 4, wait_frames: int = 15) -> Dict[str, Any]:
         """Press a single button, wait for hold frames, and advance emulator frames."""
-        res = await self.client.press_buttons([button], frames=hold_frames)
-        # Advance frames if needed or wait
-        await asyncio.sleep(0.05 * (hold_frames + wait_frames) / 10.0)
+        async with self.input_lease.acquire(owner_kind="action", owner_id=f"button:{button}"):
+            emu_before = await self.client.get_emu_state()
+            sent_frame = int(emu_before.get("frame", 0) or 0)
+            queue_before = await self._queue_length()
+            res = await self.client.press_buttons([button], frames=hold_frames)
+        # Do not assume wall-clock sleep is equivalent to emulation frames.
+        # A stalled/loaded emulator can otherwise consume the next menu key
+        # before the previous edge has reached the game.
+        frame_after, queue_after = await self._wait_for_input_completion(
+            sent_frame, hold_frames, timeout_seconds=max(1.5, 0.05 * wait_frames)
+        )
+        if isinstance(res, dict):
+            res = {
+                **res,
+                "input_verification": {
+                    "accepted": bool(res.get("queued", True)),
+                    "sent_frame": sent_frame,
+                    "frame_after": frame_after,
+                    "frames_advanced": frame_after - sent_frame,
+                    "queue_before": queue_before,
+                    "queue_after": queue_after,
+                    "completed": frame_after - sent_frame >= hold_frames and queue_after == 0,
+                },
+            }
         return res
+
+    async def _queue_length(self) -> Optional[int]:
+        try:
+            return int((await self.client.get_input_state()).get("queue_len", 0))
+        except Exception:
+            return None
+
+    async def _wait_for_input_completion(
+        self, sent_frame: int, frames: int, *, timeout_seconds: float = 1.5
+    ) -> tuple[int, Optional[int]]:
+        """Wait for the actual emulator frame edge and cleared input queue."""
+        deadline = asyncio.get_running_loop().time() + max(0.5, timeout_seconds)
+        frame_after = sent_frame
+        queue_after = await self._queue_length()
+        while True:
+            emu_after = await self.client.get_emu_state()
+            frame_after = int(emu_after.get("frame", frame_after) or frame_after)
+            queue_after = await self._queue_length()
+            if frame_after - sent_frame >= frames and queue_after == 0:
+                return frame_after, queue_after
+            if asyncio.get_running_loop().time() >= deadline:
+                return frame_after, queue_after
+            await asyncio.sleep(0.05)
 
     async def touch_screen(self, x: int = 128, y: int = 96, hold_frames: int = 4) -> Dict[str, Any]:
         """Simulate NDS touch at coordinate (x, y)."""
-        return await self.client.touch(x, y, frames=hold_frames)
+        async with self.input_lease.acquire(owner_kind="action", owner_id=f"touch:{x}:{y}"):
+            return await self.client.touch(x, y, frames=hold_frames)
 
     async def handle_title_screen_start(self) -> Dict[str, Any]:
         """Advance past the initial GameFreak / Title screen ("Press START" / Touch)."""
@@ -132,11 +179,23 @@ class ActionEngine:
 
     async def advance_dialogue_once(self) -> Dict[str, Any]:
         """Press A or B to advance the current dialogue box."""
-        await self.press_button("A", hold_frames=3, wait_frames=10)
+        # A short 3-frame edge is occasionally consumed by the Gen-5 message
+        # window while it is still handing off the TextPrinter page.  Eight
+        # frames is still one bounded A action, and was cross-checked against
+        # the live arrow/page transition; it avoids stacking a second A when
+        # the first edge was accepted but not yet reflected by the decoder.
+        await self.press_button("A", hold_frames=8, wait_frames=20)
         return {"action": "advance_dialogue_once", "status": "executed"}
 
-    async def auto_advance_dialogue(self, max_steps: int = 20, delay: float = 0.4) -> List[Dict[str, Any]]:
-        """Repeatedly advance dialogue until text completes."""
+    async def auto_advance_dialogue(
+        self, max_steps: int = 20, delay: float = 0.4, *, unsafe: bool = False,
+    ) -> List[Dict[str, Any]]:
+        """Run the legacy blind sequence only after an explicit unsafe opt-in."""
+        if not unsafe:
+            raise RuntimeError(
+                "auto_advance_dialogue is disabled for autonomous execution; "
+                "use /api/v1/agent/actions with dialogue_instance_id and execute_when"
+            )
         steps = []
         for i in range(max_steps):
             res = await self.advance_dialogue_once()

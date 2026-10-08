@@ -33,7 +33,9 @@ from ..runtime.control_log import runtime_control_log
 from ..runtime.hub import RuntimeHub
 from ..runtime.versions import BIZHAWK_BRIDGE_VERSION, RUNTIME_RELEASE_VERSION
 from ..actions.input_engine import ActionEngine
+from ..actions.input_lease import input_lease
 from ..actions.onboarding import OnboardingFlow
+from ..actions.prepared_actions import PreparedActionService
 from ..observer.presentation import build_observer_presentation
 from ..observer.capabilities import capability_store
 from ..observer.logger import observer_logger
@@ -45,13 +47,30 @@ from .workbench_routes import configure_workbench_routes, router as workbench_ro
 from .map_v5_routes import configure_map_v5_routes, router as map_v5_router
 from .world_lab_routes import configure_world_lab_routes, router as world_lab_router
 from .player_routes import configure_player_routes, router as player_router
-from .navigation_routes import configure_navigation_routes, router as navigation_router
+from .navigation_routes import (
+    configure_navigation_routes,
+    navigation_planner_service,
+    navigation_static_provider,
+    navigation_task_service,
+    router as navigation_router,
+)
+from .agent_event_routes import configure_agent_event_routes, router as agent_event_router
+from .story_automation_routes import configure_story_automation_routes, router as story_automation_router
+from .dialogue_routes import configure_dialogue_routes, router as dialogue_router
+from .progression_routes import configure_progression_routes, router as progression_router
+from .agent_action_routes import configure_prepared_action_routes, router as agent_action_router
+from ..runtime.events import agent_event_bus
 from .semantic_routes import configure_semantic_routes, router as semantic_router
+from .current_view_routes import configure_current_view_routes, router as current_view_router
 from .status_routes import configure_status_routes, router as status_router
 from .battle_routes import configure_battle_routes, router as battle_router
 from .dex_routes import router as dex_router
 from .catalog_routes import router as catalog_router
 from .encounter_routes import router as encounter_router
+from .pc_routes import configure_pc_routes, router as pc_router
+from ..world.runtime_player_state import player_runtime_service
+from ..world.runtime_actor_overlay import runtime_actor_overlay_service
+from ..world.story_automation import StoryAutomationService
 from .map_routes import (
     configure_map_routes,
     router as map_router,
@@ -68,7 +87,7 @@ transport: SocketTransport = SocketTransport(
 client: BridgeClient = BridgeClient(transport)
 memory_reader: MemoryReader = MemoryReader(client)
 state_engine: SemanticStateEngine = SemanticStateEngine(memory_reader)
-action_engine: ActionEngine = ActionEngine(client, state_engine)
+action_engine: ActionEngine = ActionEngine(client, state_engine, input_lease)
 onboarding_flow: OnboardingFlow = OnboardingFlow(client, state_engine)
 doctor: BizHawkDoctor = BizHawkDoctor(client)
 dev_wb: DeveloperTestWorkbench = init_dev_workbench(client, state_engine)
@@ -83,17 +102,72 @@ runtime_hub = RuntimeHub(
 configure_map_routes(memory_reader, client)
 configure_map_v5_routes(memory_reader)
 configure_world_lab_routes(memory_reader)
-configure_player_routes(memory_reader)
+configure_player_routes(memory_reader, client=client, action_engine=action_engine)
+configure_pc_routes(client, reader=memory_reader)
 configure_runtime_routes(runtime_hub)
 configure_workbench_routes(runtime_hub)
 configure_navigation_routes(
     client=client,
     control_sample=runtime_hub.snapshot,
     runtime_reader=memory_reader,
+    input_lease=input_lease,
 )
+story_automation_service = StoryAutomationService(
+    navigation=navigation_task_service(),
+    planner=navigation_planner_service(),
+    action_engine=action_engine,
+    hub=runtime_hub,
+    static_provider=navigation_static_provider,
+    player_refresh=lambda: player_runtime_service.sample(memory_reader, allow_discovery=True),
+    live_actor_provider=lambda: runtime_actor_overlay_service.sample(memory_reader),
+)
+configure_story_automation_routes(story_automation_service)
 configure_semantic_routes(memory_reader, runtime_hub)
+configure_current_view_routes(runtime_hub)
 configure_status_routes(memory_reader, runtime_hub)
-configure_battle_routes(memory_reader, runtime_hub)
+configure_battle_routes(memory_reader, runtime_hub, action_engine)
+configure_dialogue_routes(action_engine, state_engine, runtime_hub)
+configure_progression_routes(memory_reader, runtime_hub)
+
+
+def _active_navigation_task() -> dict[str, Any] | None:
+    try:
+        return navigation_task_service().active_task()
+    except Exception:
+        return None
+
+
+async def _execute_prepared_command(_command: dict[str, Any]) -> dict[str, Any]:
+    """Keep app-level prepared execution closed until legal actions are verified."""
+    raise RuntimeError(
+        "No evidence-gated semantic action executor is configured; "
+        "battle menu and legal input semantics remain unresolved."
+    )
+
+
+prepared_action_service = PreparedActionService(
+    state_provider=runtime_hub.snapshot,
+    executor=_execute_prepared_command,
+    event_sink=agent_event_bus.publish,
+    lease=input_lease,
+)
+
+
+async def _reset_navigation_session(previous: str | None, current: str | None) -> None:
+    try:
+        await navigation_task_service().interrupt_for_session(previous, current)
+    except Exception:
+        pass
+    await prepared_action_service.invalidate_session(previous, current)
+
+
+runtime_hub.session_reset_callback = _reset_navigation_session
+configure_agent_event_routes(
+    runtime_hub,
+    _active_navigation_task,
+    story_automation_service.active_task,
+    auto_advance_provider=action_engine.advance_dialogue_once,
+)
 
 
 @asynccontextmanager
@@ -156,11 +230,94 @@ app.include_router(map_v5_router)
 app.include_router(world_lab_router)
 app.include_router(navigation_router)
 app.include_router(semantic_router)
+app.include_router(current_view_router)
 app.include_router(status_router)
 app.include_router(battle_router)
 app.include_router(dex_router)
 app.include_router(catalog_router)
 app.include_router(encounter_router)
+app.include_router(agent_event_router)
+app.include_router(story_automation_router)
+app.include_router(agent_action_router)
+app.include_router(dialogue_router)
+app.include_router(progression_router)
+app.include_router(pc_router)
+from .pc_routes import post_party_swap, PartySwapOrderRequest, post_party_teach_move, PartyTeachMoveRequest
+
+@app.post('/api/v1/game/party/teach-move')
+@app.post('/api/v1/player/party/teach-move')
+@app.post('/api/v1/pokemon/party/teach-move')
+async def global_party_teach_move(req: PartyTeachMoveRequest):
+    return await post_party_teach_move(req)
+
+@app.post("/api/v1/game/party/swap")
+@app.post("/api/v1/player/party/swap")
+async def global_party_swap(req: PartySwapOrderRequest):
+    """Atomically swap the order of two Pokemon within the active party (1..6)."""
+    return await post_party_swap(req)
+from .navigation_routes import navigation_fast_travel_fly, navigation_fast_travel_destinations, navigation_fast_travel_evaluate, FastTravelFlyRequest
+
+@app.post("/api/v1/player/fly")
+async def global_player_fly(req: FastTravelFlyRequest, request: Request):
+    """Execute fast travel flight (Fly ? Move 19) to any legal destination town."""
+    return await navigation_fast_travel_fly(req, request)
+
+@app.get("/api/v1/player/fly/destinations")
+@app.get("/api/v1/player/fly/regions")
+async def global_player_fly_destinations(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    flyable: Optional[bool] = None,
+    has_pokemon_center: Optional[bool] = None,
+    has_gym: Optional[bool] = None,
+    format: str = "detailed",
+):
+    return await navigation_fast_travel_destinations(
+        category=category,
+        search=search,
+        status=status,
+        flyable=flyable,
+        has_pokemon_center=has_pokemon_center,
+        has_gym=has_gym,
+        format=format,
+    )
+
+@app.get("/api/v1/player/fly/available")
+async def global_player_fly_available(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    has_pokemon_center: Optional[bool] = None,
+    has_gym: Optional[bool] = None,
+):
+    from .navigation_routes import navigation_fast_travel_available
+    return await navigation_fast_travel_available(
+        category=category,
+        search=search,
+        has_pokemon_center=has_pokemon_center,
+        has_gym=has_gym,
+    )
+
+@app.get("/api/v1/player/fly/locked")
+async def global_player_fly_locked(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    has_pokemon_center: Optional[bool] = None,
+    has_gym: Optional[bool] = None,
+):
+    from .navigation_routes import navigation_fast_travel_locked
+    return await navigation_fast_travel_locked(
+        category=category,
+        search=search,
+        has_pokemon_center=has_pokemon_center,
+        has_gym=has_gym,
+    )
+
+@app.get("/api/v1/player/fly/evaluate")
+async def global_player_fly_evaluate(zone_id: Optional[int] = None):
+    return await navigation_fast_travel_evaluate(zone_id)
+
+configure_prepared_action_routes(prepared_action_service)
 
 
 class PressButtonRequest(BaseModel):
@@ -287,6 +444,12 @@ class MemoryPatternScanRequest(BaseModel):
     limit: int = 64
     domain: str = "Main RAM"
 
+
+
+class MemoryWriteRequest(BaseModel):
+    addr: int
+    bytes: list[int]
+    domain: str = "Main RAM"
 
 class MemoryBatchSnapshotRequest(BaseModel):
     """Read-only, one-frame RAM snapshot used by focused RE experiments."""
@@ -679,6 +842,17 @@ async def get_dev_test_logs():
     return [t.model_dump() for t in dev_wb.test_logs]
 
 
+@app.get("/api/dev/input_state")
+async def get_dev_input_state():
+    """Expose the live BizHawk joypad projection for bounded input debugging."""
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    try:
+        return await client.get_input_state()
+    except (ConnectionError, TimeoutError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
 @app.post("/api/dev/test_input")
 async def post_dev_test_input(req: TestInputRequest):
     record = await dev_wb.execute_input_test(req.button, req.frames)
@@ -704,8 +878,8 @@ async def post_dev_snapshot(req: SnapshotRequest):
 
 @app.post("/api/dev/savestate/save")
 async def post_savestate_save(slot: int = 1):
-    if slot < 1 or slot > 10:
-        raise HTTPException(status_code=422, detail="savestate slot must be between 1 and 10")
+    if slot < 0 or slot > 10:
+        raise HTTPException(status_code=422, detail="savestate slot must be between 0 and 10")
     if not client.is_connected:
         detail = classify_bridge_unavailable(slot=slot)
         raise HTTPException(status_code=detail["http_status"], detail=detail)
@@ -722,8 +896,8 @@ async def post_savestate_save(slot: int = 1):
 
 @app.post("/api/dev/savestate/load")
 async def post_savestate_load(slot: int = 1):
-    if slot < 1 or slot > 10:
-        raise HTTPException(status_code=422, detail="savestate slot must be between 1 and 10")
+    if slot < 0 or slot > 10:
+        raise HTTPException(status_code=422, detail="savestate slot must be between 0 and 10")
     if not client.is_connected:
         detail = classify_bridge_unavailable(slot=slot)
         raise HTTPException(status_code=detail["http_status"], detail=detail)
@@ -885,6 +1059,13 @@ async def post_memory_pattern_scan(req: MemoryPatternScanRequest):
         "arm9_matches": [f"0x{0x02000000 + offset:08X}" for offset in matches],
     }
 
+
+
+@app.post("/api/dev/memory_write")
+async def post_dev_memory_write(req: MemoryWriteRequest):
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await client.write_bytes(req.addr, req.bytes, domain=req.domain)
 
 @app.post("/api/dev/memory_batch_snapshot")
 async def post_memory_batch_snapshot(req: MemoryBatchSnapshotRequest):
@@ -1075,8 +1256,15 @@ async def post_action_dialogue_advance(request: Request):
         steps = int(steps_str)
     except ValueError:
         steps = 1
-    steps_res = await action_engine.auto_advance_dialogue(max_steps=steps)
-    return {"ok": True, "steps": steps_res}
+    unsafe = request.query_params.get("unsafe", "false").lower() in {"1", "true", "yes"}
+    if not unsafe:
+        raise HTTPException(
+            status_code=409,
+            detail="Blind dialogue sequences are disabled; submit a precondition-gated semantic action. "
+                   "Use unsafe=true only for explicit manual development testing.",
+        )
+    steps_res = await action_engine.auto_advance_dialogue(max_steps=steps, unsafe=True)
+    return {"ok": True, "unsafe": True, "steps": steps_res}
 
 
 @app.post("/api/actions/dialogue/choice")
@@ -1279,6 +1467,32 @@ async def runtime_monitor_page():
     return RedirectResponse(url="/#monitor", status_code=307)
 
 
+@app.get("/cgear")
+@app.get("/dashboard")
+async def cgear_dashboard_page():
+    page = os.path.join(FRONTEND_DIR, "cgear.html")
+    if os.path.exists(page):
+        return FileResponse(page)
+    raise HTTPException(status_code=404, detail="cgear.html not found")
+
+
+@app.get("/v2")
+@app.get("/console")
+async def v2_page():
+    page = os.path.join(FRONTEND_DIR, "v2.html")
+    if os.path.exists(page):
+        return FileResponse(page)
+    raise HTTPException(status_code=404, detail="v2.html not found")
+
+
+@app.get("/v1")
+async def v1_page():
+    page = os.path.join(FRONTEND_DIR, "workbench.html")
+    if os.path.exists(page):
+        return FileResponse(page)
+    raise HTTPException(status_code=404, detail="workbench.html not found")
+
+
 @app.get("/workbench")
 async def workbench_page():
     page = os.path.join(FRONTEND_DIR, "workbench.html")
@@ -1317,10 +1531,12 @@ async def battle_dashboard_page():
 
 @app.get("/")
 async def root():
-    page = os.path.join(FRONTEND_DIR, "home.html")
+    page = os.path.join(FRONTEND_DIR, "v2.html")
     if os.path.exists(page):
         return FileResponse(page)
     fallback = os.path.join(FRONTEND_DIR, "workbench.html")
     if os.path.exists(fallback):
         return FileResponse(fallback)
     return {"title": "Pokémon Black 2 AI Runtime", "version": RUNTIME_RELEASE_VERSION, "docs_url": "/docs"}
+
+

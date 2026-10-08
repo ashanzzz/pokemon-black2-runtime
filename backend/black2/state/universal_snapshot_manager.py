@@ -331,48 +331,140 @@ def _map_identity_from_dump(ram: bytes, frame: int) -> Dict[str, Any]:
     }
 
 
-def _runtime_world_index(ram: bytes, frame: int, semantic_state: Any, semantic_frame: int) -> Dict[str, Any]:
-    """Machine-readable hand-off contract for AI analysis of one physical dump.
+def _runtime_world_index(
+    ram: bytes,
+    frame: int,
+    semantic_state: Any,
+    semantic_frame: int,
+    *,
+    runtime_field: Dict[str, Any] | None = None,
+    battle_evidence: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Build a same-frame world index from pure physical decoders.
 
-    This deliberately does not turn static NPC spawns, dialogue guesses, or
-    legacy coordinate mirrors into runtime actors.  Those fields stay
-    unresolved until the FieldActor resolver has direct RAM evidence.
+    ``semantic_state`` is retained only under ``prior_semantic``.  It may be
+    useful context, but it is never allowed to upgrade a physical claim from
+    the dump's frame.
     """
-    verified_position = bool(getattr(semantic_state, "player_position_verified", False))
-    position = getattr(semantic_state, "player_world_pos", {}) or {}
+    runtime = runtime_field or {}
+    battle = battle_evidence or {}
+    runtime_status = str(runtime.get("status") or "unresolved")
+    runtime_confidence = str(runtime.get("confidence") or "unresolved")
+    runtime_player = runtime.get("player") or {}
+    actor = runtime_player.get("actor") if isinstance(runtime_player.get("actor"), dict) else None
+    actor_grid = (actor or {}).get("grid_position")
+    actor_world = (actor or {}).get("world_position")
+    actor_value = None
+    if actor is not None:
+        actor_value = {
+            "address": actor.get("address"),
+            "actor_uid": actor.get("actor_uid"),
+            "model_id": actor.get("model_id"),
+            "zone_id": actor.get("zone_id"),
+        }
+    physical_confidence = runtime_confidence if actor is not None else "unresolved"
+    zone_id = runtime_player.get("zone_id")
+    if not isinstance(zone_id, int) and actor is not None:
+        zone_id = actor.get("zone_id")
+    actor_system = runtime.get("actors") or {}
+    live_actors = actor_system.get("actors") if isinstance(actor_system.get("actors"), list) else []
+    battle_active = battle.get("active")
+    field_status = "resolved" if runtime_status == "resolved" else runtime_status
+    field_reason = "same-frame runtime Field resolver"
+    if battle_active is True:
+        field_status = "not_current_or_unresolved"
+        field_reason = "Primary runtime mode is BATTLE; overworld FieldG3DMapper is not current."
+    mapper = runtime.get("mapper") or {}
+    physical_player = {
+        "actor": {
+            "value": actor_value,
+            "confidence": physical_confidence,
+            "source": "main_ram.bin -> runtime_field_v2.json@physical_dump_frame",
+        },
+        "grid_position": {
+            "value": actor_grid,
+            "confidence": physical_confidence,
+            "source": "FieldActor.GPos in runtime_field_v2",
+        },
+        "world_position": {
+            "value": actor_world,
+            "confidence": physical_confidence,
+            "source": "FieldActor.WPos in runtime_field_v2",
+        },
+        "zone_id": {"value": zone_id, "confidence": physical_confidence},
+        "facing": {
+            "value": (runtime_player.get("orientation") or {}).get("facing") if actor is not None else None,
+            "confidence": physical_confidence,
+        },
+    }
+    physical_actors = {
+        "status": runtime_confidence if live_actors else "unresolved",
+        "capacity": actor_system.get("capacity"),
+        "declared_count_raw": actor_system.get("declared_count_raw", actor_system.get("declared_count")),
+        "active_slot_count": actor_system.get("active_slot_count", actor_system.get("resolved_count", len(live_actors))),
+        "player_slot": actor_system.get("player_slot"),
+        "runtime_actors": live_actors,
+        "source": "main_ram.bin -> runtime_field_resolver",
+        "count_semantics": actor_system.get("count_semantics"),
+    }
+    current = {
+        "primary_runtime": "BATTLE" if battle_active is True else (
+            "OVERWORLD" if runtime_status in {"resolved", "candidate"} else "RUNTIME_UNRESOLVED"
+        ),
+        "field": {"status": field_status, "current": battle_active is not True, "reason": field_reason},
+        "player": physical_player,
+        "actors": physical_actors,
+        "battle": {
+            "active": battle_active,
+            "active_status": battle.get("active_status", "unresolved"),
+            "source": "FieldStatus BusyFlag" if battle.get("field_busy") else "unresolved",
+            "evidence": battle,
+        },
+        "map": {
+            "zone_id": {"value": zone_id, "confidence": physical_confidence},
+            "mapper": mapper,
+            "loaded_chunks": mapper.get("loaded_chunks", []),
+            "map_section_mirror": _map_identity_from_dump(ram, frame),
+        },
+    }
+    prior_state = semantic_state.model_dump() if hasattr(semantic_state, "model_dump") else (semantic_state or {})
+    prior_semantic = {
+        "frame": semantic_frame,
+        "frame_delta": frame - semantic_frame,
+        "not_same_frame": True,
+        "context": (prior_state or {}).get("context", prior_state),
+        "player": {
+            "world_position": (prior_state or {}).get("player_world_pos"),
+            "facing": (prior_state or {}).get("player_facing"),
+        },
+    }
+    # Top-level player/actors/map aliases are a one-release compatibility view
+    # of current physical data; they intentionally do not contain prior state.
     return {
-        "schema": "pokemon_black2_runtime_world_export/v1",
+        "schema": "pokemon_black2_runtime_world_export/v2",
         "physical_dump_frame": frame,
         "semantic_state_frame": semantic_frame,
         "frame_delta": frame - semantic_frame,
         "authority": {
-            "dynamic_facts": "main_ram.bin and the other raw memory-domain files at physical_dump_frame",
-            "semantic_context": "semantic_state.json sampled before the physical dump; never treat it as same-frame raw memory",
-            "static_resources": "not joined into this export until the current resource is confirmed from runtime RAM",
+            "physical": "main_ram.bin at physical_dump_frame",
+            "derived_physical": ["runtime_field_v2.json", "battle_evidence.json"],
+            "prior_semantic_context": "semantic_state.json; not same-frame authority",
         },
-        "player": {
-            "actor": {"value": None, "confidence": "unresolved", "reason": "FieldPlayerCore -> PlayerActor chain is not verified"},
-            "world_position": {
-                "value": position if verified_position else None,
-                "confidence": "verified" if verified_position else "unresolved",
-                "source": "semantic_state.json" if verified_position else "no verified FieldActor position in this dump",
-            },
-            "facing": {"value": getattr(semantic_state, "player_facing", None) if verified_position else None, "confidence": "verified" if verified_position else "unresolved"},
-            "movement": {"value": getattr(semantic_state, "movement_state", None) if verified_position else None, "confidence": "verified" if verified_position else "unresolved"},
-        },
-        "map": {"map_section_id": _map_identity_from_dump(ram, frame), "matrix_id": {"value": None, "confidence": "unresolved"}, "loaded_chunks": {"value": [], "confidence": "unresolved"}},
+        "current": current,
+        "prior_semantic": prior_semantic,
+        "player": physical_player,
+        "map": {"map_section_id": current["map"]["map_section_mirror"], "matrix_id": {"value": mapper.get("matrix_id"), "confidence": runtime_confidence}, "loaded_chunks": {"value": mapper.get("loaded_chunks", []), "confidence": runtime_confidence}},
         "actors": {
-            "count": {"value": None, "confidence": "unresolved"},
-            "runtime_actors": [],
-            "npc_names": {"value": [], "confidence": "unresolved", "reason": "NPC names require a verified runtime actor/script/text binding"},
-            "reason": "ActorHeap layout and FieldActor stride have not yet been verified for this ROM/session",
+            **physical_actors,
+            "count": {"value": physical_actors["active_slot_count"], "confidence": runtime_confidence},
+            "npc_names": {"value": [], "confidence": "unresolved", "reason": "NPC names require ROM↔runtime script/text binding"},
         },
         "interactions": {"warps": [], "triggers": [], "objects": [], "confidence": "unresolved"},
         "unresolved_runtime_subsystems": {
-            "trainer_and_party": "raw bytes are included in memory domains; a save/runtime decoder is not verified",
-            "battle": "raw bytes are included in memory domains; battle object resolver is not verified",
-            "camera": "raw bytes are included in memory domains; FieldCamera resolver is not verified",
-            "terrain_and_collision": "raw bytes are included in memory domains; current terrain resolver is not verified",
+            "trainer_and_party": "raw bytes are included; trainer/story state is not verified",
+            "battle": "presence is profile-observed; battle kind/menu/legal actions remain unresolved",
+            "camera": "raw bytes are included; FieldCamera resolver is not verified",
+            "terrain_and_collision": "raw bytes are included; terrain semantics require controlled movement evidence",
         },
     }
 
@@ -589,16 +681,16 @@ class UniversalSnapshotManager:
         printer = ctx.printer or {}
         wpos = curr_state.player_world_pos or {}
         p_ctx = PlayerContext(
-            verified=bool(curr_state.player_position_verified),
-            grid_x=wpos.get("x"),
-            grid_y=wpos.get("y"),
-            elevation_z=wpos.get("z"),
-            facing=curr_state.player_facing or "Unresolved",
-            movement_state=curr_state.movement_state or "Unresolved",
+            verified=False,
+            grid_x=None,
+            grid_y=None,
+            elevation_z=None,
+            facing="Unresolved",
+            movement_state="Unresolved",
         )
         m_ctx = MapContext(
-            map_section_id=curr_state.map_section_id,
-            location_name=curr_state.location or "未知区域",
+            map_section_id=None,
+            location_name="未知区域",
         )
         d_ctx = DialogueContext(
             active=bool(ctx.is_dialogue_active),
@@ -620,6 +712,8 @@ class UniversalSnapshotManager:
         inventory_path = target_folder / "memory_domain_inventory.json"
         runtime_world_path = target_folder / "runtime_world.json"
         runtime_field_v2_path = target_folder / "runtime_field_v2.json"
+        battle_evidence_path = target_folder / "battle_evidence.json"
+        evidence_index_path = target_folder / "evidence_index.json"
         map_truth_v3_path = target_folder / "map_truth_v3.json"
         metadata_path = target_folder / "metadata.json"
         manifest_path = target_folder / "manifest.json"
@@ -638,15 +732,46 @@ class UniversalSnapshotManager:
         )
         _write_json(registers_path, {"frame": physical_frame, "registers": raw_regs})
 
+        runtime_field_v2: Dict[str, Any] = {}
+        battle_evidence: Dict[str, Any] = {}
         if ram_ok:
             ram = bin_path.read_bytes()
             _write_json(critical_path, _extract_forensic_ranges(ram, physical_frame))
             _write_json(heap_path, _scan_gfl_heap_candidates(ram, physical_frame))
-            _write_json(runtime_world_path, _runtime_world_index(ram, physical_frame, curr_state, semantic_frame))
-            # V5: derive from the exact same physical 4 MiB RAM image; no new emulator read.
+            # Derive every physical index from this exact RAM image before
+            # constructing runtime_world; no derived writer performs another
+            # emulator read or guesses over the resolver.
             from ..world.runtime_field_resolver import resolve_runtime_field_from_ram
+            from ..decoders.battle_runtime import decode_battle_evidence_from_ram
             runtime_field_v2 = resolve_runtime_field_from_ram(ram, frame=physical_frame)
+            battle_evidence = decode_battle_evidence_from_ram(ram, frame=physical_frame)
             _write_json(runtime_field_v2_path, runtime_field_v2)
+            _write_json(battle_evidence_path, battle_evidence)
+            runtime_world_v2 = _runtime_world_index(
+                ram, physical_frame, curr_state, semantic_frame,
+                runtime_field=runtime_field_v2, battle_evidence=battle_evidence,
+            )
+            _write_json(runtime_world_path, runtime_world_v2)
+            _write_json(evidence_index_path, {
+                "schema": "pokemon_black2_evidence_index/v1",
+                "physical_frame": physical_frame,
+                "resources": {
+                    "raw_main_ram": "main_ram.bin",
+                    "runtime_field": "runtime_field_v2.json",
+                    "battle": "battle_evidence.json",
+                    "map_truth": "map_truth_v3.json",
+                    "semantic_prior": "semantic_state.json",
+                },
+                "current_claims": {
+                    "primary_mode": runtime_world_v2["current"]["primary_runtime"],
+                    "player": runtime_world_v2["current"]["player"],
+                    "actors": runtime_world_v2["current"]["actors"],
+                    "field": runtime_world_v2["current"]["field"],
+                    "battle": runtime_world_v2["current"]["battle"],
+                },
+                "warnings": (["semantic_state is prior context, not same-frame authority"]
+                             if semantic_frame != physical_frame else []),
+            })
             try:
                 from ..world.map_truth_v3 import MapTruthV3
                 map_truth_v3 = MapTruthV3().from_runtime(runtime_field_v2, include_world=False)
@@ -684,7 +809,7 @@ class UniversalSnapshotManager:
             _write_json(
                 runtime_world_path,
                 {
-                    "schema": "pokemon_black2_runtime_world_export/v1",
+                    "schema": "pokemon_black2_runtime_world_export/v2",
                     "physical_dump_frame": physical_frame,
                     "semantic_state_frame": semantic_frame,
                     "error": "main_ram.bin is missing or incomplete; runtime index was not derived",
@@ -703,6 +828,55 @@ class UniversalSnapshotManager:
                 "confidence": "unresolved",
                 "reason": "main_ram.bin is missing or incomplete",
             })
+            _write_json(battle_evidence_path, {
+                "format": "black2-battle-runtime-evidence/v1",
+                "status": "unavailable",
+                "active": None,
+                "frame": physical_frame,
+                "reason": "main_ram.bin is missing or incomplete",
+            })
+            _write_json(evidence_index_path, {
+                "schema": "pokemon_black2_evidence_index/v1",
+                "physical_frame": physical_frame,
+                "resources": {"raw_main_ram": "main_ram.bin", "runtime_field": "runtime_field_v2.json", "battle": "battle_evidence.json", "semantic_prior": "semantic_state.json"},
+                "current_claims": {},
+                "warnings": ["main_ram.bin incomplete; no same-frame physical claims generated"],
+            })
+        # Manifest fields follow the same physical resolver output when it is
+        # available. SemanticState remains prior context only.
+        manifest_actors: list[ActorSlot] = []
+        runtime_player = (runtime_field_v2.get("player") or {}) if isinstance(runtime_field_v2, dict) else {}
+        runtime_actor = runtime_player.get("actor") if isinstance(runtime_player.get("actor"), dict) else None
+        if runtime_actor is not None:
+            grid = runtime_actor.get("grid_position") or {}
+            world = runtime_actor.get("world_position") or {}
+            p_ctx = PlayerContext(
+                verified=runtime_field_v2.get("status") == "resolved",
+                grid_x=grid.get("x"), grid_y=grid.get("z"), elevation_z=grid.get("y"),
+                world_fx_x=world.get("x"), world_fx_y=world.get("z"),
+                facing=(runtime_player.get("orientation") or {}).get("facing") or "Unknown",
+                movement_state=runtime_field_v2.get("confidence", "candidate"),
+            )
+        actor_system = runtime_field_v2.get("actors") if isinstance(runtime_field_v2, dict) else None
+        for item in (actor_system or {}).get("actors") or []:
+            if not isinstance(item, dict):
+                continue
+            grid = item.get("grid_position") or {}
+            try:
+                manifest_actors.append(ActorSlot(
+                    slot_id=int(item.get("slot", 0)), uid=int(item.get("actor_uid") or 0),
+                    scrid=int(item.get("script_id") or 0), model_id=int(item.get("model_id") or 0),
+                    grid_pos={"x": int(grid.get("x") or 0), "y": int(grid.get("y") or 0), "z": int(grid.get("z") or 0)},
+                    facing=int(item.get("face_direction_raw") or 0), raw_addr=str(item.get("address") or ""),
+                ))
+            except (TypeError, ValueError):
+                continue
+        if isinstance(runtime_player.get("zone_id"), int):
+            m_ctx = MapContext(
+                map_section_id=runtime_player.get("zone_id"),
+                location_name=curr_state.location or "未知区域",
+                matrix_id=(runtime_field_v2.get("map_identity") or {}).get("matrix_id"),
+            )
 
         _write_json(domains_path, memory_domains)
         _write_json(inventory_path, domain_inventory)
@@ -732,6 +906,8 @@ class UniversalSnapshotManager:
             ("memory_domain_inventory_json", inventory_path),
             ("runtime_world_json", runtime_world_path),
             ("runtime_field_v2_json", runtime_field_v2_path),
+            ("battle_evidence_json", battle_evidence_path),
+            ("evidence_index_json", evidence_index_path),
             ("map_truth_v3_json", map_truth_v3_path),
             ("metadata_json", metadata_path),
         ):
@@ -753,6 +929,8 @@ class UniversalSnapshotManager:
             inventory_path,
             runtime_world_path,
             runtime_field_v2_path,
+            battle_evidence_path,
+            evidence_index_path,
             map_truth_v3_path,
             metadata_path,
         ]
@@ -773,7 +951,7 @@ class UniversalSnapshotManager:
             artifacts=artifact_summary,
             registers=raw_regs,
             player=p_ctx,
-            actors=[],  # Runtime ActorHeap has not been validated; see runtime_world.json.
+            actors=manifest_actors,
             map=m_ctx,
             dialogue=d_ctx,
             raw_state_dump=curr_state.model_dump(),
@@ -793,6 +971,8 @@ class UniversalSnapshotManager:
             "memory_domain_inventory.json",
             "runtime_world.json",
             "runtime_field_v2.json",
+            "battle_evidence.json",
+            "evidence_index.json",
             "map_truth_v3.json",
         ]
         integrity_payload = {

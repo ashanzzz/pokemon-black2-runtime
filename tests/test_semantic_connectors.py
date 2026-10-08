@@ -71,18 +71,16 @@ def _service(rom: FixtureRom | None = None) -> SemanticConnectorService:
     return SemanticConnectorService(RomMapGraphService(rom or FixtureRom()))
 
 
-def test_target_record_coordinates_and_reciprocal_pair_are_resolved():
+def test_unverified_target_record_is_not_promoted_to_connector():
     result = _service().query(0)
     warp = result["warps"][0]
     assert warp["source"]["entities_id"] == 200  # ZoneData +0x16, not encounterID at +0x14.
-    assert warp["destination"]["resolution"] == "rom_target_warp_resolved"
-    assert warp["destination"]["target_connector_id"] == "zone:1:warp:0"
-    assert warp["destination"]["target_tile_candidate"] == {
-        "space": "gen5-field-grid-v1", "zone_id": 1, "x": 6, "y": None, "z": 19,
-    }
+    assert warp["destination"]["resolution"] == "target_warp_index_unresolved"
+    assert warp["destination"]["target_connector_id"] is None
+    assert warp["destination"]["target_tile_candidate"] is None
     assert warp["destination"]["landing_tile"] is None
     assert warp["destination"]["landing_status"] == "not_observed"
-    assert warp["reverse_edges"] == ["zone:1:warp:0"]
+    assert warp["reverse_edges"] == []
     assert warp["role"]["kind"] == "entrance"
     assert warp["traversal"]["can_traverse"] is None
     assert warp["return_path"]["can_return"] is None
@@ -93,7 +91,7 @@ def test_incoming_to_source_is_not_a_reverse_without_matching_destination_pair()
     warp = _service().query(0)["warps"][1]
     # Zone 1 Warp 2 points at Zone 0 Warp 1, but the forward endpoint is
     # Zone 1 Warp 1. Returning through Warp 2 is a different connector.
-    assert warp["destination"]["target_connector_id"] == "zone:1:warp:1"
+    assert warp["destination"]["target_connector_id"] is None
     assert warp["reverse_edges"] == []
     assert warp["return_path"]["status"] == "unverified"
 
@@ -105,9 +103,9 @@ def test_sentinel_invalid_zone_and_missing_target_warp_are_distinct():
     assert warps[2]["destination"]["target_tile_candidate"] is None
     assert warps[3]["destination"]["resolution"] == "invalid_or_unresolved_zone"
     assert warps[3]["destination"]["target_zone_or_map_raw"] == 9
-    assert warps[4]["destination"]["resolution"] == "missing_target_warp"
+    assert warps[4]["destination"]["resolution"] == "target_warp_index_unresolved"
     assert warps[4]["destination"]["zone_id"] == 1
-    assert warps[4]["destination"]["warp_id"] == 99
+    assert warps[4]["destination"]["warp_id"] is None
     assert warps[5]["role"]["kind"] == "same_zone_link"
     assert warps[5]["reverse_edges"] == []
 
@@ -124,7 +122,23 @@ def test_world_tile_floor_and_matrix_reference_do_not_add_live_chunk_origins():
     assert source["coordinate_resolution"]["horizontal_reference"] == "matrix_absolute_candidate"
     assert source["coordinate_resolution"]["matrix_cell_candidate"]["zone_id"] == 0
     destination = _service().query(0)["warps"][0]["destination"]
-    assert destination["target_coordinate_resolution"]["horizontal_reference"] == "standalone_matrix_local_candidate"
+    assert destination["target_coordinate_resolution"] is None
+
+
+def test_window_warps_stays_zone_local_and_does_not_build_global_catalog():
+    class NoGlobalGraph:
+        def __init__(self):
+            self.rom = FixtureRom()
+
+        def build(self):
+            raise AssertionError("a static window must not build the full ROM graph")
+
+    service = SemanticConnectorService(NoGlobalGraph())
+    warps = service.window_warps(0)
+    assert len(warps) == 6
+    assert warps[0]["source"]["zone_id"] == 0
+    assert warps[0]["destination"]["resolution"] == "not_expanded_for_static_window"
+    assert service.cache_status()["global_catalog"]["built"] is False
 
 
 @pytest.mark.parametrize("x_world,reason", [(-8, "outside"), (536, "different Zone")])

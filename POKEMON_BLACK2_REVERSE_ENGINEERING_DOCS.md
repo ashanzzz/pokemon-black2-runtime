@@ -21,7 +21,7 @@ Raw Memory API (ARM9 Main RAM 4MB / 0x02000000 ~ 0x02400000)
         ▼
 Runtime Object Resolver & SWAN Schema
         │
-        ├── Player / Actor Parser (FieldActor @ 0x0223DE00)
+        ├── Player / Actor Parser (FieldActor discovered through Field → ActorSystem)
         ├── Dialogue & Text Printer Parser (MsgBuffer @ 0x022490A0, Printer @ 0x0231FCB0)
         ├── Map Matrix & Chunk Parser (Matrix #0, #45 ... from NARC a/0/0/9)
         ├── 3D Visual Geometry & Texture Engine (BMD0 a/0/0/8 + BTX0 a/0/1/4)
@@ -41,8 +41,9 @@ AI Agent & Native Map Viewer
 所有地址均在实机环境中经过动作实验、切图实验与内存差分（Memory Diff）严格验证。
 
 ### 2.1 玩家实体结构体 (`Player FieldActor`)
-* **基准指针 / 数组首地址**：`0x0223DE00`
-* **实体跨度 (Actor Stride)**：`0x100` 字节（Actor #0 = 玩家，Actor #1..#15 = 现场活跃 NPC）
+* **FieldActor stride**：`0x100` 字节；当前 IREJ rev.1 多份 RAM dump 中得到结构一致性验证。
+* **Actor heap / Player slot**：不是固定地址或固定索引，必须通过 `Field → ActorSystem → actor_heap` 与 `FieldPlayerCore → player_actor` 的指针关系定位。
+* **有效 slot**：必须满足 `FieldActor.actor_system == current ActorSystem`。supplied dump 中 Player 出现在 slot 4 与 slot 8，因此不能假设 slot 0 是玩家。
 
 | 字段名 | 偏移量 (Offset) | 数据类型 | 验证数值 / 范围 | 语义解释 | 验证状态 |
 | :--- | :---: | :---: | :---: | :--- | :---: |
@@ -86,6 +87,42 @@ AI Agent & Native Map Viewer
   * `0x1` = 骑行 (Cycling / Bike)
   * `0x2` = 水面冲浪 (Surf)
   * `0x3` = 潜水 (Dive)
+
+### 2.4 全局核心数据块与指针表 (`GameData @ 0x0223B570`)
+* **IREJ rev.1 基址**：`0x0223B570` (ARM9 Main RAM)
+* 保存了全游戏持久化数据的指针表，经实机切图、保存与内存差分严格验证。
+
+| 字段名 / 指针偏移 | 数据类型 | 典型运行时指针 | 语义解释 | 验证状态 |
+| :--- | :---: | :---: | :--- | :---: |
+| `+0x190` | `u32*` | `0x0221DC24` | 指向玩家背包数据结构 (`PlayerBag / MYITEM`) | **Verified** |
+| `+0x194` | `u32*` | `0x0221E624` | 指向玩家随身队伍数据结构 (`PokeParty`) | **Verified** |
+| `+0x1B8` | `u32*` | `0x0224211C` | 指向野外状态机 (`FieldStatus / BusyFlag`) | **Verified** |
+
+### 2.5 玩家背包内存布局 (`PlayerBag @ GameData + 0x190`)
+* **基址指针**：`0x0223B570 -> +0x190` (当前运行时地址 `0x0221DC24`)
+* **总大小**：`0x998` 字节
+* **单槽格式**：`4` 字节 (`u16 item_id`, `u16 quantity`)。`item_id == 0` 或 `quantity == 0` 为空槽。
+* **五大口袋相对偏移与容量**：
+
+| 口袋标识 (Pocket ID) | 中文名称 | 相对偏移 (Rel Offset) | 最大槽位数 (Max Slots) | 内存占用 | 验证状态 |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| `items` | 道具 | `+0x000` | 310 | 1240 字节 | **Verified (实测精灵球 x10)** |
+| `key_items` | 重要道具 | `+0x4D8` | 83 | 332 字节 | **Verified (实测白金宝珠/兑换券)** |
+| `tm_hm` | 技能机器 | `+0x624` | 109 | 436 字节 | **Verified** |
+| `medicine` | 回复药 | `+0x7D8` | 48 | 192 字节 | **Verified (实测伤药 x2)** |
+| `berries` | 树果 | `+0x898` | 64 | 256 字节 | **Verified** |
+
+### 2.6 玩家队伍与宝可梦解密 (`PokeParty @ GameData + 0x194`)
+* **基址指针**：`0x0223B570 -> +0x194` (当前运行时地址 `0x0221E624`)
+* **结构体头**：`+0x00`: `u32 capacity = 6`, `+0x04`: `u32 count = 1~6`
+* **槽位跨度**：每只宝可梦 `0xDC` (220) 字节
+* **解密规范**：
+  * 前 `0x08` 字节为头部 (`PID`, `Checksum`)。
+  * `0x08 ~ 0x88` (128 字节)：由 `Checksum` 作为种子的 LCG 算法解密，并使用 PKHeX `Shuffle45`（基于 `PID >> 13 & 0x1F`）解除 A/B/C/D 块乱序。
+    * Block A (`+0x00`): 物种 ID (`u16`), 携带道具 (`u16`), 经验值 (`u32`)。
+    * Block B (`+0x20`): 4 个招式 ID (`u16 * 4`) 及 4 个对应当前剩余 PP (`u8 * 4`)。
+  * `0x88 ~ 0xDC` (84 字节)：队伍专用战斗统计（等级、当前 HP、最大 HP、异常状态），由 `PID` 作为种子解密。
+* **验证状态**：**Verified**（实测槽位 1 水水獭 Lv9 HP 31/31，撞击 PP 35、摇尾巴 PP 30、水枪 PP 25，校验和完全匹配）。
 
 ---
 
@@ -139,3 +176,24 @@ AI Agent & Native Map Viewer
 * **实时文字化地图知识库**：`GET /api/v1/map/knowledge/current.txt`
 * **全量 ROM 目录索引**：`GET /api/v1/map/knowledge/catalog.txt`
 * **实时对话与时序流**：`GET /api/observer/presentation`
+
+---
+
+## 6. 开源逆向工程与生态参考库（权威索引）
+
+详见专门索引文档：`docs/GEN5_REVERSE_ENGINEERING_ECOSYSTEM.md`。
+
+| 优先级 | 项目名称 | GitHub 仓库 | 核心参考价值 |
+| :---: | :--- | :--- | :--- |
+| ⭐⭐⭐⭐⭐ | **BizHawk** | [TASEmulators/BizHawk](https://github.com/TASEmulators/BizHawk) | 模拟器核心底座、Memory Domain、Frame Control、Savestate |
+| ⭐⭐⭐⭐⭐ | **BizHawk External Tools Wiki** | [TASEmulators/BizHawk-ExternalTools/wiki](https://github.com/TASEmulators/BizHawk-ExternalTools/wiki) | BizHawk 扩展开发 C# Tool、EmuHawk 接口 |
+| ⭐⭐⭐⭐⭐ | **bizhawk-mcp-native** | [stealthc/bizhawk-mcp-native](https://github.com/stealthc/bizhawk-mcp-native) | AI 控制模拟器参考、LLM → Tool → Emulator 架构 |
+| ⭐⭐⭐⭐⭐ | **SwissArmyKnife** | [PlatinumMaster/SwissArmyKnife](https://github.com/PlatinumMaster/SwissArmyKnife) | Gen5 ROM 静态解析（地图、脚本、NPC、Warp、Zone） |
+| ⭐⭐⭐⭐⭐ | **swan** | [ds-pokemon-hacking/swan](https://github.com/ds-pokemon-hacking/swan) | Black2/White2 逆向数据库（Symbol、函数原型、内存结构体、ESDB） |
+| ⭐⭐⭐⭐ | **CTRMap-CE** | [PlatinumMaster/CTRMap-CE](https://github.com/PlatinumMaster/CTRMap-CE) | Gen5 地图编辑器、地图结构、事件与脚本模型 |
+| ⭐⭐⭐⭐ | **PKHeX** | [kwsch/PKHeX](https://github.com/kwsch/PKHeX) | 宝可梦数据模型、Shuffle45 解混淆算法、测试集 |
+| ⭐⭐⭐⭐ | **PokéBot** | [Kakumi/Pokebot](https://github.com/Kakumi/Pokebot) | 宝可梦自动化参考（内存读取、自动操作） |
+| ⭐⭐⭐⭐ | **NTRGhidra** | [pedro-javierf/NTRGhidra](https://github.com/pedro-javierf/NTRGhidra) | NDS 静态逆向 Ghidra 插件、ARM 代码与 Overlay 分析 |
+| ⭐⭐⭐⭐ | **ndspy** | [RoadrunnerWMC/ndspy](https://github.com/RoadrunnerWMC/ndspy) | NDS 格式解析（ROM、NARC、二进制容器） |
+| ⭐⭐⭐ | **PMC** | [ds-pokemon-hacking/PMC](https://github.com/ds-pokemon-hacking/PMC) | B2W2 代码注入框架、后期内部 Hook、Debug API |
+| ⭐⭐⭐ | **White2Upgrade** | [ds-pokemon-hacking/White2Upgrade](https://github.com/ds-pokemon-hacking/White2Upgrade) | B2W2 大型 Hack 案例、真实代码注入实践 |

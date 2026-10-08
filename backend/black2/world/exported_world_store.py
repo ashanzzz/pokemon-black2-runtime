@@ -20,7 +20,9 @@ class ExportedWorldStore:
         self.root = Path(project_root) if project_root else Path(__file__).resolve().parents[3]
         self.zone_dir = self.root / "reverse_engineering" / "derived" / "v5" / "zones"
 
-    @lru_cache(maxsize=512)
+    # Exported JSON bundles can be large. This cache is intentionally bounded
+    # to the active scene working set rather than the full Zone catalog.
+    @lru_cache(maxsize=16)
     def zone(self, zone_id: int) -> dict[str, Any]:
         path = self.zone_dir / f"zone_{int(zone_id):04d}.json"
         if path.is_file():

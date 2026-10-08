@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import threading
 from types import SimpleNamespace
+import asyncio
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from backend.black2.world.navigation_planning import NavigationPlanService, NavigationPlanningError
 from backend.black2.world.observed_navigation import NavNode, ObservedNavigationGraph
 from backend.black2.world.static_navigation import RomStaticNavigationGraph, StaticNavigationCell
+from backend.black2.world.navigation_tasks import NavigationTaskService
 
 
 class FakeMatrix:
@@ -113,6 +117,32 @@ def test_global_astar_crosses_zone_boundary_without_connector():
     assert result["decoded_zone_ids"] == [10, 11]
 
 
+def test_unverified_terrain_requires_explicit_opt_in():
+    provider = FakeGlobalProvider()
+    cell = provider._fake_cells[11][(32, 5)]
+    provider._fake_cells[11][(32, 5)] = StaticNavigationCell(
+        node=cell.node,
+        layer_index=cell.layer_index,
+        tile_class=cell.tile_class,
+        flags=cell.flags,
+        static_blocked=cell.static_blocked,
+        material={"kind": "unknown", "status": "unverified"},
+    )
+
+    blocked = provider.find_global_path(
+        NavNode(10, 30, 0, 5), matrix_id=0, x=34, y=0, z=5, player_sample=player_sample()
+    )
+    assert blocked["reachable"] is False
+
+    candidate = provider.find_global_path(
+        NavNode(10, 30, 0, 5), matrix_id=0, x=34, y=0, z=5,
+        player_sample=player_sample(), allow_unverified_terrain=True,
+    )
+    assert candidate["reachable"] is True
+    assert candidate["terrain_policy"]["allow_unverified_terrain"] is True
+    assert candidate["unverified_tile_count"] == 1
+
+
 def test_planner_accepts_global_destination_without_zone_id():
     provider = FakeGlobalProvider()
     planner = NavigationPlanService(ObservedNavigationGraph(), lambda: player_sample(), static_provider=provider)
@@ -152,3 +182,87 @@ def test_cross_matrix_global_destination_still_requires_verified_connector():
         assert exc.code == "NAV_MATRIX_TRANSITION_UNVERIFIED"
     else:
         raise AssertionError("cross-Matrix global destination must require a verified connector")
+
+
+def test_navigation_task_executes_across_same_matrix_zone_boundary():
+    async def scenario():
+        with TemporaryDirectory() as td:
+            latest = player_sample()
+            latest["locomotion"].update({"phase": "Idle", "semantic_state": "Standing"})
+            graph = ObservedNavigationGraph(project_root=Path(td))
+            planner = NavigationPlanService(graph, lambda: latest, static_provider=FakeGlobalProvider())
+
+            class Bridge:
+                is_connected = True
+
+                def __init__(self):
+                    self.clear_count = 0
+                    self.calls = []
+
+                async def press_buttons(self, buttons, frames=4):
+                    self.calls.append((list(buttons), frames))
+                    assert list(buttons) == ["B", "Right"]
+                    steps = max(1, frames // 10)
+                    latest["position"]["grid"]["x"] += steps
+                    latest["position"]["world"]["x"] += steps * 16
+                    latest["grid"]["x"] += steps
+                    latest["world"]["x"] += steps * 16
+                    latest["zone_id"] = 11 if latest["grid"]["x"] >= 32 else 10
+                    latest["frame"] += frames
+                    return {"queued": True}
+
+                async def clear_inputs(self):
+                    self.clear_count += 1
+                    return {"ok": True}
+
+            bridge = Bridge()
+            tasks = NavigationTaskService(
+                planner,
+                bridge,
+                lambda: latest,
+                control_sample=lambda: {
+                    "runtime": {"status": "ready"},
+                    "semantic": {
+                        "map_loaded": True,
+                        "ready_for_input": True,
+                        "context": {
+                            "screen_type": "OVERWORLD",
+                            "can_move_player": True,
+                            "is_dialogue_active": False,
+                        },
+                    },
+                },
+                poll_seconds=0.001,
+                step_timeout_seconds=0.02,
+                continuous_segment_limit=2,
+            )
+            started = tasks.start({
+                "type": "global_grid",
+                "space": "gen5-matrix-grid-v1",
+                "x": 34,
+                "y": 0,
+                "z": 5,
+            }, max_steps=4)
+
+            await tasks._runners[started["task_id"]]
+            result = tasks.get(started["task_id"])
+
+            assert result["status"] == "succeeded", result["stop_reason"]
+            assert result["arrival"]["zone_id"] == 11
+            assert result["arrival"]["position"] == {"x": 34, "y": 0, "z": 5}
+            assert result["progress"]["completed_steps"] == 4
+            assert result["zone_transitions"] == [
+                {"from_zone_id": 10, "to_zone_id": 11, "at": {"x": 32, "y": 0, "z": 5}}
+            ]
+            # Global/static candidates use the conservative one-tile closed
+            # loop, including at a same-Matrix Zone boundary.  The executor
+            # must not group two uncalibrated edges into one hold.
+            assert bridge.calls == [
+                (["B", "Right"], 6),
+                (["B", "Right"], 6),
+                (["B", "Right"], 6),
+                (["B", "Right"], 6),
+            ]
+            assert bridge.clear_count == 4
+
+    asyncio.run(scenario())

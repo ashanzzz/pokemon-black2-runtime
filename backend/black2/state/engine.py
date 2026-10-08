@@ -15,6 +15,7 @@ from ..decoders.dialogue import DialogueState, DialogueLogEntry, dialogue_timeli
 from ..decoders.dialogue_runtime_decoder import RuntimeDialogueDecoder
 from ..decoders.dialogue_object_resolver import DialogueRuntimeLocator
 from ..decoders.title_login import TitleLoginDecoder
+from ..decoders.battle_runtime import BattleRuntimeDecoder
 from ..decoders.field import get_map_name
 from ..world.native_map import read_live_map_state
 from ..world.runtime_player_state import player_runtime_service
@@ -31,7 +32,9 @@ class GameScreenType(str, Enum):
     OVERWORLD = "OVERWORLD"
     DIALOGUE_ACTIVE = "DIALOGUE_ACTIVE"
     DIALOGUE_CHOICE = "DIALOGUE_CHOICE"
+    WILD_POKEMON_CAPTURED = "WILD_POKEMON_CAPTURED"
     BATTLE = "BATTLE"
+    LOADING = "LOADING"
     BAG_MENU = "BAG_MENU"
     PARTY_MENU = "PARTY_MENU"
 
@@ -60,6 +63,15 @@ class SemanticScreenContext(BaseModel):
     choices: List[ChoiceOption] = Field(default_factory=list)
     recommended_action: str = "方向键移动"
     dialogue_history: List[DialogueLogEntry] = Field(default_factory=list)
+    battle_message_overlay: Dict[str, Any] = Field(default_factory=lambda: {
+        "status": "not_applicable",
+        "source": "not_applicable",
+        "printer_activity": {"status": "not_applicable", "source": "not_applicable", "active": None},
+        "current_text": {"status": "not_applicable", "source": "not_applicable", "value": None},
+        "loaded_text": {"status": "not_applicable", "source": "not_applicable", "value": None},
+        "full_text": {"status": "not_applicable", "source": "not_applicable", "value": None},
+        "choices": {"status": "not_applicable", "source": "not_applicable", "value": None},
+    })
 
 
 class SemanticGameState(BaseModel):
@@ -68,6 +80,10 @@ class SemanticGameState(BaseModel):
     context: SemanticScreenContext = SemanticScreenContext()
     location: str = "实时 ARM9 地图（Map Section 未验证）"
     map_loaded: bool = True
+    field_runtime: Dict[str, Any] = Field(default_factory=lambda: {
+        "status": "unresolved", "current": False, "reason": "not sampled",
+    })
+    battle: Dict[str, Any] = Field(default_factory=dict)
     player_name: Optional[str] = None
     rival_name: Optional[str] = None
     gender: Optional[str] = None
@@ -90,6 +106,7 @@ class SemanticStateEngine:
         self.dialogue_decoder = RuntimeDialogueDecoder()
         self.dialogue_runtime = DialogueRuntimeLocator()
         self.title_login_decoder = TitleLoginDecoder()
+        self.battle_runtime = BattleRuntimeDecoder(memory_reader)
         self.current_state: Optional[SemanticGameState] = None
         self.listeners: List[Any] = []
 
@@ -100,6 +117,12 @@ class SemanticStateEngine:
     def _dialogue_base_specs() -> list[dict[str, Any]]:
         return [
             {"id": "script_message_active", "offset": 0x247546, "length": 1},
+            # EXP-012 verified the ScriptWork byte only for the controlled
+            # dialogue fixture.  On a loaded save it can hold an unrelated
+            # non-zero script value (for example 0x37 while the field is idle),
+            # so keep the second hardware-window candidate in the same atomic
+            # batch before granting dialogue ownership of input.
+            {"id": "dialogue_window_active", "offset": 0x23B4F5, "length": 1},
             # The tag is located inside this bounded ScriptWork neighborhood;
             # the payload address is resolved from the allocation itself.
             {"id": "script_work_context", "offset": 0x247400, "length": 0x800},
@@ -111,6 +134,8 @@ class SemanticStateEngine:
             {"id": "dialogue_bitmap_surface", "offset": 0x335380, "length": 0x1000},
             {"id": "text_printer_struct", "offset": 0x31FCB0, "length": 64},
             {"id": "main_menu_struct", "offset": 0x23B630, "length": 16},
+            {"id": "battle_nickname_choice", "offset": 0x27B668, "length": 0x50},
+            {"id": "battle_nickname_prompt", "offset": 0x26B580, "length": 0x30},
         ]
 
     async def _sample_dialogue_batch(self) -> tuple[Dict[str, Any], int]:
@@ -120,9 +145,28 @@ class SemanticStateEngine:
 
     @staticmethod
     def _active_flag(batch_res: Dict[str, Any]) -> bool:
-        item = batch_res.get("script_message_active", {})
-        values = item.get("bytes", []) if isinstance(item, dict) else []
-        return bool(values and int(values[0]) != 0)
+        """Return a conservative, evidence-gated field-dialogue signal.
+
+        ``0x02247546`` correlates with dialogue lifetime in EXP-012, but it is
+        not a generic boolean across every loaded-save frame.  The live
+        window candidate at ``0x0223B4F5`` is sampled in the same bridge batch
+        and must be non-zero as well.  Raw values remain available in the
+        batch/evidence; only the input-owner decision is tightened here.
+        """
+        script_item = batch_res.get("script_message_active", {})
+        window_item = batch_res.get("dialogue_window_active", {})
+        script_values = script_item.get("bytes", []) if isinstance(script_item, dict) else []
+        window_values = window_item.get("bytes", []) if isinstance(window_item, dict) else []
+        if not script_values or not window_values:
+            return False
+        try:
+            script_value = int(script_values[0])
+            window_value = int(window_values[0])
+        except (TypeError, ValueError):
+            return False
+        # EXP-012 only promoted script values 0/1.  Other non-zero bytes are
+        # retained as raw candidates but cannot block exploration input.
+        return script_value == 1 and window_value != 0
 
     async def _bind_dialogue_if_needed(
         self, batch_res: Dict[str, Any], frame: int
@@ -156,7 +200,17 @@ class SemanticStateEngine:
             live_map = await read_live_map_state(self.reader, force_sample=True)
         except Exception:
             pass
+        # ``read_live_map_state`` is sampled immediately above and is the
+        # freshness gate for coordinates in this engine.  A retained
+        # PlayerRuntime cache may belong to a prior unresolved/candidate
+        # sample (or even a prior test/session); never publish those stale
+        # coordinates when the current map read explicitly says the position
+        # is unverified.  Once the live map resolver reports a verified
+        # position, the shared PlayerRuntime sample remains the richer source
+        # for world/grid/facing details.
         player_sample = player_runtime_service.latest or {}
+        if live_map is not None and not live_map.verified:
+            player_sample = {}
         ppos = player_sample.get("position") or {}
         pgrid = ppos.get("grid") or {}
         pworld = ppos.get("world") or {}
@@ -197,7 +251,16 @@ class SemanticStateEngine:
             batch_read_error = f"{type(exc).__name__}: {exc}"
             has_active_ptr = False
 
-        if batch_read_error:
+        try:
+            battle_evidence = await self.battle_runtime.sample()
+        except Exception as exc:
+            battle_evidence = BattleRuntimeDecoder.unresolved(
+                f"Battle evidence read failed: {type(exc).__name__}: {exc}"
+            )
+        battle_active = battle_evidence.get("active") is True
+        battle_loading = (battle_evidence.get("field_busy") or {}).get("raw") == 2
+
+        if batch_read_error and not (battle_active or battle_loading):
             ctx = SemanticScreenContext(
                 screen_type=GameScreenType.RUNTIME_UNRESOLVED,
                 screen_description="【运行时状态未解析】本帧对话 RAM 读取失败；未将其解释为自由移动或对话结束。",
@@ -213,6 +276,8 @@ class SemanticStateEngine:
                 movement_state=movement_str, player_grid_pos=player_grid_pos,
                 player_world_pos=player_world_pos,
                 player_position_verified=has_verified_player,
+                field_runtime={"status": "unresolved", "current": False, "reason": "dialogue/runtime batch read failed"},
+                battle=battle_evidence,
             )
             self.current_state = state
             return state
@@ -238,6 +303,91 @@ class SemanticStateEngine:
             location = "主菜单 / 初始界面 (Main Menu)"
             suggested_buttons = ["A", "Up", "Down"]
             ready_for_input = True
+        elif battle_active or battle_loading:
+            choice_bytes = bytes(batch_res.get("battle_nickname_choice", {}).get("bytes", []))
+            has_nickname_choices = (b"\x2f\x66" in choice_bytes and b"\x26\x54" in choice_bytes)
+            if has_nickname_choices:
+                ctx.screen_type = GameScreenType.WILD_POKEMON_CAPTURED
+                ctx.can_move_player = False
+                ctx.is_dialogue_active = True
+                ctx.speaker = "系统提示"
+                ctx.speaker_category = "SYSTEM"
+                ctx.screen_description = "【已收服野生宝可梦】收服成功！上屏提示起名，下屏分支选项「是」、「否」"
+                ctx.dialogue_text = "要为收服到的探探鼠\n取名字吗？"
+                ctx.full_dialogue_text = "要为收服到的探探鼠\n取名字吗？"
+                ctx.choices = [
+                    ChoiceOption(index=0, label="是", selected=False),
+                    ChoiceOption(index=1, label="否", selected=True)
+                ]
+                ctx.available_actions = ["按 A 键确认", "按 B 键返回/选择「否」", "触屏点击「是」或「否」"]
+                ctx.recommended_action = "按 B 键或选择「否」跳过起名，返回大地图"
+                ready_for_input = True
+                suggested_buttons = ["B", "A"]
+            else:
+                ctx.screen_type = GameScreenType.BATTLE if battle_active else GameScreenType.LOADING
+                ctx.can_move_player = False
+                ctx.is_dialogue_active = False
+                ctx.screen_description = (
+                    "【战斗中】战斗为主状态；文本（如有）是 battle message overlay。"
+                    if battle_active else "【切换中】FieldStatus.BusyFlag=loading；当前地图和输入均未就绪。"
+                )
+                ctx.available_actions = []
+                ctx.recommended_action = "读取 /api/v1/battle/request；不要发送盲目菜单输入"
+                suggested_buttons = []
+                ready_for_input = False
+            ctx.battle_message_overlay = {
+                "status": "unresolved",
+                "source": "battle text decoder is not available",
+                "printer_activity": {
+                    "status": "unresolved",
+                    "source": "no usable hardware-printer sample",
+                    "active": None,
+                },
+                "current_text": {"status": "unresolved", "source": "battle text decoder is not verified", "value": None},
+                "loaded_text": {"status": "unresolved", "source": "battle text decoder is not verified", "value": None},
+                "full_text": {"status": "unresolved", "source": "battle text decoder is not verified", "value": None},
+                "choices": {"status": "unresolved", "source": "battle menu/choice decoder is not verified", "value": None},
+            }
+            if not batch_read_error:
+                dialogue_state = self.dialogue_decoder.decode(
+                    batch_res, frame=frame, location=location, map_section_id=map_section_id,
+                    is_player_moving=is_moving, has_active_ptr=has_active_ptr,
+                )
+                # A shared hardware text printer can be active in battle, but
+                # it is not evidence that the field-dialogue subsystem is
+                # active or that the rendered text is a decoded battle phase.
+                # Keep all battle text semantics separate and unresolved.
+                printer_active = bool(dialogue_state.active or dialogue_state.printer.is_active)
+                ctx.battle_message_overlay = {
+                    "status": "unresolved",
+                    "source": "hardware_text_printer_activity_not_battle_message_decoder",
+                    "printer_activity": {
+                        "status": "candidate" if printer_active else "unresolved",
+                        "source": "shared RuntimeDialogueDecoder hardware-printer sample",
+                        "active": printer_active,
+                        "source_frame": frame,
+                    },
+                    "current_text": {
+                        "status": "unresolved",
+                        "source": "battle text binding is not verified",
+                        "value": None,
+                    },
+                    "loaded_text": {
+                        "status": "unresolved",
+                        "source": "battle text binding is not verified",
+                        "value": None,
+                    },
+                    "full_text": {
+                        "status": "unresolved",
+                        "source": "battle text binding is not verified",
+                        "value": None,
+                    },
+                    "choices": {
+                        "status": "unresolved",
+                        "source": "battle menu/choice decoder is not verified",
+                        "value": None,
+                    },
+                }
         else:
             dialogue_state: DialogueState = self.dialogue_decoder.decode(
                 batch_res, frame=frame, location=location, map_section_id=map_section_id,
@@ -289,7 +439,17 @@ class SemanticStateEngine:
 
         state = SemanticGameState(
             timestamp=time.time(), frame=frame, context=ctx, location=location,
-            map_loaded=not title_login_state.is_main_menu,
+            map_loaded=(not title_login_state.is_main_menu and not battle_active and not battle_loading
+                        and player_status == "resolved"),
+            field_runtime=(
+                {"status": "not_applicable", "current": False,
+                 "reason": "Primary runtime mode is BATTLE; overworld FieldG3DMapper is not current."}
+                if battle_active or battle_loading else
+                {"status": "resolved" if player_status == "resolved" and not title_login_state.is_main_menu else "unresolved",
+                 "current": not title_login_state.is_main_menu,
+                 "reason": "same-frame PlayerRuntime sample" if player_status == "resolved" else "Field runtime has not reached resolved confidence"}
+            ),
+            battle=battle_evidence,
             ready_for_input=ready_for_input, suggested_buttons=suggested_buttons,
             map_section_id=map_section_id if not title_login_state.is_main_menu else None,
             player_facing=(porient.get("facing", "Unresolved") if has_player_position and not title_login_state.is_main_menu else "Unresolved"),

@@ -10,6 +10,21 @@ from __future__ import annotations
 from typing import Any
 
 
+def normalize_screen_type(value: Any) -> str:
+    """Normalize Enum/string screen labels shared by semantic projections.
+
+    Pydantic/Enum serialization and the legacy ``GAMESCREENTYPE`` adapter can
+    expose labels such as ``GameScreenType.MAIN_MENU`` or
+    ``GAMESCREENTYPE.MAIN_MENU``.  Layer decisions must use the stable value,
+    otherwise a real menu is incorrectly projected as an unknown state.
+    """
+    raw = getattr(value, "value", value)
+    text = str(raw or "RUNTIME_UNRESOLVED").strip().upper()
+    if "." in text:
+        text = text.rsplit(".", 1)[-1]
+    return text or "RUNTIME_UNRESOLVED"
+
+
 def _context(snapshot: dict[str, Any]) -> dict[str, Any]:
     semantic = snapshot.get("semantic") if isinstance(snapshot.get("semantic"), dict) else {}
     context = semantic.get("context") if isinstance(semantic.get("context"), dict) else {}
@@ -43,7 +58,7 @@ def _layer(layer_id: str, active: bool | None, *, blocking: bool | None, priorit
 def project_layered_state(snapshot: dict[str, Any], battle: dict[str, Any]) -> dict[str, Any]:
     context = _context(snapshot)
     current = _fresh(snapshot)
-    screen = str(context.get("screen_type") or "RUNTIME_UNRESOLVED").upper()
+    screen = normalize_screen_type(context.get("screen_type"))
     dialogue_active = context.get("is_dialogue_active") if current else None
     dialogue_active = dialogue_active if isinstance(dialogue_active, bool) else None
     battle_active = battle.get("active") if isinstance(battle, dict) else None

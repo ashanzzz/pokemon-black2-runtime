@@ -1,0 +1,277 @@
+function renderMultiLayerGrid(data) {
+  const container = document.getElementById('mapSliceContainer');
+  if (!container) return;
+
+  const totalLayers = data.total_active_layers || 1;
+  const activeLayers = data.active_layers || [0];
+  const playerFloorY = data.player_floor_y ?? 0;
+  const slices = data.slices || [];
+
+  if (slices.length === 0) {
+    container.innerHTML = '<div style="padding:20px; color:var(--text-3); text-align:center;">当前区域无切片数据</div>';
+    return;
+  }
+
+  // 更新顶栏多层提示
+  const summaryBadge = document.getElementById('layerSummaryBadge');
+  const stair = data.stair_runtime || {};
+  if (summaryBadge) {
+    if (stair.active) {
+      summaryBadge.innerText = `检测到 2 层立体标高通道 (地面 Y=0 vs 高架 Y=+2) + 中间双阶楼梯 (主角踩踏第 ${stair.current_step} 阶 / 共 2 阶 · 标高 ${stair.step_world_y})`;
+    } else if (totalLayers === 1) {
+      summaryBadge.innerText = `当前区域为单层地面 (标高 Y=${activeLayers[0]})`;
+    } else if (totalLayers === 2) {
+      summaryBadge.innerText = `检测到 2 层立体标高通道 (地面 Y=0 vs 高架 Y=+2)`;
+    } else {
+      summaryBadge.innerText = `检测到 ${totalLayers} 层立体楼宇/阶梯通道 (共 ${totalLayers} 层)`;
+    }
+  }
+
+  // 楼层切片选择栏
+  const floorSelector = document.getElementById('floorSelector');
+  if (floorSelector) {
+    if (totalLayers > 1) {
+      floorSelector.style.display = 'flex';
+      const isAuto = (sliceFilterMode === 'auto');
+      floorSelector.innerHTML = `
+        <span style="font-size:12px; font-weight:700; color:var(--text-3);">立体楼层栈:</span>
+        <button class="ds-btn ds-btn-sm ${sliceFilterMode === 'all' ? 'ds-btn-primary' : 'ds-btn-ghost'}" onclick="setSliceFilter('all')">[双层全景对齐 (默认全部展开)]</button>
+        <button class="ds-btn ds-btn-sm ${sliceFilterMode === 'active_only' ? 'ds-btn-cyan' : 'ds-btn-ghost'}" onclick="setSliceFilter('active_only')">[仅显示路径涉及层]</button>
+      ` + activeLayers.map(fy => {
+        const isPlayer = fy === playerFloorY;
+        const isFocused = (sliceFilterMode === String(fy));
+        return `<button class="ds-btn ds-btn-sm ${isFocused ? 'ds-btn-yellow' : isPlayer ? 'ds-btn-green' : ''}" onclick="setSliceFilter('${fy}')">[仅看 Y=${fy >= 0 ? '+' + fy : fy} ${isPlayer ? '★主角层' : ''}]</button>`;
+      }).join('');
+    } else {
+      floorSelector.style.display = 'none';
+    }
+  }
+
+  // 按标高从小到大严格升序排序：Floor Y=0 (下层地面) -> Y=1 (楼梯) -> Y=2 (上层高台)
+  const sortedSlices = [...slices].sort((a, b) => (a.floor_y ?? 0) - (b.floor_y ?? 0));
+
+  container.innerHTML = sortedSlices.map(s => {
+    const fy = s.floor_y ?? 0;
+    const isPlayerFloor = (fy === playerFloorY);
+    const grid = s.grid || [];
+    if (grid.length === 0) return '';
+
+    const minX = grid[0][0].x;
+    const maxX = grid[0][grid[0].length - 1].x;
+
+    const stair = data.stair_runtime || {};
+    let floorTitle = `【${fy >= 0 ? '+' + fy : fy} 层标高切片】`;
+    if (stair.active && fy === stair.stair_slice_y) {
+      floorTitle = `【楼梯跨层通道 标高 Y=+1 ★主角踩踏第 ${stair.current_step} 阶 (标高 ${stair.step_world_y})】`;
+    } else if (fy === 0) {
+      floorTitle = `【下层地面切片 标高 Y=0 ${isPlayerFloor && !stair.active ? '★主角当前所在层' : ''}】`;
+    } else if (fy === 1) {
+      floorTitle = `【楼梯跨层中段 标高 Y=+1 ${isPlayerFloor ? '★主角当前所在位置' : ''}】`;
+    } else if (fy === 2) {
+      floorTitle = `【上层高台切片 标高 Y=+2 ${isPlayerFloor && !stair.active ? '★主角当前所在层' : ''}】`;
+    } else {
+      floorTitle = `【${fy >= 0 ? '+' + fy : fy} 层标高切片 ${isPlayerFloor ? '★主角当前所在层' : ''}】`;
+    }
+
+    // 统计当前切片上的真实实体步数与跨层发光投影步数
+    const currentFloorCoords = new Set();
+    grid.forEach(row => row.forEach(c => {
+      if (c && c.walkable) currentFloorCoords.add(`${c.x},${c.z}`);
+    }));
+    let realSteps = [];
+    let projSteps = [];
+    for (const [key, node] of activePlannedPathMap.entries()) {
+      if (node.isRealFloor && key.endsWith(`,${fy}`) && node.step) {
+        realSteps.push(node.step);
+      } else if (node.isProjection && key.split(",").length === 2 && node.step) {
+        const parts = key.split(",");
+        if (node.y !== fy && currentFloorCoords.has(`${parts[0]},${parts[1]}`)) {
+          projSteps.push(node.step);
+        }
+      }
+    }
+    realSteps = Array.from(new Set(realSteps)).sort((a, b) => a - b);
+    projSteps = Array.from(new Set(projSteps)).sort((a, b) => a - b);
+
+    let pathBadge = '';
+    if (realSteps.length > 0 || projSteps.length > 0) {
+      let badges = [];
+      if (realSteps.length > 0) {
+        const rStr = (realSteps[0] === realSteps[realSteps.length - 1]) ? `第 ${realSteps[0]} 步` : `第 ${realSteps[0]}~${realSteps[realSteps.length - 1]} 步`;
+        badges.push(`<span class="ds-badge" style="background:#FF8F00; color:#000; font-weight:800;">[本层实体: ${rStr}]</span>`);
+      }
+      if (projSteps.length > 0) {
+        const pStr = (projSteps[0] === projSteps[projSteps.length - 1]) ? `第 ${projSteps[0]} 步` : `第 ${projSteps[0]}~${projSteps[projSteps.length - 1]} 步`;
+        badges.push(`<span class="ds-badge" style="background:rgba(255,214,0,0.15); border:1px dashed #FFD600; color:#FFE082; font-weight:700;">[跨层发光投影: ${pStr}]</span>`);
+      }
+      pathBadge = badges.join(' ');
+    } else if (fy !== 0) {
+      pathBadge = `<span class="ds-badge" style="color:var(--text-3); border:1px solid var(--border-subtle);">[高层立体地形 · 标高 Y=+2]</span>`;
+    }
+
+    // 切片展示裁决逻辑 (默认 'all' 全景展开，绝不产生“检测到2层却折叠”的矛盾)
+    const hasPathOnFloor = (realSteps.length > 0);
+    const isSelectedFloor = Boolean(currentSelectedCell && currentSelectedCell.y === fy);
+    let shouldShowFloor = true;
+    if (sliceFilterMode === 'active_only') {
+      shouldShowFloor = isPlayerFloor || isSelectedFloor || hasPathOnFloor;
+    } else if (sliceFilterMode === 'all') {
+      if (activeSlicesData && activeSlicesData.slices && activeSlicesData.slices.length > 2) {
+        shouldShowFloor = isPlayerFloor || isSelectedFloor || hasPathOnFloor;
+      } else {
+        shouldShowFloor = true;
+      }
+    } else {
+      shouldShowFloor = (sliceFilterMode === String(fy));
+    }
+
+    if (!shouldShowFloor) {
+      return `
+        <div class="ds-map-slice ds-map-slice-collapsed" style="padding:10px 16px; background:var(--bg-1); border:1px dashed var(--border-subtle); display:flex; justify-content:space-between; align-items:center; border-radius:4px; margin-bottom:8px;">
+          <div style="font-size:12px; color:var(--text-3); display:flex; align-items:center; gap:8px;">
+            <span class="ds-badge">${fy >= 0 ? '+' + fy : fy} 层标高</span>
+            <span style="color:var(--text-1); font-weight:700;">${floorTitle}</span>
+            <span style="color:var(--text-3);">（已切换为单层聚焦视图）</span>
+          </div>
+          <button class="ds-btn ds-btn-sm ds-btn-ghost" onclick="setSliceFilter('all')">[切回双层全景并显]</button>
+        </div>
+      `;
+    }
+
+    let sliceHtml = `
+      <div class="ds-map-slice radius-${currentRadarRadius}" id="slice-floor-${fy}">
+        <div class="ds-map-slice-header">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="color:${isPlayerFloor ? 'var(--accent-cyan)' : 'var(--text-1)'}; font-family:var(--font-mono); font-size:14px; font-weight:700;">
+              ${floorTitle}
+            </span>
+            ${pathBadge}
+          </div>
+          <span class="ds-badge ${isPlayerFloor ? 'ds-badge-cyan' : ''}">层高 Y=${fy}</span>
+        </div>
+        <div class="ds-map-grid-body">
+          <div class="ds-map-ruler-row">
+            <div class="ds-ruler-corner">Z\\X</div>`;
+
+    for (let x = minX; x <= maxX; x++) {
+      sliceHtml += `<div class="ds-ruler-col">${x}</div>`;
+    }
+    sliceHtml += `</div>`;
+
+    grid.forEach(row => {
+      const z = row[0].z;
+      sliceHtml += `<div class="ds-map-row"><div class="ds-ruler-row">${z}</div>`;
+      row.forEach(cell => {
+        const rawSym = cell.symbol || '.';
+        let sym = rawSym;
+        let cellClass = 'cell-dot';
+
+        const isWarpTile = (cell.has_warp || cell.underlying_symbol === 'D' || rawSym === 'D');
+        const isCatwalk = ['╫', '╪', 'o'].includes(rawSym);
+        const isStair = ['▲', '▼'].includes(rawSym);
+        const isNPC = (rawSym === 'N' || rawSym === 'T');
+        const isItem = (rawSym === 'h' || rawSym === 'I');
+
+        // 优先级严格保障：主角 > 传送大门[D] > 楼梯 > 独木桥入口[╪]/主体[╫] > 悬空高低差[↕] > NPC > 道具 > 草丛/水体 > 物理墙体 > 普通平地
+        if (cell.is_player || rawSym === 'P') {
+          sym = 'P';
+          cellClass = isWarpTile ? 'cell-P cell-warp-player' : 'cell-P';
+        } else if (rawSym === 'D' || cell.is_portal_doorway === true) {
+          sym = 'D';
+          cellClass = 'cell-warp';
+        } else if (isStair) {
+          // 立体双向符号法：在地面(Y=0)显示上行▲，在高台(Y=2)显示下行▼，直观呈现上下接驳
+          sym = (fy >= 2) ? '▼' : '▲';
+          cellClass = (fy >= 2) ? 'cell-stair cell-stair-down' : 'cell-stair cell-stair-up';
+        } else if (isCatwalk) {
+          sym = rawSym; // 严格保留 ╪ (入口) 与 ╫ (主体) 区分，契合 AGENTS.md 准则 7
+          cellClass = 'cell-catwalk';
+        } else if (rawSym === '↕') {
+          sym = '↕';
+          cellClass = 'cell-elevation-gap';
+        } else if (isNPC) {
+          sym = rawSym;
+          cellClass = 'cell-npc';
+        } else if (rawSym === 'h') {
+          sym = 'h';
+          cellClass = 'cell-grass';
+        } else if (rawSym === 'I') {
+          sym = 'I';
+          cellClass = 'cell-grass';
+        } else if (rawSym === '*') {
+          sym = '*';
+          cellClass = 'cell-grass';
+        } else if (rawSym === 'W') {
+          sym = 'W';
+          cellClass = 'cell-water';
+        } else if (rawSym === '~') {
+          sym = '~';
+          cellClass = 'cell-shore';
+        } else if (!cell.walkable || cell.blocked || rawSym === '#' || rawSym === 'B') {
+          sym = '#';
+          cellClass = 'cell-wall cell-blocked';
+        } else {
+          sym = '.';
+          cellClass = 'cell-dot';
+        }
+
+        const cellKey = `${cell.x},${cell.z},${cell.y}`;
+        activeCellDataMap.set(cellKey, cell);
+
+        const isSelected = (currentSelectedCell && currentSelectedCell.x === cell.x && currentSelectedCell.z === cell.z && currentSelectedCell.y === cell.y);
+        const kindSafe = String(cell.kind || '普通地面').replace(/"/g, '&quot;');
+
+        // 立体双模路径高亮裁决：
+        // 1. 本层真实实体走过的路径 (exactPathNode): 实心高亮正常显示 (在Y=2实际走的地图上，5,6,7,8和星星★都正常高亮显示！)
+        // 2. 跨层垂直投影 (projPathNode): 边缘发光虚线框 (在Y=0显示5,6,7,8和终点★边缘发光，提示同坐标在另一层)
+        const exactPathNode = activePlannedPathMap.get(cellKey);
+        const projPathNode = activePlannedPathMap.get(`${cell.x},${cell.z}`);
+        let pathClass = '';
+        let cellDisplay = sym;
+
+        if (exactPathNode) {
+          // 本层真实实体路径 (实心高亮正常呈现，终点★)
+          if (activePlannedMovementMode === 'walk') {
+            pathClass = 'cell-path-walk';
+          } else if (activePlannedMovementMode === 'bike') {
+            pathClass = 'cell-path-bike';
+          } else if (activePlannedMovementMode === 'surf') {
+            pathClass = 'cell-path-surf';
+          } else {
+            pathClass = 'cell-path-run'; // 默认奔跑：深墨绿
+          }
+          if (exactPathNode.isGoal) {
+            pathClass += ' cell-path-goal';
+            cellDisplay = '★';
+          } else if (!cell.is_player && sym !== 'P') {
+            cellDisplay = exactPathNode.step;
+          }
+        } else if (projPathNode) {
+          // 跨层垂直投影节点 (边缘发光，代表不是这一层，但处于同坐标上方或下方)
+          pathClass = `cell-path-projected proj-${activePlannedMovementMode}`;
+          if (projPathNode.isGoal) {
+            pathClass += ' proj-goal';
+            cellDisplay = '★';
+          } else if (!cell.is_player && sym !== 'P') {
+            cellDisplay = projPathNode.step;
+          }
+        }
+
+        sliceHtml += `<div class="ds-map-cell ${cellClass} ${pathClass} ${isSelected ? 'selected' : ''}" 
+          data-x="${cell.x}" data-z="${cell.z}" data-y="${cell.y}" 
+          data-walkable="${cell.walkable}" data-kind="${kindSafe}" 
+          data-symbol="${sym}"
+          data-cellkey="${cellKey}"
+          onmouseenter="handleCellHover(this)" 
+          onclick="handleCellClick(this)">${cellDisplay}</div>`;
+      });
+      sliceHtml += `</div>`;
+    });
+
+    sliceHtml += `</div></div>`;
+    return sliceHtml;
+  }).join('');
+}
+
+
+// 楼层切片平滑聚焦滚动

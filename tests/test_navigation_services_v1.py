@@ -140,6 +140,46 @@ def test_task_groups_a_straight_corridor_into_one_continuous_hold():
     asyncio.run(scenario())
 
 
+def test_unverified_runtime_gait_forces_single_step_closed_loop():
+    async def scenario():
+        with TemporaryDirectory() as td:
+            graph = ObservedNavigationGraph(project_root=Path(td))
+            graph.observe_player(graph_player(1, 10, 0, 10))
+            graph.observe_player(graph_player(2, 11, 0, 10))
+            graph.observe_player(graph_player(3, 12, 0, 10))
+            latest = raw_player(4, 10, 0, 10)
+            latest["locomotion"]["gait_calibration"] = {"status": "needs_samples"}
+
+            class TimingUnverifiedBridge(FakeBridge):
+                def __init__(self, sample):
+                    super().__init__(sample)
+                    self.calls = []
+
+                async def press_buttons(self, buttons, frames=4):
+                    self.calls.append((buttons, frames))
+                    self.latest["position"]["grid"]["x"] += 1
+                    self.latest["position"]["world"]["x"] += 16
+                    self.latest["frame"] += frames
+                    return {"queued": True}
+
+            bridge = TimingUnverifiedBridge(latest)
+            tasks = NavigationTaskService(
+                NavigationPlanService(graph, lambda: latest), bridge, lambda: latest,
+                control_sample=controllable_snapshot, poll_seconds=0.001, step_timeout_seconds=0.02,
+            )
+            started = tasks.start(
+                {"type": "grid", "space": "gen5-field-grid-v1", "zone_id": 427, "x": 12, "y": 0, "z": 10},
+                max_steps=2,
+            )
+            await tasks._runners[started["task_id"]]
+            result = tasks.get(started["task_id"])
+            assert result["status"] == "succeeded", result["stop_reason"]
+            assert bridge.calls == [(["Right"], 8), (["Right"], 8)]
+            assert all(segment["steps"] == 1 for segment in result["continuous_segments"])
+
+    asyncio.run(scenario())
+
+
 def test_explicit_start_is_read_only_candidate_and_does_not_need_live_player():
     with TemporaryDirectory() as td:
         graph = ObservedNavigationGraph(project_root=Path(td))
@@ -241,6 +281,8 @@ def test_task_stuck_fails_and_clears_inputs():
             result = tasks.get(started["task_id"])
             assert result["status"] == "failed"
             assert result["stop_reason"]["code"] == "NAV_STUCK"
+            assert result["current"]["position"] == {"x": 10, "y": 0, "z": 10}
+            assert result["stop_reason"]["details"]["landing_diagnostics"]["outcome"] == "timeout"
             assert bridge.clear_count == 1
     asyncio.run(scenario())
 
@@ -393,7 +435,7 @@ def test_each_step_rechecks_controllable_state():
             await tasks._runners[started["task_id"]]
             result = tasks.get(started["task_id"])
             assert result["status"] == "failed"
-            assert result["stop_reason"]["code"] == "NAV_NOT_CONTROLLABLE"
+            assert result["stop_reason"]["code"] == "NAV_INTERRUPTED_BY_DIALOGUE"
             assert bridge.press_count == 1
             assert bridge.clear_count == 1
     asyncio.run(scenario())
@@ -477,7 +519,7 @@ def test_non_controllable_screen_fails_before_sending_input():
             await tasks._runners[started["task_id"]]
             result = tasks.get(started["task_id"])
             assert result["status"] == "failed"
-            assert result["stop_reason"]["code"] == "NAV_NOT_CONTROLLABLE"
+            assert result["stop_reason"]["code"] == "NAV_INTERRUPTED_BY_DIALOGUE"
             assert bridge.press_count == 0
             assert bridge.clear_count == 1
     asyncio.run(scenario())
@@ -536,3 +578,123 @@ def test_wait_for_landing_clears_queue_before_accepting_idle_expected_tile():
 
     asyncio.run(scenario())
 
+
+def test_partial_segment_clears_once_and_publishes_the_actual_intermediate_node():
+    async def scenario():
+        with TemporaryDirectory() as td:
+            graph = ObservedNavigationGraph(project_root=Path(td))
+            for frame, x in enumerate(range(10, 19), start=1):
+                graph.observe_player(graph_player(frame, x, 0, 10))
+            latest = raw_player(10, 10, 0, 10)
+
+            class PartialBridge(FakeBridge):
+                async def press_buttons(self, buttons, frames=4):
+                    self.latest["position"]["grid"]["x"] += 3
+                    self.latest["position"]["world"]["x"] += 48
+                    self.latest["frame"] += frames
+                    return {"queued": True}
+
+            bridge = PartialBridge(latest)
+            tasks = NavigationTaskService(
+                NavigationPlanService(graph, lambda: latest), bridge, lambda: latest,
+                control_sample=controllable_snapshot, poll_seconds=0.001, step_timeout_seconds=0.02,
+            )
+            started = tasks.start(
+                {"type": "grid", "space": "gen5-field-grid-v1", "zone_id": 427, "x": 18, "y": 0, "z": 10},
+                max_steps=8,
+            )
+            await tasks._runners[started["task_id"]]
+            result = tasks.get(started["task_id"])
+
+            assert result["status"] == "failed"
+            assert result["stop_reason"]["code"] == "NAV_PARTIAL_SEGMENT"
+            assert result["current"]["position"] == {"x": 13, "y": 0, "z": 10}
+            assert result["stop_reason"]["details"]["landing_diagnostics"]["outcome"] == "partial"
+            assert bridge.clear_count == 1
+
+    asyncio.run(scenario())
+
+
+def test_expected_moving_node_settles_to_idle_after_clear_before_next_decision():
+    async def scenario():
+        with TemporaryDirectory() as td:
+            graph = ObservedNavigationGraph(project_root=Path(td))
+            graph.observe_player(graph_player(1, 10, 0, 10))
+            graph.observe_player(graph_player(2, 11, 0, 10))
+            latest = raw_player(3, 10, 0, 10)
+
+            class MovingBridge(FakeBridge):
+                async def press_buttons(self, buttons, frames=4):
+                    result = await super().press_buttons(buttons, frames)
+                    self.latest["locomotion"] = {"phase": "Moving", "semantic_state": "Walking"}
+                    return result
+
+            samples = {"count": 0}
+
+            async def settle_runtime():
+                samples["count"] += 1
+                if samples["count"] >= 2:
+                    latest["locomotion"] = {"phase": "Idle", "semantic_state": "Standing"}
+
+            bridge = MovingBridge(latest)
+            tasks = NavigationTaskService(
+                NavigationPlanService(graph, lambda: latest), bridge, lambda: latest,
+                control_sample=controllable_snapshot, live_player_sampler=settle_runtime,
+                poll_seconds=0.001, post_clear_settle_seconds=0.05,
+            )
+            started = tasks.start(
+                {"type": "grid", "space": "gen5-field-grid-v1", "zone_id": 427, "x": 11, "y": 0, "z": 10},
+                max_steps=1,
+            )
+            await tasks._runners[started["task_id"]]
+            result = tasks.get(started["task_id"])
+
+            assert result["status"] == "succeeded", result["stop_reason"]
+            assert samples["count"] >= 2
+            assert bridge.clear_count == 1
+
+    asyncio.run(scenario())
+
+
+def test_dialogue_during_eight_tile_segment_clears_and_reports_real_position():
+    async def scenario():
+        with TemporaryDirectory() as td:
+            graph = ObservedNavigationGraph(project_root=Path(td))
+            for frame, x in enumerate(range(10, 19), start=1):
+                graph.observe_player(graph_player(frame, x, 0, 10))
+            latest = raw_player(10, 10, 0, 10)
+            state = {"dialogue": False}
+
+            class DialogueBridge(FakeBridge):
+                async def press_buttons(self, buttons, frames=4):
+                    self.latest["position"]["grid"]["x"] += 4
+                    self.latest["position"]["world"]["x"] += 64
+                    self.latest["locomotion"] = {"phase": "Moving", "semantic_state": "Walking"}
+                    self.latest["frame"] += frames
+                    state["dialogue"] = True
+                    return {"queued": True}
+
+            bridge = DialogueBridge(latest)
+            tasks = NavigationTaskService(
+                NavigationPlanService(graph, lambda: latest), bridge, lambda: latest,
+                control_sample=lambda: controllable_snapshot(
+                    "DIALOGUE_ACTIVE" if state["dialogue"] else "OVERWORLD",
+                    not state["dialogue"], state["dialogue"],
+                ),
+                poll_seconds=0.001,
+            )
+            started = tasks.start(
+                {"type": "grid", "space": "gen5-field-grid-v1", "zone_id": 427, "x": 18, "y": 0, "z": 10},
+                max_steps=8,
+            )
+            await tasks._runners[started["task_id"]]
+            result = tasks.get(started["task_id"])
+
+            assert result["status"] == "failed"
+            assert result["stop_reason"]["code"] == "NAV_INTERRUPTED_BY_DIALOGUE"
+            assert result["stop_reason"]["details"]["phase"] == "Moving"
+            assert result["current"]["position"] == {"x": 14, "y": 0, "z": 10}
+            assert result["stop_reason"]["details"]["landing_diagnostics"]["input_clear"] == "cleared"
+            assert bridge.clear_count == 1
+
+    asyncio.run(scenario())

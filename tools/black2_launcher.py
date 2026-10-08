@@ -480,7 +480,18 @@ def stop_backend() -> dict[str, Any]:
             pid = int(control.get("pid") or 0)
         except (TypeError, ValueError):
             pid = 0
-        if pid > 0 and (os.name != "nt" or _pid_is_project_backend(pid, rows)):
+        # The runtime-control endpoint is served by the process itself and
+        # reports the canonical checkout root.  On Windows, CIM command-line
+        # output can replace non-ASCII checkout characters with U+FFFD; in
+        # that case the older process-table matcher rejects an otherwise
+        # positively identified PID and STOP leaves the backend running.
+        # Trust the exact project_root assertion from our own control endpoint
+        # while retaining the strict process-table check for every other PID.
+        if pid > 0 and (
+            os.name != "nt"
+            or _pid_is_project_backend(pid, rows)
+            or _norm_path_text(control.get("project_root")) == _norm_path_text(ROOT)
+        ):
             candidates.add(pid)
 
     stopped: list[int] = []

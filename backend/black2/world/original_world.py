@@ -25,7 +25,9 @@ class OriginalWorldService:
     def __init__(self, rom_path: str | None = None) -> None:
         self.rom = Gen5RomMap(rom_path)
 
-    @lru_cache(maxsize=512)
+    # Zone descriptors include parsed terrain and building placements. Keep a
+    # small LRU so connected-scene exploration cannot retain the whole ROM.
+    @lru_cache(maxsize=16)
     def zone(self, zone_id: int) -> dict[str, Any]:
         zone = self.rom.zone(zone_id)
         area = self.rom.area(zone.area_id)

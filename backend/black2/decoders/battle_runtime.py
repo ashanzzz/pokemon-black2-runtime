@@ -1,10 +1,10 @@
 """Conservative Pokemon Black 2 IREJ rev.1 battle-presence decoder.
 
 This module deliberately separates *observed bytes* from *battle semantics*.
-The address chain below was recovered from six user-supplied battle Main RAM
-captures and matches the public SWAN ``GameData`` / ``FieldStatus`` layouts.
-It is strong candidate evidence, not a cross-state verification: no paired
-IREJ overworld capture was supplied with this patch.
+The address chain below was recovered from supplied IREJ Main RAM captures
+and matches the public SWAN ``GameData`` / ``FieldStatus`` layouts.  The
+BusyFlag presence distinction is cross-state verified for this profile; the
+battle kind, menu and legal actions remain unresolved.
 
 Consequences:
 - ``BusyFlag == 1`` may be reported as a high-confidence *candidate* battle.
@@ -46,7 +46,28 @@ POKE_PARTY_HEADER_SIZE = 8
 POKE_PARTY_EXPECTED_CAPACITY = 6
 
 # Captures used by this recovery.  This number is evidence metadata only.
-SUPPLIED_BATTLE_CAPTURE_COUNT = 6
+SUPPLIED_BATTLE_CAPTURE_COUNT = 5
+SUPPLIED_OVERWORLD_CONTROL_COUNT = 3
+
+# Dimensions deliberately kept explicit in the evidence payload.  The
+# presence locator is useful to clients, but these values have no verified
+# IREJ rev.1 offsets yet; naming them here prevents callers from mistaking a
+# missing field for an inactive/zero-valued field.
+UNRESOLVED_BATTLE_DIMENSIONS = {
+    "battle_kind": "Battle kind (wild/trainer/link/etc.) is not decoded.",
+    "battle_format": "Single/double/triple/rotation format is not decoded.",
+    "phase": "Command/message/animation/result phase is not decoded.",
+    "active_pokemon": "BattleMon pointer and active side/slot are not decoded.",
+    "opponent_roster": "Opponent BattleMon roster is not decoded.",
+    "move_legality": "Battle move usability, PP and target legality are not decoded.",
+    "item_legality": "Battle item inventory/filtering and target legality are not decoded.",
+    "battle_weather": "Battle weather/turn countdown is not decoded.",
+    "field_effects": "Gen V field effects and side conditions are not decoded.",
+    "battlefield_visual": "Battle background/terrain visual state is not decoded.",
+    "overworld_time": "Overworld time-of-day is not established by battle RAM.",
+    "overworld_season": "Overworld season is not established by battle RAM.",
+    "overworld_weather": "Overworld zone weather is not established by battle RAM.",
+}
 
 
 def _bytes(row: Any) -> bytes:
@@ -81,10 +102,163 @@ def _main_ram_pointer(value: Any) -> bool:
 
 
 @dataclass(frozen=True)
-class BattleEvidenceProfile:
+class IrejBattleProfile:
     game_data: int = IREJ_REV1_GAME_DATA
+    party_ptr_offset: int = GAME_DATA_PARTY_PTR
+    field_status_ptr_offset: int = GAME_DATA_FIELD_STATUS_PTR
+    field_busy_offset: int = FIELD_STATUS_BUSY_FLAG
+    last_battle_result_offset: int = GAME_DATA_LAST_BATTLE_RESULT
+    pause_events_offset: int = GAME_DATA_PAUSE_EVENTS
     source: str = "user battle RAM captures + ds-pokemon-hacking/swan structure layout"
     target: str = "Pokemon Black 2 IREJ rev.1"
+
+
+# Kept as a public compatibility name for callers using the v1 decoder.
+BattleEvidenceProfile = IrejBattleProfile
+
+
+def _ram_u32(ram: bytes, address: int) -> int | None:
+    offset = address - MAIN_RAM_START
+    if offset < 0 or offset + 4 > len(ram):
+        return None
+    return int.from_bytes(ram[offset:offset + 4], "little")
+
+
+def _ram_u8(ram: bytes, address: int) -> int | None:
+    offset = address - MAIN_RAM_START
+    return ram[offset] if 0 <= offset < len(ram) else None
+
+
+def _raw_range(ram: bytes, address: int | None, length: int) -> dict[str, Any] | None:
+    """Return a small, explicitly-addressed byte range from a RAM image.
+
+    Battle semantics are intentionally not inferred from these bytes.  Keeping
+    the exact bytes in the evidence payload makes a live capture auditable and
+    lets a later decoder be tested against the same frame without guessing an
+    offset again.  This helper is bounded by the supplied image and therefore
+    cannot leak an out-of-range slice when a pointer candidate is malformed.
+    """
+    if not _main_ram_pointer(address):
+        return None
+    offset = address - MAIN_RAM_START
+    if offset < 0 or offset + length > len(ram):
+        return None
+    return {
+        "address": f"0x{address:08X}",
+        "length": length,
+        "hex": ram[offset:offset + length].hex(),
+        "source": "Main RAM image at evidence frame",
+    }
+
+
+def decode_battle_evidence_from_ram(
+    ram: bytes,
+    *,
+    frame: int = 0,
+    profile: IrejBattleProfile = IrejBattleProfile(),
+) -> dict[str, Any]:
+    """Decode only the structurally supported battle-presence evidence.
+
+    ``ram`` is a complete ARM9 Main RAM image beginning at ``0x02000000``.
+    The same pure function is used by offline snapshot export and can be
+    exercised without a bridge or emulator.
+    """
+    detector = {
+        "profile": "IREJ-rev1",
+        "presence_cross_state_verified": True,
+        "positive_controls": SUPPLIED_BATTLE_CAPTURE_COUNT,
+        "negative_controls": SUPPLIED_OVERWORLD_CONTROL_COUNT,
+        "battle_kind_verified": False,
+        "menu_verified": False,
+    }
+    base = profile.game_data
+    party_ptr = _ram_u32(ram, base + profile.party_ptr_offset)
+    field_ptr = _ram_u32(ram, base + profile.field_status_ptr_offset)
+    last_result = _ram_u32(ram, base + profile.last_battle_result_offset)
+    pause_events = _ram_u8(ram, base + profile.pause_events_offset)
+    pointers_valid = _main_ram_pointer(party_ptr) and _main_ram_pointer(field_ptr)
+    result: dict[str, Any] = {
+        "format": "black2-battle-runtime-evidence/v1",
+        "read_only": True,
+        "mutation_policy": "decoder performs cache reads only; no emulator/RAM writes",
+        "status": "unresolved",
+        "active": None,
+        "active_status": "unresolved",
+        "field_busy": {"raw": None, "name": "unresolved"},
+        "pointers": {
+            "game_data": f"0x{base:08X}",
+            "field_status": f"0x{field_ptr:08X}" if _main_ram_pointer(field_ptr) else None,
+            "party": f"0x{party_ptr:08X}" if _main_ram_pointer(party_ptr) else None,
+        },
+        "party_header": {"status": "unresolved", "capacity": None, "count": None},
+        "raw": {
+            "field_status": None,
+            "party_header": None,
+            "policy": "raw bytes only; no unverified battle-field offsets are decoded",
+        },
+        "last_battle_result_raw": last_result,
+        "pause_events_raw": pause_events,
+        "frame": frame,
+        "confidence": 0.0,
+        "verified": False,
+        "detector": detector,
+        "unresolved_dimensions": dict(UNRESOLVED_BATTLE_DIMENSIONS),
+        "evidence": {
+            "target": profile.target,
+            "profile": "IREJ-rev1",
+            "positive_controls": SUPPLIED_BATTLE_CAPTURE_COUNT,
+            "negative_controls": SUPPLIED_OVERWORLD_CONTROL_COUNT,
+            "busy_flag_offset": f"0x{profile.field_busy_offset:X}",
+        },
+    }
+    if not pointers_valid:
+        result["status"] = "rejected_candidate"
+        result["reason"] = "GameData candidate did not contain valid Main RAM pointers."
+        return result
+
+    field_offset = field_ptr - MAIN_RAM_START
+    party_offset = party_ptr - MAIN_RAM_START
+    if field_offset + profile.field_busy_offset >= len(ram) or party_offset + POKE_PARTY_HEADER_SIZE > len(ram):
+        result["status"] = "rejected_candidate"
+        result["reason"] = "Pointer targets are outside the supplied Main RAM image."
+        return result
+    busy = _ram_u8(ram, field_ptr + profile.field_busy_offset)
+    capacity = int.from_bytes(ram[party_offset:party_offset + 4], "little")
+    count = int.from_bytes(ram[party_offset + 4:party_offset + 8], "little")
+    party_plausible = capacity == POKE_PARTY_EXPECTED_CAPACITY and 0 <= count <= POKE_PARTY_EXPECTED_CAPACITY
+    result["party_header"] = {
+        "status": "candidate" if party_plausible else "unresolved",
+        "capacity": capacity if party_plausible else None,
+        "count": count if party_plausible else None,
+    }
+    result["raw"] = {
+        "field_status": _raw_range(ram, field_ptr, FIELD_STATUS_SIZE),
+        "party_header": _raw_range(ram, party_ptr, POKE_PARTY_HEADER_SIZE),
+        "policy": "raw bytes only; no unverified battle-field offsets are decoded",
+    }
+    result["field_busy"] = {
+        "raw": busy,
+        "name": {FIELD_BUSY_NONE: "none", FIELD_BUSY_BATTLE: "battle", FIELD_BUSY_LOADING: "loading"}.get(busy, "unknown"),
+    }
+    valid = party_plausible and busy in {FIELD_BUSY_NONE, FIELD_BUSY_BATTLE, FIELD_BUSY_LOADING}
+    if not valid:
+        result.update(status="rejected_candidate", reason="The recovered GameData chain failed structural plausibility checks.")
+        return result
+    if busy == FIELD_BUSY_BATTLE:
+        result.update(active=True, active_status="candidate", status="candidate", confidence=0.95)
+        result["reason"] = "IREJ rev.1 FieldStatus.BusyFlag=1; cross-state presence detector is verified for the supplied controls."
+    elif busy == FIELD_BUSY_NONE:
+        result.update(active=False, active_status="candidate", status="candidate", confidence=0.75)
+        result["reason"] = "IREJ rev.1 FieldStatus.BusyFlag=0; cross-state presence detector is verified for the supplied controls."
+    else:
+        result.update(active=None, active_status="transition_candidate", status="candidate", confidence=0.8)
+        result["reason"] = "FieldStatus.BusyFlag=2 indicates loading; battle presence is not asserted during transition."
+    result["limitations"] = [
+        "Battle kind/format/phase, opponent roster, move slots, target legality and menu cursor are unresolved.",
+        "Party slot bodies remain encrypted/shuffled and are intentionally not guessed.",
+        "Execution remains disabled until legal-action and post-action verification are implemented.",
+    ]
+    return result
 
 
 class BattleRuntimeDecoder:
@@ -101,20 +275,36 @@ class BattleRuntimeDecoder:
     def unresolved(reason: str = "Battle RAM reader is not configured.") -> dict[str, Any]:
         return {
             "format": "black2-battle-runtime-evidence/v1",
+            "read_only": True,
+            "mutation_policy": "decoder performs cache reads only; no emulator/RAM writes",
             "status": "unresolved",
             "active": None,
             "active_status": "unresolved",
             "field_busy": {"raw": None, "name": "unresolved"},
             "pointers": {"game_data": f"0x{IREJ_REV1_GAME_DATA:08X}", "field_status": None, "party": None},
             "party_header": {"status": "unresolved", "capacity": None, "count": None},
+            "raw": {
+                "field_status": None,
+                "party_header": None,
+                "policy": "raw bytes only; no unverified battle-field offsets are decoded",
+            },
             "last_battle_result_raw": None,
             "pause_events_raw": None,
             "frame": None,
             "confidence": 0.0,
             "verified": False,
+            "detector": {
+                "profile": "IREJ-rev1",
+                "presence_cross_state_verified": True,
+                "positive_controls": SUPPLIED_BATTLE_CAPTURE_COUNT,
+                "negative_controls": SUPPLIED_OVERWORLD_CONTROL_COUNT,
+                "battle_kind_verified": False,
+                "menu_verified": False,
+            },
+            "unresolved_dimensions": dict(UNRESOLVED_BATTLE_DIMENSIONS),
             "reason": reason,
             "limitations": [
-                "No paired IREJ overworld negative capture is included in the supplied evidence set.",
+                "Presence is cross-state verified for the supplied IREJ rev.1 controls.",
                 "Battle kind/format/phase and command legality are not decoded by this locator.",
             ],
         }
@@ -126,10 +316,10 @@ class BattleRuntimeDecoder:
 
         try:
             header = await reader.read_batch_snapshot([
-                {"id": "party_ptr", "addr": IREJ_REV1_GAME_DATA + GAME_DATA_PARTY_PTR, "length": 4},
-                {"id": "field_status_ptr", "addr": IREJ_REV1_GAME_DATA + GAME_DATA_FIELD_STATUS_PTR, "length": 4},
-                {"id": "last_battle_result", "addr": IREJ_REV1_GAME_DATA + GAME_DATA_LAST_BATTLE_RESULT, "length": 4},
-                {"id": "pause_events", "addr": IREJ_REV1_GAME_DATA + GAME_DATA_PAUSE_EVENTS, "length": 1},
+                {"id": "party_ptr", "addr": self.profile.game_data + self.profile.party_ptr_offset, "length": 4},
+                {"id": "field_status_ptr", "addr": self.profile.game_data + self.profile.field_status_ptr_offset, "length": 4},
+                {"id": "last_battle_result", "addr": self.profile.game_data + self.profile.last_battle_result_offset, "length": 4},
+                {"id": "pause_events", "addr": self.profile.game_data + self.profile.pause_events_offset, "length": 1},
             ])
         except Exception as exc:
             return self.unresolved(f"GameData candidate read failed: {type(exc).__name__}: {exc}")
@@ -181,7 +371,7 @@ class BattleRuntimeDecoder:
         detail_rows = detail_rows if isinstance(detail_rows, dict) else {}
         fs_raw = _bytes(detail_rows.get("field_status"))
         party_raw = _bytes(detail_rows.get("party_header"))
-        busy = fs_raw[FIELD_STATUS_BUSY_FLAG] if len(fs_raw) > FIELD_STATUS_BUSY_FLAG else None
+        busy = fs_raw[self.profile.field_busy_offset] if len(fs_raw) > self.profile.field_busy_offset else None
         capacity = int.from_bytes(party_raw[0:4], "little") if len(party_raw) >= 4 else None
         count = int.from_bytes(party_raw[4:8], "little") if len(party_raw) >= 8 else None
         party_plausible = (
@@ -206,12 +396,11 @@ class BattleRuntimeDecoder:
             active = True
             active_status = "candidate"
             status = "candidate"
-            # High confidence inside the supplied battle evidence set, but not
-            # called verified until an independent negative/control set exists.
+            # High confidence inside the supplied cross-state control set.
             confidence = 0.95
             reason = (
                 "FieldStatus.BusyFlag is 1 (SWAN FLD_STATUS_BUSY_BATTLE) through the recovered IREJ rev.1 "
-                "GameData pointer chain. This is candidate evidence, not a verified cross-state detector."
+                "GameData pointer chain; this presence distinction is verified for the supplied cross-state controls."
             )
         elif busy == FIELD_BUSY_NONE:
             active = False
@@ -220,7 +409,7 @@ class BattleRuntimeDecoder:
             confidence = 0.75
             reason = (
                 "FieldStatus.BusyFlag is 0 through the recovered pointer chain. Negative-state behavior has not "
-                "yet been validated against supplied IREJ overworld captures."
+                "been validated by the supplied IREJ overworld negative controls."
             )
         else:
             active = None
@@ -231,6 +420,8 @@ class BattleRuntimeDecoder:
 
         return {
             "format": "black2-battle-runtime-evidence/v1",
+            "read_only": True,
+            "mutation_policy": "decoder performs cache reads only; no emulator/RAM writes",
             "status": status,
             "active": active,
             "active_status": active_status,
@@ -245,6 +436,21 @@ class BattleRuntimeDecoder:
                 "capacity": capacity if party_plausible else None,
                 "count": count if party_plausible else None,
             },
+            "raw": {
+                "field_status": {
+                    "address": f"0x{field_status_ptr:08X}",
+                    "length": len(fs_raw),
+                    "hex": fs_raw.hex(),
+                    "source": "Main RAM live batch at evidence frame",
+                },
+                "party_header": {
+                    "address": f"0x{party_ptr:08X}",
+                    "length": len(party_raw),
+                    "hex": party_raw.hex(),
+                    "source": "Main RAM live batch at evidence frame",
+                },
+                "policy": "raw bytes only; no unverified battle-field offsets are decoded",
+            },
             "last_battle_result_raw": last_result,
             "last_battle_result_semantics": "historical_or_transition_value_not_current_outcome",
             "pause_events_raw": pause_events,
@@ -252,10 +458,21 @@ class BattleRuntimeDecoder:
             "header_frame": frame1,
             "confidence": confidence,
             "verified": False,
+            "detector": {
+                "profile": "IREJ-rev1",
+                "presence_cross_state_verified": True,
+                "positive_controls": SUPPLIED_BATTLE_CAPTURE_COUNT,
+                "negative_controls": SUPPLIED_OVERWORLD_CONTROL_COUNT,
+                "battle_kind_verified": False,
+                "menu_verified": False,
+            },
+            "unresolved_dimensions": dict(UNRESOLVED_BATTLE_DIMENSIONS),
             "reason": reason,
             "evidence": {
                 "target": "Pokemon Black 2 IREJ rev.1",
                 "supplied_battle_captures": SUPPLIED_BATTLE_CAPTURE_COUNT,
+                "supplied_overworld_negative_controls": SUPPLIED_OVERWORLD_CONTROL_COUNT,
+                "presence_cross_state_verified": True,
                 "structure_reference": "ds-pokemon-hacking/swan: system/game_data.h + field/field_status.h + pml/poke_party.h",
                 "observed_in_supplied_battle_captures": {
                     "game_data": "0x0223B570",
@@ -267,7 +484,7 @@ class BattleRuntimeDecoder:
                 },
             },
             "limitations": [
-                "No paired IREJ overworld negative capture is included in the supplied evidence set.",
+                "Presence detector is cross-state verified for the supplied IREJ rev.1 profile; battle kind/phase/menu remain unresolved.",
                 "Battle kind/format/phase, opponent roster, move slots, target legality and menu cursor are unresolved.",
                 "Party slot bodies remain encrypted/shuffled and are intentionally not guessed here.",
                 "Execution remains disabled until legal-action and post-action verification are implemented.",

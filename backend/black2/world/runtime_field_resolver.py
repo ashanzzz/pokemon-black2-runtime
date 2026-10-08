@@ -482,11 +482,29 @@ def _decode_actor_system(r: _Ram, address: int, field: int, mapper: int, player_
     return {
         "address": f"0x{address:08X}",
         "capacity": capacity,
+        "declared_count_raw": declared_count,
         "declared_count": declared_count,
         "resolved_count": len(actors),
+        "active_slot_count": len(actors),
         "actor_heap": f"0x{(heap or 0):08X}",
         "player_slot": player_index,
-        "structure_coherent": coherent and len(actors) == declared_count,
+        "structure_coherent": coherent,
+        "count_semantics": {
+            "declared_count_raw": declared_count,
+            "active_slot_count": len(actors),
+            "relationship_verified": False,
+            "reason": (
+                "ActorSystem.count is preserved as raw metadata; active slots are defined by "
+                "FieldActor.actor_system back-reference matches."
+            ),
+        },
+        "slot_scan": {
+            "capacity": capacity,
+            "backref_matches": len(actors),
+            "player_slot": player_index,
+            "highest_matching_slot": max((a["slot"] for a in actors), default=None),
+            "matching_slots": [a["slot"] for a in actors],
+        },
         "actors": actors,
         "zone_consensus": {
             "value": zone_value,
@@ -931,8 +949,86 @@ class RuntimeFieldLocator:
         if not preserve_lifecycle_retry:
             self.lifecycle_rediscovery_pending = False
 
+    async def _discover_fast_gamedata(self, reader: MemoryReader) -> dict[str, Any] | None:
+        """Fast-path locator bootstrap via authoritative GameData -> ActorSystem pointer chain.
+
+        In Pokemon Black 2 (IREJ rev.1), GameData resides persistently at 0x0223B570.
+        When the player is in an active Field scene, its pointer graph links
+        directly to ActorSystem, Field, G3DMapper, FieldPlayer, Core and Actor.
+        Validating these 8 interconnected pointers takes <15ms (1 batch read)
+        and bypasses the heavy 4 MiB RAM dump whenever the chain is already coherent.
+        """
+        try:
+            # Batch read: GameData header (at 0x0223B570), reading pointers at +0x1A8
+            gd_bytes = await reader.read_bytes(0x0223B570 - ARM9_BASE + 0x1A8, 4, "Main RAM")
+            if len(gd_bytes) != 4:
+                return None
+            actor_sys = int.from_bytes(bytes(gd_bytes), "little")
+            if not (ARM9_BASE <= actor_sys < ARM9_BASE + MAIN_RAM_SIZE):
+                return None
+
+            # Read ActorSystem header (0x50 bytes)
+            sys_bytes = await reader.read_bytes(actor_sys - ARM9_BASE, 0x50, "Main RAM")
+            if len(sys_bytes) < 0x48:
+                return None
+            mapper = int.from_bytes(bytes(sys_bytes[0x38:0x3C]), "little")
+            field = int.from_bytes(bytes(sys_bytes[0x40:0x44]), "little")
+            if not (ARM9_BASE <= mapper < ARM9_BASE + MAIN_RAM_SIZE and ARM9_BASE <= field < ARM9_BASE + MAIN_RAM_SIZE):
+                return None
+
+            # Read Field header (0xA0 bytes) to get player pointer at +0x94
+            f_bytes = await reader.read_bytes(field - ARM9_BASE + 0x94, 4, "Main RAM")
+            if len(f_bytes) != 4:
+                return None
+            player = int.from_bytes(bytes(f_bytes), "little")
+            if not (ARM9_BASE <= player < ARM9_BASE + MAIN_RAM_SIZE):
+                return None
+
+            # Read FieldPlayer struct (0x10 bytes) for core and grid
+            p_bytes = await reader.read_bytes(player - ARM9_BASE, 0x10, "Main RAM")
+            if len(p_bytes) < 0x10:
+                return None
+            core = int.from_bytes(bytes(p_bytes[0x04:0x08]), "little")
+            grid = int.from_bytes(bytes(p_bytes[0x08:0x0C]), "little")
+            if not (ARM9_BASE <= core < ARM9_BASE + MAIN_RAM_SIZE and ARM9_BASE <= grid < ARM9_BASE + MAIN_RAM_SIZE):
+                return None
+
+            # Read FieldPlayerCore (0x24 bytes) for state and player_actor
+            c_bytes = await reader.read_bytes(core - ARM9_BASE, 0x24, "Main RAM")
+            if len(c_bytes) < 0x20:
+                return None
+            state = int.from_bytes(bytes(c_bytes[0x0C:0x10]), "little")
+            player_actor = int.from_bytes(bytes(c_bytes[0x1C:0x20]), "little")
+            if not (ARM9_BASE <= state < ARM9_BASE + MAIN_RAM_SIZE and ARM9_BASE <= player_actor < ARM9_BASE + MAIN_RAM_SIZE):
+                return None
+
+            self.addresses = {
+                "field": field,
+                "mapper": mapper,
+                "player": player,
+                "core": core,
+                "grid": grid,
+                "state": state,
+                "player_actor": player_actor,
+                "actor_system": actor_sys,
+            }
+            sample = await self._sample_cached(reader)
+            if sample is not None and sample.get("status") in {"resolved", "candidate"}:
+                self.discovery_confidence = str(sample.get("confidence", "candidate"))
+                self.last_failure_reason = ""
+                return sample
+            self.addresses = {}
+            return None
+        except Exception:
+            self.addresses = {}
+            return None
+
     async def discover(self, reader: MemoryReader) -> dict[str, Any]:
         self.last_discovery_attempt = time.monotonic()
+        fast_result = await self._discover_fast_gamedata(reader)
+        if fast_result is not None:
+            return fast_result
+
         ram = await read_main_ram(reader)
         result = resolve_runtime_field_from_ram(ram)
         if result.get("status") not in {"resolved", "candidate"}:
@@ -1072,6 +1168,55 @@ class RuntimeFieldLocator:
         grid_command = u32("grid", PLAYER_GRID["last_command"])
         ex_state = u32("state", PLAYER_STATE["ex_state"])
 
+        # Props is a child of the live Mapper and contains the runtime
+        # day-part/season selectors used by the field renderer.  The pointer
+        # is discovered from the already validated mapper blob, then sampled
+        # in one tiny follow-up range.  A missing or incoherent Props object
+        # must never invalidate an otherwise usable player sample.
+        props_payload: dict[str, Any] = {}
+        prop_address = u32("mapper", MAPPER["prop_system"])
+        prop_valid = (
+            isinstance(prop_address, int)
+            and ARM9_BASE <= prop_address < ARM9_BASE + MAIN_RAM_SIZE
+            and prop_address % 4 == 0
+        )
+        if prop_valid:
+            try:
+                prop_snapshot = await reader.read_batch_snapshot([{
+                    "id": "props", "addr": prop_address, "length": 0x20,
+                }])
+                prop_results = prop_snapshot.get("results", {}) if isinstance(prop_snapshot, dict) else {}
+                prop_frame = int(prop_snapshot.get("frame", frame)) if isinstance(prop_snapshot, dict) else frame
+                prop_blob = _result_bytes(prop_results.get("props", {}))
+                if len(prop_blob) >= 0x16:
+                    mapper_backref = int.from_bytes(prop_blob[PROP_SYSTEM["mapper"]:PROP_SYSTEM["mapper"] + 4], "little")
+                    if mapper_backref == a["mapper"]:
+                        props_payload = {
+                            "status": "probable",
+                            "address": f"0x{prop_address:08X}",
+                            "day_part": int.from_bytes(prop_blob[PROP_SYSTEM["day_part"]:PROP_SYSTEM["day_part"] + 4], "little"),
+                            "previous_day_part": int.from_bytes(prop_blob[PROP_SYSTEM["previous_day_part"]:PROP_SYSTEM["previous_day_part"] + 4], "little"),
+                            "day_part_changed": int.from_bytes(prop_blob[PROP_SYSTEM["day_part_changed"]:PROP_SYSTEM["day_part_changed"] + 4], "little"),
+                            "season": prop_blob[0x15],
+                            "source": "FieldPropSystem pointer/back-reference",
+                            "source_frame": prop_frame,
+                            "semantic_status": "raw enum values; day-part and season labels require paired time-of-day validation",
+                        }
+                    else:
+                        props_payload = {
+                            "status": "unresolved",
+                            "address": f"0x{prop_address:08X}",
+                            "reason": "FieldPropSystem mapper back-reference disagrees with cached Mapper",
+                            "source_frame": prop_frame,
+                        }
+            except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError, TypeError, IndexError):
+                props_payload = {
+                    "status": "unresolved",
+                    "address": f"0x{prop_address:08X}",
+                    "reason": "FieldPropSystem follow-up sample failed",
+                    "source_frame": frame,
+                }
+
         if grid_status == 7 or grid_command == 9:
             phase = "Fall"
         elif grid_status in (4, 5, 6) or grid_command in (6, 7, 8):
@@ -1189,6 +1334,11 @@ class RuntimeFieldLocator:
                     "y": s8("actor", ACTOR["model_pos_offset_y"]),
                     "z": s8("actor", ACTOR["model_pos_offset_z"]),
                 },
+            },
+            "props": props_payload or {
+                "status": "unresolved",
+                "reason": "FieldPropSystem pointer is unavailable in the current Mapper sample",
+                "source_frame": frame,
             },
             "mapper": {
                 "matrix_width": width,

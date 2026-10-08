@@ -367,7 +367,17 @@ class EncounterRegionService:
         for cell in matrix.cells():
             owner = _int(cell.get("zone_id"))
             chunk = _int(cell.get("chunk_id"))
-            if owner is None or chunk is None or chunk == 0xFFFF:
+            # Empty Matrix cells use 0xFFFFFFFF.  Treat them as unowned
+            # instead of feeding them into ROM zone lookup; otherwise the
+            # connected-region endpoint can fail for an otherwise valid
+            # exterior Zone when it follows the Matrix ownership graph.
+            zone_count = _int(getattr(self.provider.rom, "zone_count", None))
+            if (
+                owner is None
+                or (zone_count is not None and not 0 <= owner < zone_count)
+                or chunk is None
+                or chunk == 0xFFFF
+            ):
                 continue
             ownership[(int(cell["x"]), int(cell["y"]))] = owner
         graph: dict[int, set[int]] = {}

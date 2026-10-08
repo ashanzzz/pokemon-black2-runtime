@@ -95,6 +95,22 @@ def test_interaction_task_turns_in_place_after_reaching_stand_tile(tmp_path: Pat
         latest = player(11, 0, 6, face_dir=2)
         graph.observe_player(latest)
 
+        modal = {"screen_type": "OVERWORLD", "dialogue": False}
+
+        def control_snapshot():
+            return {
+                "runtime": {"status": "ready"},
+                "semantic": {
+                    "map_loaded": True,
+                    "ready_for_input": True,
+                    "context": {
+                        "screen_type": modal["screen_type"],
+                        "can_move_player": not modal["dialogue"],
+                        "is_dialogue_active": modal["dialogue"],
+                    }
+                },
+            }
+
         class Bridge:
             is_connected = True
 
@@ -107,6 +123,9 @@ def test_interaction_task_turns_in_place_after_reaching_stand_tile(tmp_path: Pat
                 assert buttons in (["Up"], ["A"])
                 latest["orientation"] = {"face_dir_raw": 0, "facing": "North"}
                 latest["frame"] += frames
+                if buttons == ["A"]:
+                    modal["screen_type"] = "DIALOGUE_ACTIVE"
+                    modal["dialogue"] = True
                 return {"queued": True}
 
             async def clear_inputs(self):
@@ -116,7 +135,7 @@ def test_interaction_task_turns_in_place_after_reaching_stand_tile(tmp_path: Pat
         bridge = Bridge()
         planner = NavigationPlanService(graph, lambda: latest, static_provider=RoomProvider())
         tasks = NavigationTaskService(
-            planner, bridge, lambda: latest, control_sample=controls,
+            planner, bridge, lambda: latest, control_sample=control_snapshot,
             poll_seconds=0.001, step_timeout_seconds=0.03,
         )
         interaction = {
@@ -132,7 +151,9 @@ def test_interaction_task_turns_in_place_after_reaching_stand_tile(tmp_path: Pat
         finished = tasks.get(started["task_id"])
         assert finished["status"] == "succeeded", finished["stop_reason"]
         assert finished["arrival"]["interaction"]["facing"] == "North"
-        assert bridge.turns == [(["Up"], 1), (["A"], 1)]
+        assert bridge.turns == [(["Up"], 1), (["A"], 8)]
+        assert finished["arrival"]["interaction_observation"]["observed"] is True
+        assert finished["arrival"]["interaction_input"]["hold_frames"] == 8
         assert bridge.clear_count == 1
 
     asyncio.run(scenario())

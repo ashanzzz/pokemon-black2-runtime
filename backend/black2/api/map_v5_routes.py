@@ -320,7 +320,7 @@ async def v6_scene_current(
 async def v6_scene_connected_current(
     force_identity: bool = False,
     refresh_visual: bool = False,
-    max_zones: int = 24,
+    max_zones: int = 8,
     reader: MemoryReader = Depends(_map_reader),
 ) -> dict[str, Any]:
     """Render the exact same-Matrix exterior Zone component around the player."""
@@ -345,7 +345,7 @@ async def v6_scene_connected_current(
 
 
 @router.get("/api/v1/map/v6/scene/connected/zone/{zone_id}")
-async def v6_scene_connected_zone(zone_id: int, max_zones: int = 24) -> dict[str, Any]:
+async def v6_scene_connected_zone(zone_id: int, max_zones: int = 8) -> dict[str, Any]:
     """Read-only stitched preview for one exterior same-Matrix Zone component."""
     *_prefix, scene = _services()
     try:
@@ -372,7 +372,7 @@ async def v6_scene_connected_zone(zone_id: int, max_zones: int = 24) -> dict[str
 
 
 @router.get("/api/v1/map/v6/world/cluster/{zone_id}")
-async def v6_world_cluster(zone_id: int, max_zones: int = 24) -> dict[str, Any]:
+async def v6_world_cluster(zone_id: int, max_zones: int = 8) -> dict[str, Any]:
     """Machine-readable whole-map bundle: stitched static scene plus connector graph."""
     *_prefix, scene = _services()
     graph_service = _graph_service()
@@ -442,6 +442,29 @@ async def v6_actors_live(force: bool = False, reader: MemoryReader = Depends(_ma
     try:
         return await scene.runtime_actors(reader, force=force)
     except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError) as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+
+
+@router.get("/api/v1/map/v6/npcs/merged")
+async def v6_npcs_merged(
+    zone_ids: str,
+    reader: MemoryReader = Depends(_map_reader),
+) -> dict[str, Any]:
+    """Return current-scene ROM NPC candidates with conservative live bindings."""
+    values: list[int] = []
+    for token in str(zone_ids).split(","):
+        try:
+            zone_id = int(token.strip())
+        except ValueError:
+            continue
+        if zone_id >= 0 and zone_id not in values:
+            values.append(zone_id)
+    if not values:
+        raise HTTPException(status_code=422, detail="zone_ids must contain at least one non-negative Zone ID")
+    *_prefix, scene = _services()
+    try:
+        return await scene.merged_npcs(reader, zone_ids=values)
+    except (ConnectionError, TimeoutError, OSError, RuntimeError, ValueError, IndexError) as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
 
 

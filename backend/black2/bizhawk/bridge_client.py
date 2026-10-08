@@ -105,10 +105,24 @@ class BridgeClient:
         """
         return await self.transport.request("memory.read_batch", {"ranges": ranges})
 
-    async def press_buttons(self, buttons: Union[str, List[str]], frames: int = 4) -> Dict[str, Any]:
+    async def press_buttons(
+        self,
+        buttons: Union[str, List[str]],
+        frames: int = 4,
+        stop_when: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Queue input with an optional emulator-side coordinate stop condition.
+
+        ``stop_when`` is evaluated inside the BizHawk Lua frame loop, not by
+        wall-clock polling in Python. This keeps navigation bounded when the
+        emulator is running in turbo/fast-forward mode.
+        """
         if isinstance(buttons, str):
             buttons = [buttons]
-        return await self.transport.request("input.press", {"buttons": buttons, "frames": frames})
+        payload: Dict[str, Any] = {"buttons": buttons, "frames": frames}
+        if stop_when is not None:
+            payload["stop_when"] = stop_when
+        return await self.transport.request("input.press", payload)
 
     async def touch(self, x: int, y: int, frames: int = 4) -> Dict[str, Any]:
         return await self.transport.request("input.touch", {"x": x, "y": y, "frames": frames})

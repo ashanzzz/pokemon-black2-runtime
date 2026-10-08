@@ -87,7 +87,7 @@ rejected as the active printer for this run.
 ## Rejected historical PlayerActor candidates
 
 At the earlier captured state, full Main-RAM reverse-pointer searches found
-zero pointers to `0x0223DE00` and to the position mirror `0x02143620`. Neither
+zero pointers to the historical candidates `0x0223DE00` and `0x02143620`. Neither
 is a PlayerActor root and neither may be used by the Runtime API. A broad SWAN
 FieldActor signature scan produced 3381 unvalidated matches; those are not
 3381 individually proven actors.

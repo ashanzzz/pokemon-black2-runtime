@@ -1,8 +1,9 @@
 """Bounded AI map views, using the same strict ROM readers as the 3D scene."""
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import asdict
-from functools import lru_cache
+import threading
 from typing import Any
 
 from .gen5_rom_map import MATRIX_NONE, Gen5RomMap
@@ -10,16 +11,48 @@ from .gen5_rom_map import MATRIX_NONE, Gen5RomMap
 
 GRID_SPACE = "gen5-field-grid-v1"
 CHUNK_TILES = 32
+TERRAIN_GRID_CACHE_CAP = 32
 
 
 class SemanticWorldService:
     def __init__(self, rom: Gen5RomMap) -> None:
         self.rom = rom
+        self._terrain_lock = threading.RLock()
+        self._terrain_grids: OrderedDict[int, tuple[Any, ...]] = OrderedDict()
 
-    @lru_cache(maxsize=256)
     def terrain_grids(self, chunk_id: int):
+        chunk_id = int(chunk_id)
+        with self._terrain_lock:
+            cached = self._terrain_grids.get(chunk_id)
+            if cached is not None:
+                self._terrain_grids.move_to_end(chunk_id)
+                return cached
+
         from .tile_semantics import decode_chunk_terrain
-        return decode_chunk_terrain(self.rom.chunk(chunk_id))
+        decoded = decode_chunk_terrain(self.rom.chunk(chunk_id))
+        with self._terrain_lock:
+            cached = self._terrain_grids.get(chunk_id)
+            if cached is not None:
+                self._terrain_grids.move_to_end(chunk_id)
+                return cached
+            self._terrain_grids[chunk_id] = decoded
+            self._terrain_grids.move_to_end(chunk_id)
+            while len(self._terrain_grids) > TERRAIN_GRID_CACHE_CAP:
+                self._terrain_grids.popitem(last=False)
+            return decoded
+
+    def cache_status(self) -> dict[str, Any]:
+        with self._terrain_lock:
+            terrain = {
+                "entries": len(self._terrain_grids),
+                "cap": TERRAIN_GRID_CACHE_CAP,
+                "chunk_ids": list(self._terrain_grids),
+            }
+        return {
+            "format": "black2-semantic-world-cache-status/v1",
+            "terrain_grids": terrain,
+            "rom": self.rom.cache_status() if hasattr(self.rom, "cache_status") else None,
+        }
 
     def zone(self, zone_id: int) -> dict[str, Any]:
         header = self.rom.zone(zone_id)
@@ -107,4 +140,11 @@ class SemanticWorldService:
             "width": 2 * radius + 1, "height": 2 * radius + 1,
             "order": "row-major, x increases east, z increases south",
             "tiles": tiles,
+            "view": {
+                "kind": "static_rom_window",
+                "is_current_nds_view": False,
+                "screen_verified": False,
+                "memory_backed": False,
+                "policy": "This is a bounded static ROM query, not a reconstruction of the current NDS camera view or an AI memory snapshot.",
+            },
         }
