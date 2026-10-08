@@ -106,7 +106,7 @@ MAIN_RAM_END = 0x02400000
 # bounded: a whole-RAM scan belongs to explicit evidence export, not to every
 # /battle/state poll.
 BATTLE_POKE_HEAP_START = 0x0225B000
-BATTLE_POKE_HEAP_LENGTH = 0x1000
+BATTLE_POKE_HEAP_LENGTH = 0x2800
 # A live trainer battle allocates its setup object and UTF-16 string buffer in
 # this bounded Main-RAM window.  This is intentionally a second, small read:
 # it is not a whole-RAM text search and is sampled only while battle presence
@@ -807,13 +807,16 @@ class BattleIdentityDecoder:
 
         player_groups = [group for group in groups if group.get("species_id") in player_ids]
         opponent_groups = [group for group in groups if group.get("species_id") not in player_ids]
-        if len(player_groups) == 1 and len(opponent_groups) >= 1:
-            player_active = self._project_group(player_groups[0])
-            opponent_party = [self._project_group(group) for group in opponent_groups]
-            opponent_active = opponent_party[0] if opponent_party else None
+
+        if opponent_groups:
+            # Clean separation: species not in player's party are opponents
+            opponent_party = [self._project_group(g) for g in opponent_groups]
+            opponent_active = opponent_party[0]
+            player_active_group = next((g for g in player_groups if g.get("species_id") == player_lead_species), None) or (player_groups[0] if player_groups else None)
+            player_active = self._project_group(player_active_group) if player_active_group else None
             side_status = "candidate"
         elif player_lead_species is not None and len(groups) >= 2:
-            # When opponent species is already present in player's party (e.g. duplicate species)
+            # Fallback when opponent species happens to be in player's party
             player_lead_group = next((g for g in groups if g.get("species_id") == player_lead_species), None)
             other_groups = [g for g in groups if g is not player_lead_group]
             if player_lead_group is not None and other_groups:
