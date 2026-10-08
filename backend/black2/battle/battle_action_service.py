@@ -169,6 +169,22 @@ class BattleActionService:
             target_move = moves[move_slot - 1]
 
         before_pp = target_move.get("current_pp", 0) if isinstance(target_move, dict) else 0
+        if before_pp <= 0:
+            move_name = target_move.get("name") if isinstance(target_move, dict) else f"Move #{move_slot}"
+            max_pp_val = target_move.get("max_pp", 0) if isinstance(target_move, dict) else 0
+            return {
+                "format": "black2-battle-action-execution/v1",
+                "status": "rejected",
+                "executed": False,
+                "reason": {
+                    "code": "MOVE_PP_EXHAUSTED",
+                    "message": f"Move slot {move_slot}「{move_name}」PP is exhausted (0/{max_pp_val}). Action aborted to prevent a wasted turn.",
+                },
+                "move_slot": move_slot,
+                "current_pp": 0,
+                "max_pp": max_pp_val,
+                "request_id": request_id,
+            }
         opp_hp_before = (opp_data.get("active") or opp_data).get("current_hp", 0)
 
         # 2. Issue input
