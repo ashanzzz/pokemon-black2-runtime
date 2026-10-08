@@ -1432,6 +1432,15 @@ async def post_nav_navigate_to(req: NavigateToRequest):
 # Serve Frontend Web UI
 FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../frontend"))
 CAPTURE_DIR = DeveloperTestWorkbench._capture_dir()
+@app.middleware("http")
+async def add_no_cache_header(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/frontend/") or request.url.path in ("/v2", "/v1", "/workbench"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
 if os.path.exists(FRONTEND_DIR):
     app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="assets")
