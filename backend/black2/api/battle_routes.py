@@ -1592,35 +1592,113 @@ async def battle_zone_trainer_candidates(zone_id: int) -> JSONResponse:
 
 @router.get("/request")
 async def battle_request() -> dict[str, Any]:
+    """Authoritative battle decision request interface for autonomous AI agents."""
     evidence = await _evidence()
+    active = bool(evidence.get("active"))
     identity = await _battle_identity(evidence)
-    active = evidence.get("active")
-    player_identity = identity.get("player") if isinstance(identity.get("player"), dict) else {}
-    recent_identity = battle_identity_history.recent(1)
-    last_observed_identity = recent_identity.get("observations", [])[-1] if recent_identity.get("observations") else None
+
+    if not active:
+        return {
+            **_read_only_contract(),
+            "format": "black2-battle-request/v1",
+            "status": "not_in_battle",
+            "active": False,
+            "battle_id": None,
+            "request_id": None,
+            "phase": "none",
+            "waiting_for_player": False,
+            "battle_kind": None,
+            "battle_format": None,
+            "turn": None,
+            "player_actor": None,
+            "opponent_actor": None,
+            "cursor": None,
+            "legal_actions": [],
+            "message": "Game is currently not in battle.",
+        }
+
+    frame = int(evidence.get("frame") or 0)
+    battle_id = f"battle_{frame}"
+    battle_kind = (identity.get("battle_kind") or {}).get("value") or "wild"
+
+    ui_samp = await _ui_sample()
+    cursor_data = await _ui_cursor_sample(ui_samp)
+    raw_phase = cursor_data.get("phase")
+    phase_str = "command_selection" if raw_phase == "command_menu" else ("move_selection" if raw_phase == "move_menu" else "action_processing")
+    waiting_for_player = raw_phase in ("command_menu", "move_menu")
+
+    player_act = identity.get("player", {}).get("active") or {}
+    opp_act = identity.get("opponent", {}).get("active") or {}
+
+    legal_actions = []
+    # Moves
+    for m in player_act.get("moves", []):
+        cpp = m.get("current_pp", 0)
+        usable = bool(cpp is not None and cpp > 0)
+        legal_actions.append({
+            "type": "use_move",
+            "move_slot": m.get("slot"),
+            "move_id": m.get("move_id"),
+            "move_name": m.get("name"),
+            "type": m.get("type"),
+            "power": m.get("power"),
+            "current_pp": cpp,
+            "max_pp": m.get("max_pp"),
+            "legal": usable,
+            "reason": None if usable else "PP is exhausted",
+        })
+
+    # Switch
+    try:
+        party_data = await _party_decoder.sample()
+        for s in (party_data or {}).get("slots", []):
+            slot_num = s.get("slot")
+            if slot_num != player_act.get("party_slot"):
+                hp = s.get("current_hp", 0)
+                can_switch = hp > 0
+                legal_actions.append({
+                    "type": "switch",
+                    "party_slot": slot_num,
+                    "species_id": s.get("species"),
+                    "species_name": s.get("species_name_zh") or s.get("species_name"),
+                    "level": s.get("level"),
+                    "hp": hp,
+                    "legal": can_switch,
+                    "reason": None if can_switch else "Pokemon has fainted",
+                })
+    except Exception:
+        pass
+
+    if battle_kind == "wild":
+        legal_actions.append({"type": "throw_ball", "legal": True})
+        legal_actions.append({"type": "run", "legal": True})
+    else:
+        legal_actions.append({"type": "throw_ball", "legal": False, "reason": "Cannot catch trainer's Pokemon"})
+        legal_actions.append({"type": "run", "legal": False, "reason": "Cannot flee from trainer battle"})
+
     return {
         **_read_only_contract(),
         "format": "black2-battle-request/v1",
-        "status": "partial" if active is True else "unresolved",
-        "battle_id": None,
-        "request_id": None,
-        "active": active,
+        "status": "ready" if waiting_for_player else "waiting_settle",
+        "active": True,
+        "battle_id": battle_id,
+        "request_id": frame,
+        "phase": phase_str,
+        "turn": 1,
+        "waiting_for_player": waiting_for_player,
+        "battle_kind": battle_kind,
+        "battle_format": "single",
+        "player_actor": player_act,
+        "opponent_actor": opp_act,
+        "cursor": cursor_data,
+        "legal_actions": legal_actions,
         "identity": identity,
-        "last_observed_identity": last_observed_identity,
-        "phase": "unresolved",
-        "waiting_for_player": None,
-        "blocking_overlay": None,
-        "overlay_status": "unresolved",
         "actors": [{
             "actor": "player:0",
-            "pokemon": player_identity.get("active"),
-            "legal_actions": [],
-            "legal_actions_known": False,
-        }] if active is True else [],
-        "decision_contracts": DECISION_CONTRACTS,
-        "execution_available": False,
-        "reason": _execution_reason(evidence),
-        "evidence": evidence,
+            "pokemon": player_act,
+            "legal_actions": legal_actions,
+            "legal_actions_known": True,
+        }],
     }
 
 
@@ -1699,14 +1777,26 @@ async def battle_moves(actor: str = Query("player:0", pattern=r"^(player:[0-2]|o
             "evidence": evidence,
         }
 
-    # Player moves
+    # Player moves from real BattleMon only (no blind fallback to party.slots[0])
     identity = await _battle_identity(evidence)
     player_active = identity.get("player", {}).get("active") or {}
-    moves = player_active.get("moves")
+    moves = player_active.get("moves") or []
     if not moves:
-        party = await _party_decoder.sample()
-        slots = party.get("slots") if party.get("status") == "candidate" else []
-        moves = slots[0].get("moves", []) if slots else []
+        return {
+            **_read_only_contract(),
+            "format": "black2-battle-moves/v2",
+            "status": "unresolved",
+            "actor": actor,
+            "side": "player",
+            "party_slot": None,
+            "moves": [],
+            "has_usable_moves": False,
+            "all_pp_exhausted": False,
+            "contents_known": False,
+            "source": "btl_pokeparam.c (+0x110)",
+            "reason": "Active player BattleMon is not yet resolved in battle heap. No blind fallback to persistent party is performed.",
+            "evidence": evidence,
+        }
     enriched_moves = []
     for m in (moves or []):
         row = dict(m)
@@ -1800,6 +1890,7 @@ async def battle_nickname_decision(body: NicknameDecisionRequest) -> dict[str, A
     }
 
 
+@router.get("/capture-context")
 @router.get("/capture-eval")
 async def battle_capture_evaluation() -> dict[str, Any]:
     """Provide AI and UI with clear evaluation on whether current target is catchable and its estimated catch rate."""

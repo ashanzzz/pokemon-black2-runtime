@@ -1,80 +1,12 @@
-"""REST endpoints for precondition-gated semantic actions."""
-from __future__ import annotations
+﻿# 1. Update agent_action_routes.py with /observation
+with open("backend/black2/api/agent_action_routes.py", "r", encoding="utf-8") as f:
+    text = f.read()
 
-from typing import Any
-
-from fastapi import APIRouter, Header, HTTPException, Query
-from pydantic import BaseModel, ConfigDict, Field
-
-from ..actions.prepared_actions import PreparedActionService
-
-
-router = APIRouter(prefix="/api/v1/agent", tags=["agent-actions"])
-_service: PreparedActionService | None = None
-
-
-def configure_prepared_action_routes(service: PreparedActionService) -> None:
-    global _service
-    _service = service
-
-
-class PreparedActionRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    kind: str = Field(min_length=1, max_length=80)
-    command: dict[str, Any]
-    correlation_id: str | None = Field(default=None, max_length=200)
-    preconditions: dict[str, Any] = Field(default_factory=dict)
-    execute_when: dict[str, Any] = Field(default_factory=dict)
-    ttl_frames: int | None = Field(default=None, ge=1, le=100000)
-    ttl_seconds: float | None = Field(default=None, gt=0, le=3600)
-
-
-def _configured() -> PreparedActionService:
-    if _service is None:
-        raise HTTPException(status_code=503, detail="Prepared action service is not configured.")
-    return _service
-
-
-@router.post("/actions", status_code=202)
-async def submit_prepared_action(
-    body: PreparedActionRequest,
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
-) -> dict[str, Any]:
-    try:
-        return await _configured().submit(
-            kind=body.kind,
-            command=body.command,
-            preconditions=body.preconditions,
-            execute_when=body.execute_when,
-            correlation_id=body.correlation_id,
-            ttl_frames=body.ttl_frames,
-            ttl_seconds=body.ttl_seconds,
-            idempotency_key=idempotency_key,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@router.get("/actions/{action_id}")
-async def prepared_action_status(action_id: str) -> dict[str, Any]:
-    try:
-        return _configured().get(action_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Prepared action was not found.") from exc
-
-
-@router.post("/actions/{action_id}/cancel")
-async def cancel_prepared_action(action_id: str) -> dict[str, Any]:
-    try:
-        return await _configured().cancel(action_id)
-    except KeyError as exc:
-        raise HTTPException(status_code=404, detail="Prepared action was not found.") from exc
-
+observation_code = """
 
 @router.get("/observation")
 async def get_agent_observation() -> dict[str, Any]:
-    """Unified single-point observation API for autonomous AI agents (Design Doc Section 9)."""
+    \"\"\"Unified single-point observation API for autonomous AI agents (Design Doc Section 9).\"\"\"
     import time
     from ..world.runtime_player_state import player_runtime_service
     from ..world.player_coordinates import canonical_grid_player
@@ -194,3 +126,85 @@ async def get_agent_observation() -> dict[str, Any]:
         "inventory_summary": inv_summary,
         "available_actions": available_actions,
     }
+"""
+
+if "@router.get(\"/observation\")" not in text:
+    text += observation_code
+    with open("backend/black2/api/agent_action_routes.py", "w", encoding="utf-8") as f:
+        f.write(text)
+    print("Added /api/v1/agent/observation to agent_action_routes.py!")
+else:
+    print("/observation already in agent_action_routes.py")
+
+# 2. Update app.py with /api/v1/input/* and /api/v1/ui/state
+with open("backend/black2/api/app.py", "r", encoding="utf-8") as f:
+    app_text = f.read()
+
+input_code = """
+class GenericInputPressRequest(BaseModel):
+    button: str = Field(..., description="Button name (A, B, X, Y, Up, Down, Left, Right, Start, Select, L, R)")
+    frames: int = Field(4, ge=1, le=120, description="Hold frames")
+
+class GenericInputTouchRequest(BaseModel):
+    x: int = Field(..., ge=0, le=255, description="Touch screen X coordinate (0..255)")
+    y: int = Field(..., ge=0, le=191, description="Touch screen Y coordinate (0..191)")
+    frames: int = Field(6, ge=1, le=120, description="Hold frames")
+
+@app.post("/api/v1/input/press")
+async def post_v1_input_press(req: GenericInputPressRequest):
+    \"\"\"Standard low-level button press actuator for external AI fallback.\"\"\"
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await client.press_buttons([req.button], frames=req.frames)
+
+@app.post("/api/v1/input/hold")
+async def post_v1_input_hold(req: GenericInputPressRequest):
+    \"\"\"Standard low-level button hold actuator for external AI fallback.\"\"\"
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await client.press_buttons([req.button], frames=max(req.frames, 16))
+
+@app.post("/api/v1/input/touch")
+async def post_v1_input_touch(req: GenericInputTouchRequest):
+    \"\"\"Standard low-level touch screen actuator for external AI fallback.\"\"\"
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await client.touch_screen(req.x, req.y, frames=req.frames)
+
+@app.get("/api/v1/ui/state")
+async def get_v1_ui_state():
+    \"\"\"Standard UI screen state and waiting status query (Design Doc Section 11).\"\"\"
+    from .battle_routes import _evidence, _ui_sample, _ui_cursor_sample
+    ev = await _evidence()
+    in_battle = bool(ev.get("active"))
+    if in_battle:
+        ui_samp = await _ui_sample()
+        cursor = await _ui_cursor_sample(ui_samp)
+        raw_phase = cursor.get("phase")
+        return {
+            "format": "black2-ui-state/v1",
+            "screen": "BATTLE",
+            "phase": raw_phase or "command_menu",
+            "waiting_for_input": raw_phase in ("command_menu", "move_menu"),
+            "can_move_player": False,
+            "cursor": cursor,
+        }
+    return {
+        "format": "black2-ui-state/v1",
+        "screen": "OVERWORLD",
+        "phase": "field_idle",
+        "waiting_for_input": True,
+        "can_move_player": True,
+        "cursor": None,
+    }
+"""
+
+if "@app.post(\"/api/v1/input/press\")" not in app_text:
+    target_pos = 'configure_prepared_action_routes(prepared_action_service)'
+    assert target_pos in app_text
+    app_text = app_text.replace(target_pos, input_code + "\n" + target_pos)
+    with open("backend/black2/api/app.py", "w", encoding="utf-8") as f:
+        f.write(app_text)
+    print("Added /api/v1/input/* and /api/v1/ui/state to app.py!")
+else:
+    print("/api/v1/input/* already present in app.py")

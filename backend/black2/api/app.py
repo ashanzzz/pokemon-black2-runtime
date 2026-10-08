@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ..bizhawk.process_probe import dismiss_bizhawk_popup, probe_bizhawk_process, public_bizhawk_popup
 from ..bizhawk.socket_transport import SocketTransport
@@ -316,6 +316,64 @@ async def global_player_fly_locked(
 @app.get("/api/v1/player/fly/evaluate")
 async def global_player_fly_evaluate(zone_id: Optional[int] = None):
     return await navigation_fast_travel_evaluate(zone_id)
+
+
+class GenericInputPressRequest(BaseModel):
+    button: str = Field(..., description="Button name (A, B, X, Y, Up, Down, Left, Right, Start, Select, L, R)")
+    frames: int = Field(4, ge=1, le=120, description="Hold frames")
+
+class GenericInputTouchRequest(BaseModel):
+    x: int = Field(..., ge=0, le=255, description="Touch screen X coordinate (0..255)")
+    y: int = Field(..., ge=0, le=191, description="Touch screen Y coordinate (0..191)")
+    frames: int = Field(6, ge=1, le=120, description="Hold frames")
+
+@app.post("/api/v1/input/press")
+async def post_v1_input_press(req: GenericInputPressRequest):
+    """Standard low-level button press actuator for external AI fallback."""
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await client.press_buttons([req.button], frames=req.frames)
+
+@app.post("/api/v1/input/hold")
+async def post_v1_input_hold(req: GenericInputPressRequest):
+    """Standard low-level button hold actuator for external AI fallback."""
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await client.press_buttons([req.button], frames=max(req.frames, 16))
+
+@app.post("/api/v1/input/touch")
+async def post_v1_input_touch(req: GenericInputTouchRequest):
+    """Standard low-level touch screen actuator for external AI fallback."""
+    if not client.is_connected:
+        raise HTTPException(status_code=503, detail="BizHawk bridge is not connected")
+    return await client.touch(req.x, req.y, frames=req.frames)
+
+@app.get("/api/v1/ui/state")
+async def get_v1_ui_state():
+    """Standard UI screen state and waiting status query (Design Doc Section 11)."""
+    from .battle_routes import _evidence, _ui_sample, _ui_cursor_sample
+    ev = await _evidence()
+    in_battle = bool(ev.get("active"))
+    if in_battle:
+        ui_samp = await _ui_sample()
+        cursor = await _ui_cursor_sample(ui_samp)
+        raw_phase = cursor.get("phase")
+        return {
+            "format": "black2-ui-state/v1",
+            "screen": "BATTLE",
+            "phase": raw_phase or "command_menu",
+            "waiting_for_input": raw_phase in ("command_menu", "move_menu"),
+            "can_move_player": False,
+            "cursor": cursor,
+        }
+    return {
+        "format": "black2-ui-state/v1",
+        "screen": "OVERWORLD",
+        "phase": "field_idle",
+        "waiting_for_input": True,
+        "can_move_player": True,
+        "cursor": None,
+    }
 
 configure_prepared_action_routes(prepared_action_service)
 
